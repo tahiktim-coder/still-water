@@ -7,7 +7,13 @@ const tpl = fs.readFileSync(path.join(root, 'src', 'template.html'), 'utf8');
 const js = fs.readFileSync(path.join(root, 'src', 'game.js'), 'utf8');
 if (!tpl.includes('/*GAME*/')) throw new Error('src/template.html is missing the /*GAME*/ placeholder');
 
-const out = tpl.replace('/*GAME*/', () => js); // function form: no $-pattern substitution
-fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
-fs.writeFileSync(path.join(root, 'dist', 'index.html'), out);
-console.log('built dist/index.html (' + (out.length / 1024).toFixed(1) + ' KB)');
+const isTest = process.argv.includes('--test');
+const TEST_FLAG = "if (new URLSearchParams(window.location.search).has('test') || window.location.hash === '#test') setTestMode(true);";
+if (isTest && !js.includes(TEST_FLAG)) throw new Error('src/game.js is missing the test-mode flag line');
+const src = isTest ? js.replace(TEST_FLAG, 'setTestMode(true); // test build') : js;
+const page = isTest ? tpl.replace('<title>Still Water</title>', '<title>Still Water (test build)</title>') : tpl;
+const out = page.replace('/*GAME*/', () => src); // function form: no $-pattern substitution
+const dest = isTest ? path.join(root, 'tools', 'out', 'test.html') : path.join(root, 'dist', 'index.html');
+fs.mkdirSync(path.dirname(dest), { recursive: true });
+fs.writeFileSync(dest, out);
+console.log('built ' + path.relative(root, dest) + ' (' + (out.length / 1024).toFixed(1) + ' KB)');

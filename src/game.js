@@ -1611,6 +1611,29 @@ function press() {
   else if (p === 'dialog') dlgTap();
 }
 function release() { G.holding = false; }
+
+// ---------------------------------------------------------------- test mode (temporary)
+// Skips the fishing minigame: one call lands the next fish, or triggers the golden
+// scene or the red sequence, exactly as a real catch would. Enable with ?test in the
+// URL or the T key. The S key or the Skip button performs a skip.
+let TEST = false;
+function setTestMode(on) {
+  TEST = !!on;
+  if (UI.el && UI.el.skip) UI.el.skip.hidden = !TEST;
+  UI.caption(TEST ? 'Test mode on' : 'Test mode off', 1.5);
+}
+const SKIP_BOB = { x: 63, y: 280 };
+function testCatch() {
+  if (!TEST) return;
+  const p = G.phase;
+  if (p === 'title') { startGame(); return; }
+  if (p === 'card') { closeCard(); return; }
+  if (p !== 'ready' && p !== 'casting' && p !== 'waiting' && p !== 'bite' && p !== 'reeling' && p !== 'lost') return;
+  G.cast = null; G.wait = null; G.holding = false; G.bobDip = 0;
+  G.bob = { x: SKIP_BOB.x, y: SKIP_BOB.y, fly: false };
+  hook();
+  if (G.phase === 'reeling' && G.reel) { G.reel.p = 1; land(); }
+}
 function startGame() {
   UI.title(false);
   setPhase('ready');
@@ -1661,7 +1684,7 @@ function makeUI() {
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
     title: $('title'), found: $('found'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endFound: $('endFound'),
-    again: $('again'), fade: $('fade'), mute: $('mute'),
+    again: $('again'), fade: $('fade'), mute: $('mute'), skip: $('skip'),
   };
   let capTimer = null;
   const rgb = (i, a) => 'rgba(' + (PALRGB[i * 3] | 0) + ',' + (PALRGB[i * 3 + 1] | 0) + ',' + (PALRGB[i * 3 + 2] | 0) + ',' + (a === undefined ? 1 : a) + ')';
@@ -1779,6 +1802,8 @@ function boot() {
       if (c) { e.preventDefault(); c.cb(); }
       return;
     }
+    if (e.code === 'KeyT') { setTestMode(!TEST); return; }
+    if (e.code === 'KeyS' && TEST) { testCatch(); return; }
     if (e.code === 'Space' || e.code === 'Enter') {
       if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
       e.preventDefault();
@@ -1799,6 +1824,8 @@ function boot() {
     UI.el.mute.blur();
   });
   UI.el.again.addEventListener('click', e => { e.stopPropagation(); UI.el.again.blur(); restart(); });
+  UI.el.skip.addEventListener('click', e => { e.stopPropagation(); UI.el.skip.blur(); testCatch(); });
+  if (new URLSearchParams(window.location.search).has('test') || window.location.hash === '#test') setTestMode(true);
 
   let last = 0, lastMood = -1, lastDim = -1;
   function frame(ts) {
@@ -1821,7 +1848,7 @@ if (IS_BROWSER) {
 } else if (typeof module !== 'undefined') {
   UI = stubUI();
   module.exports = {
-    init, render, update, press, release, resetAll, setPhase,
+    init, render, update, press, release, resetAll, setPhase, setTestMode, testCatch,
     WS, G, STORY, DLG, SPECIES, makeFish, FPAL, GPAL,
     get UI() { return UI; },
     get phase() { return G.phase; },

@@ -5,9 +5,11 @@
   "description": "Still Water: a short procedural pixel-art fishing horror game in a single HTML file",
   "scripts": {
     "build": "node build.js",
+    "build:test": "node build.js --test",
     "sim": "node tools/sim.js",
     "shots": "node tools/shot.js all && node tools/snaps.js",
-    "domtest": "node build.js && node tools/domtest.js"
+    "domtest": "node build.js && node tools/domtest.js",
+    "skipcheck": "node tools/skipcheck.js"
   },
   "devDependencies": {
     "jsdom": "^24.1.3",

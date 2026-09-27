@@ -62,12 +62,14 @@ body {
   font-size: calc(var(--u) * 3.3); pointer-events: none;
 }
 #count { color: var(--ui-ink); opacity: 0.85; }
-#mute {
+#mute, #skip {
   pointer-events: auto; font: inherit; color: var(--ui-ink); background: transparent; cursor: pointer;
   border: calc(var(--u) * 0.45) solid var(--ui-edge); padding: calc(var(--u) * 0.6) calc(var(--u) * 1.8);
   opacity: 0.8;
 }
-#mute:focus-visible, .choice:focus-visible, #again:focus-visible { outline: calc(var(--u) * 0.6) solid var(--ui-accent); outline-offset: calc(var(--u) * 0.5); }
+#skip { margin-left: calc(var(--u) * 1.5); border-style: dashed; }
+#skip[hidden] { display: none; }
+#mute:focus-visible, #skip:focus-visible, .choice:focus-visible, #again:focus-visible { outline: calc(var(--u) * 0.6) solid var(--ui-accent); outline-offset: calc(var(--u) * 0.5); }
 
 #caption {
   position: absolute; z-index: 5; top: 11%; left: 9%; right: 9%; text-align: center;
@@ -165,7 +167,7 @@ body {
 <div id="wrap">
   <div id="stage" aria-label="Still Water, a short fishing game">
     <canvas id="c" width="216" height="384"></canvas>
-    <div id="hud"><span id="count" class="shade" aria-live="polite"></span><button id="mute" type="button" aria-pressed="false">Sound on</button></div>
+    <div id="hud"><span id="count" class="shade" aria-live="polite"></span><span><button id="mute" type="button" aria-pressed="false">Sound on</button><button id="skip" type="button" hidden>Skip fish</button></span></div>
     <div id="caption" class="shade" aria-live="polite"></div>
     <div id="prompt" class="shade"></div>
     <div id="card" class="panel" aria-live="polite">
@@ -1812,6 +1814,29 @@ function press() {
   else if (p === 'dialog') dlgTap();
 }
 function release() { G.holding = false; }
+
+// ---------------------------------------------------------------- test mode (temporary)
+// Skips the fishing minigame: one call lands the next fish, or triggers the golden
+// scene or the red sequence, exactly as a real catch would. Enable with ?test in the
+// URL or the T key. The S key or the Skip button performs a skip.
+let TEST = false;
+function setTestMode(on) {
+  TEST = !!on;
+  if (UI.el && UI.el.skip) UI.el.skip.hidden = !TEST;
+  UI.caption(TEST ? 'Test mode on' : 'Test mode off', 1.5);
+}
+const SKIP_BOB = { x: 63, y: 280 };
+function testCatch() {
+  if (!TEST) return;
+  const p = G.phase;
+  if (p === 'title') { startGame(); return; }
+  if (p === 'card') { closeCard(); return; }
+  if (p !== 'ready' && p !== 'casting' && p !== 'waiting' && p !== 'bite' && p !== 'reeling' && p !== 'lost') return;
+  G.cast = null; G.wait = null; G.holding = false; G.bobDip = 0;
+  G.bob = { x: SKIP_BOB.x, y: SKIP_BOB.y, fly: false };
+  hook();
+  if (G.phase === 'reeling' && G.reel) { G.reel.p = 1; land(); }
+}
 function startGame() {
   UI.title(false);
   setPhase('ready');
@@ -1862,7 +1887,7 @@ function makeUI() {
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
     title: $('title'), found: $('found'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endFound: $('endFound'),
-    again: $('again'), fade: $('fade'), mute: $('mute'),
+    again: $('again'), fade: $('fade'), mute: $('mute'), skip: $('skip'),
   };
   let capTimer = null;
   const rgb = (i, a) => 'rgba(' + (PALRGB[i * 3] | 0) + ',' + (PALRGB[i * 3 + 1] | 0) + ',' + (PALRGB[i * 3 + 2] | 0) + ',' + (a === undefined ? 1 : a) + ')';
@@ -1980,6 +2005,8 @@ function boot() {
       if (c) { e.preventDefault(); c.cb(); }
       return;
     }
+    if (e.code === 'KeyT') { setTestMode(!TEST); return; }
+    if (e.code === 'KeyS' && TEST) { testCatch(); return; }
     if (e.code === 'Space' || e.code === 'Enter') {
       if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
       e.preventDefault();
@@ -2000,6 +2027,8 @@ function boot() {
     UI.el.mute.blur();
   });
   UI.el.again.addEventListener('click', e => { e.stopPropagation(); UI.el.again.blur(); restart(); });
+  UI.el.skip.addEventListener('click', e => { e.stopPropagation(); UI.el.skip.blur(); testCatch(); });
+  if (new URLSearchParams(window.location.search).has('test') || window.location.hash === '#test') setTestMode(true);
 
   let last = 0, lastMood = -1, lastDim = -1;
   function frame(ts) {
@@ -2022,7 +2051,7 @@ if (IS_BROWSER) {
 } else if (typeof module !== 'undefined') {
   UI = stubUI();
   module.exports = {
-    init, render, update, press, release, resetAll, setPhase,
+    init, render, update, press, release, resetAll, setPhase, setTestMode, testCatch,
     WS, G, STORY, DLG, SPECIES, makeFish, FPAL, GPAL,
     get UI() { return UI; },
     get phase() { return G.phase; },

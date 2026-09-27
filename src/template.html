@@ -62,12 +62,14 @@ body {
   font-size: calc(var(--u) * 3.3); pointer-events: none;
 }
 #count { color: var(--ui-ink); opacity: 0.85; }
-#mute {
+#mute, #skip {
   pointer-events: auto; font: inherit; color: var(--ui-ink); background: transparent; cursor: pointer;
   border: calc(var(--u) * 0.45) solid var(--ui-edge); padding: calc(var(--u) * 0.6) calc(var(--u) * 1.8);
   opacity: 0.8;
 }
-#mute:focus-visible, .choice:focus-visible, #again:focus-visible { outline: calc(var(--u) * 0.6) solid var(--ui-accent); outline-offset: calc(var(--u) * 0.5); }
+#skip { margin-left: calc(var(--u) * 1.5); border-style: dashed; }
+#skip[hidden] { display: none; }
+#mute:focus-visible, #skip:focus-visible, .choice:focus-visible, #again:focus-visible { outline: calc(var(--u) * 0.6) solid var(--ui-accent); outline-offset: calc(var(--u) * 0.5); }
 
 #caption {
   position: absolute; z-index: 5; top: 11%; left: 9%; right: 9%; text-align: center;
@@ -165,7 +167,7 @@ body {
 <div id="wrap">
   <div id="stage" aria-label="Still Water, a short fishing game">
     <canvas id="c" width="216" height="384"></canvas>
-    <div id="hud"><span id="count" class="shade" aria-live="polite"></span><button id="mute" type="button" aria-pressed="false">Sound on</button></div>
+    <div id="hud"><span id="count" class="shade" aria-live="polite"></span><span><button id="mute" type="button" aria-pressed="false">Sound on</button><button id="skip" type="button" hidden>Skip fish</button></span></div>
     <div id="caption" class="shade" aria-live="polite"></div>
     <div id="prompt" class="shade"></div>
     <div id="card" class="panel" aria-live="polite">

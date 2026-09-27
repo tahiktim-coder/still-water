@@ -12,6 +12,11 @@ Premise: it starts as a calm fishing game, and a golden fish grants three wishes
 - `npm run sim`: a headless bot plays through every ending. It must print `ALL ENDINGS REACHED`.
 - `npm run shots`: renders scene states and ending frames to `tools/out/*.png`. Look at them after any visual change.
 - `npm run domtest`: plays the built page in jsdom with the canvas stubbed. It is slow and takes a few minutes.
+- `npm run skipcheck`: verifies the temporary test mode below. It takes under a second.
+- `npm run build:test`: writes `tools/out/test.html`, a copy of the game with test mode already on. Publish that file when someone needs to play through the story on a phone without fishing. It is gitignored and must never be uploaded to itch.io.
+
+## Test mode (temporary)
+Skips the fishing minigame so the story can be reached in seconds. Open `dist/index.html?test` (or `#test`), or press T in any build to toggle it. A dashed "Skip fish" button appears in the HUD; each click (or the S key) lands the next fish as if it had been reeled in, including the golden fish and the act 2 red sequence. Dialogue and cinematics still play normally. It lives in `setTestMode` and `testCatch` in `src/game.js`, next to `release()`, and is exported to `tools/`. Remove or hide it before the itch.io release.
 
 ## Rules
 - The game stays a single HTML file, with no image or audio assets. All art is procedural and all sound is synthesised with WebAudio. The only external request is the Pixelify Sans Google Font, which has fallbacks.
