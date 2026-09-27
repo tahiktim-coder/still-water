@@ -1,0 +1,16 @@
+{
+  "name": "still-water",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Still Water: a short procedural pixel-art fishing horror game in a single HTML file",
+  "scripts": {
+    "build": "node build.js",
+    "sim": "node tools/sim.js",
+    "shots": "node tools/shot.js all && node tools/snaps.js",
+    "domtest": "node build.js && node tools/domtest.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3",
+    "pngjs": "^7.0.0"
+  }
+}
