@@ -2153,7 +2153,7 @@ const CINE_OCEAN = {
     at('big', OCEAN_BIG_T, () => { bigEnter(); SFX.weight(true); }); // no stinger: the swell rises with the crossing
   },
 };
-function oceanTold() { dlgRun([fish('Told you. I’d let that one pass.')], () => setPhase('ocean')); }
+function oceanTold() { dlgRun([fish('Where the fish are. I’d leave the big one. It’s been waiting longer than you have.')], () => setPhase('ocean')); }
 // The choice is made by input: a cast while the big one is under the boat is the Swallowed ending; waiting the
 // window out lets it leave. Skip fish counts as a cast here.
 function oceanCast() {
