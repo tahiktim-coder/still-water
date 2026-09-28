@@ -78,7 +78,6 @@ body {
 }
 #caption.on { opacity: 1; }
 #caption.whisper { color: var(--ui-dim); letter-spacing: 0.08em; }
-#caption.said { font-weight: 600; } /* the fisherman's and the companion's lines; the quotes are in the text */
 #prompt {
   position: absolute; z-index: 5; left: 6%; right: 6%; bottom: 9%; text-align: center;
   font-size: calc(var(--u) * 3.7); color: var(--ui-ink);
@@ -114,6 +113,34 @@ body {
 .choice:hover { background: var(--ui-edge); color: var(--ui-solid); }
 #more { position: absolute; right: calc(var(--u) * 3.2); bottom: calc(var(--u) * 1.4); opacity: 0; color: var(--ui-accent); }
 #more.on { opacity: 0.9; animation: nudge 0.9s steps(2, jump-none) infinite; }
+
+/* The thought bubble (bible, 4b): a thin comic bubble over the stage in the UI ink, near-transparent, with a
+   scalloped SVG outline drawn in currentColor and a tail of two circles toward whoever is thinking. Its
+   position is set from internal pixels by UI.think; #thinkChoices is the companion's question only. */
+#think {
+  position: absolute; z-index: 6; width: 40%; color: var(--ui-ink);
+  padding: calc(var(--u) * 2.4) calc(var(--u) * 2.8) calc(var(--u) * 2.2);
+  font-size: calc(var(--u) * 3.1); line-height: 1.3; text-align: center;
+  opacity: 0; transition: opacity 0.35s ease; pointer-events: none;
+}
+#think.on { opacity: 1; }
+#think.ask { pointer-events: auto; }
+#thinkSvg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: var(--ui-solid); fill-opacity: 0.22; stroke: currentColor; stroke-width: 1px; }
+#thinkWho {
+  position: absolute; top: calc(var(--u) * -1.3); left: calc(var(--u) * 4);
+  padding: 0 calc(var(--u) * 0.7); font-size: calc(var(--u) * 2.4); line-height: 1.1; color: var(--ui-dim);
+  background: var(--ui-solid);
+}
+#thinkWho[hidden] { display: none; }
+#thinkText { position: relative; }
+#thinkText .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
+#thinkChoices {
+  position: absolute; left: -12%; right: -12%; top: 100%; margin-top: calc(var(--u) * 6.4);
+  display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--u) * 1.2);
+}
+#thinkChoices[hidden] { display: none; }
+#thinkChoices .choice { flex: 1 1 auto; text-align: center; padding: calc(var(--u) * 0.7) calc(var(--u) * 1.6); font-size: calc(var(--u) * 3.1); background: var(--ui-panel); }
+#thinkChoices .choice:hover { background: var(--ui-edge); }
 
 #card {
   position: absolute; z-index: 6; left: 13%; right: 13%; top: 27%;
@@ -177,6 +204,12 @@ body {
     <div id="hud"><span id="count" class="shade" aria-live="polite"></span><span><button id="mute" type="button" aria-pressed="false">Sound on</button><button id="skip" type="button" hidden>Skip fish</button></span></div>
     <div id="caption" class="shade" aria-live="polite"></div>
     <div id="prompt" class="shade"></div>
+    <div id="think" aria-live="polite">
+      <svg id="thinkSvg" aria-hidden="true"><path id="thinkPath" d=""/><circle id="thinkTail1" r="0"/><circle id="thinkTail2" r="0"/></svg>
+      <div id="thinkWho" hidden>Fisherman</div>
+      <div id="thinkText"></div>
+      <div id="thinkChoices" hidden></div>
+    </div>
     <div id="card" class="panel" aria-live="polite">
       <canvas id="cardFish" width="8" height="8"></canvas>
       <div id="cardName"></div>

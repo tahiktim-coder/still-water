@@ -44,7 +44,8 @@ function play(plan, label, opts) {
     t += dt;
     if (p === 'end') break;
   }
-  const caps = UI.log.filter(l => l[0] === 'caption').map(l => l[1]);
+  // Captions and thought bubbles in order; a bubble shows as (fisherman) or (companion) plus its text.
+  const caps = UI.log.filter(l => l[0] === 'caption' || l[0] === 'think').map(l => l[0] === 'think' ? '(' + l[2] + ') ' + l[1] : l[1]);
   const cards = UI.log.filter(l => l[0] === 'card').map(l => l[1].name + ': ' + l[1].desc + (l[1].voice ? ' ' + l[1].voice : ''));
   const card = (UI.log.filter(l => l[0] === 'ending').map(l => l[1]))[0];
   const S = g.STORY;

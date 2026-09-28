@@ -78,7 +78,6 @@ body {
 }
 #caption.on { opacity: 1; }
 #caption.whisper { color: var(--ui-dim); letter-spacing: 0.08em; }
-#caption.said { font-weight: 600; } /* the fisherman's and the companion's lines; the quotes are in the text */
 #prompt {
   position: absolute; z-index: 5; left: 6%; right: 6%; bottom: 9%; text-align: center;
   font-size: calc(var(--u) * 3.7); color: var(--ui-ink);
@@ -114,6 +113,34 @@ body {
 .choice:hover { background: var(--ui-edge); color: var(--ui-solid); }
 #more { position: absolute; right: calc(var(--u) * 3.2); bottom: calc(var(--u) * 1.4); opacity: 0; color: var(--ui-accent); }
 #more.on { opacity: 0.9; animation: nudge 0.9s steps(2, jump-none) infinite; }
+
+/* The thought bubble (bible, 4b): a thin comic bubble over the stage in the UI ink, near-transparent, with a
+   scalloped SVG outline drawn in currentColor and a tail of two circles toward whoever is thinking. Its
+   position is set from internal pixels by UI.think; #thinkChoices is the companion's question only. */
+#think {
+  position: absolute; z-index: 6; width: 40%; color: var(--ui-ink);
+  padding: calc(var(--u) * 2.4) calc(var(--u) * 2.8) calc(var(--u) * 2.2);
+  font-size: calc(var(--u) * 3.1); line-height: 1.3; text-align: center;
+  opacity: 0; transition: opacity 0.35s ease; pointer-events: none;
+}
+#think.on { opacity: 1; }
+#think.ask { pointer-events: auto; }
+#thinkSvg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: var(--ui-solid); fill-opacity: 0.22; stroke: currentColor; stroke-width: 1px; }
+#thinkWho {
+  position: absolute; top: calc(var(--u) * -1.3); left: calc(var(--u) * 4);
+  padding: 0 calc(var(--u) * 0.7); font-size: calc(var(--u) * 2.4); line-height: 1.1; color: var(--ui-dim);
+  background: var(--ui-solid);
+}
+#thinkWho[hidden] { display: none; }
+#thinkText { position: relative; }
+#thinkText .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
+#thinkChoices {
+  position: absolute; left: -12%; right: -12%; top: 100%; margin-top: calc(var(--u) * 6.4);
+  display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--u) * 1.2);
+}
+#thinkChoices[hidden] { display: none; }
+#thinkChoices .choice { flex: 1 1 auto; text-align: center; padding: calc(var(--u) * 0.7) calc(var(--u) * 1.6); font-size: calc(var(--u) * 3.1); background: var(--ui-panel); }
+#thinkChoices .choice:hover { background: var(--ui-edge); }
 
 #card {
   position: absolute; z-index: 6; left: 13%; right: 13%; top: 27%;
@@ -177,6 +204,12 @@ body {
     <div id="hud"><span id="count" class="shade" aria-live="polite"></span><span><button id="mute" type="button" aria-pressed="false">Sound on</button><button id="skip" type="button" hidden>Skip fish</button></span></div>
     <div id="caption" class="shade" aria-live="polite"></div>
     <div id="prompt" class="shade"></div>
+    <div id="think" aria-live="polite">
+      <svg id="thinkSvg" aria-hidden="true"><path id="thinkPath" d=""/><circle id="thinkTail1" r="0"/><circle id="thinkTail2" r="0"/></svg>
+      <div id="thinkWho" hidden>Fisherman</div>
+      <div id="thinkText"></div>
+      <div id="thinkChoices" hidden></div>
+    </div>
     <div id="card" class="panel" aria-live="polite">
       <canvas id="cardFish" width="8" height="8"></canvas>
       <div id="cardName"></div>
@@ -848,7 +881,7 @@ const G = {
   phase: 'title', t: 0, pt: 0, holding: false, bob: null, cast: null, wait: null, reel: null, land: null,
   rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 },
   lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0, hbGap: HB_GAP,
-  capUntil: 0, saidUntil: 0, saidPending: [],
+  capUntil: 0, thinkUntil: 0, thinkPending: [],
   arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0,
 };
 const freshStory = () => ({
@@ -872,6 +905,8 @@ function stubUI() {
     card: f('card'), cardHide: f('cardHide'),
     dlgShow: f('dlgShow'), dlgText() {}, dlgChoices(list) { this.choices = list; },
     dlgMore() {}, dlgHide: f('dlgHide'),
+    think(text, opts) { log.push(['think', text, opts && opts.side || 'fisherman']); if (opts && opts.choices) { this.choices = opts.choices; this.thinkOwns = true; } },
+    thinkHide() { if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; } },
     title: f('title'), ending: f('ending'), endingHide: f('endingHide'), fade: f('fade'), colors() {},
   };
 }
@@ -1406,6 +1441,7 @@ function fishSpeaking() {
 }
 const mouthOpen = t => ((t * 10) | 0) & 1;
 function drawKeptFish(t, bx, dy) {
+  if (!STORY.kept) return;
   const speaking = fishSpeaking();
   const a = speaking ? 1 : WS.goldKept;
   if (a <= 0.01) return;
@@ -1677,9 +1713,10 @@ const SFX = {
   },
 };
 
-const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0 };
+const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0, echo: null, hold: 0 };
+const ECHO_DUR = 1.2, BUBBLE_HOLD = 3;
 function dlgRun(lines, done) {
-  DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.run++;
+  DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.hold = 0; DLG.run++;
   setPhase('dialog');
   dlgNext();
 }
@@ -1689,6 +1726,8 @@ function dlgNext() {
     if (L.act) { L.act(); continue; }
     if (L.pause) { DLG.cur = null; DLG.wait = L.pause; UI.dlgHide(); return; }
     DLG.cur = L; DLG.n = 0;
+    if (L.bubble) { dlgBubble(L); return; }
+    thinkHide();
     UI.dlgShow(L.who || '', L.style || '');
     UI.dlgText('', L.mark);
     UI.dlgChoices(null);
@@ -1699,26 +1738,45 @@ function dlgNext() {
   const d = DLG.done; DLG.done = null;
   if (d) d();
 }
+function dlgBubble(L) {
+  DLG.n = L.text.length; G.thinkUntil = 0;
+  UI.dlgHide();
+  UI.think(L.text, { side: 'companion', mark: L.mark, choices: L.choices ? choiceList(L) : null });
+  if (!L.choices) DLG.hold = BUBBLE_HOLD;
+}
+function choiceList(L) {
+  return L.choices.map(c => ({
+    label: c.label,
+    cb: () => {
+      if (DLG.cur !== L) return;
+      UI.dlgChoices(null); DLG.cur = null; SFX.select();
+      UI.dlgHide(); thinkHide();
+      UI.think(c.label, { who: 'Fisherman' });
+      DLG.echo = { t: ECHO_DUR, pick: c.pick };
+    },
+  }));
+}
+function dlgEcho(dt) {
+  DLG.echo.t -= dt;
+  if (DLG.echo.t > 0) return;
+  const e = DLG.echo; DLG.echo = null;
+  thinkHide();
+  const run = DLG.run;
+  e.pick();
+  if (DLG.run === run && DLG.active) dlgNext();
+}
 function dlgFull() {
   const L = DLG.cur;
   DLG.n = L.text.length;
   UI.dlgText(L.text, L.mark);
-  if (L.choices) {
-    UI.dlgChoices(L.choices.map(c => ({
-      label: c.label,
-      cb: () => {
-        if (DLG.cur !== L) return;
-        UI.dlgChoices(null); DLG.cur = null; SFX.select();
-        const run = DLG.run;
-        c.pick();
-        if (DLG.run === run && DLG.active) dlgNext();
-      },
-    })));
-  } else UI.dlgMore(true);
+  if (L.choices) UI.dlgChoices(choiceList(L));
+  else UI.dlgMore(true);
 }
 function dlgUpdate(dt) {
   if (!DLG.active) return;
+  if (DLG.echo) { dlgEcho(dt); return; }
   if (DLG.wait > 0) { DLG.wait -= dt; if (DLG.wait <= 0) { DLG.wait = 0; dlgNext(); } return; }
+  if (DLG.hold > 0) { DLG.hold -= dt; if (DLG.hold <= 0) { DLG.hold = 0; thinkHide(); dlgNext(); } return; }
   const L = DLG.cur;
   if (!L || DLG.n >= L.text.length) return;
   const prev = Math.floor(DLG.n);
@@ -1729,6 +1787,7 @@ function dlgUpdate(dt) {
 function dlgTap() {
   const L = DLG.cur;
   if (!L) return;
+  if (L.bubble) { if (!L.choices) { DLG.hold = 0; thinkHide(); dlgNext(); } return; }
   if (DLG.n < L.text.length) { dlgFull(); return; }
   if (L.choices) return;
   UI.dlgMore(false);
@@ -1885,6 +1944,7 @@ const narr = text => ({ who: '', text, style: 'narr' });
 const fish = text => ({ who: FISHN, text });
 const red = text => ({ who: FISHN, text, style: 'red' });
 const whisperFish = text => ({ who: FISHN, text, style: 'whisper' });
+const comp = (text, extra) => Object.assign({ who: 'Companion', text, bubble: true }, extra);
 function lakeWhisper(text) { UI.dlgShow('The lake', 'whisper'); UI.dlgText(text); }
 function goldenScene() {
   G.bob = null;
@@ -1946,7 +2006,7 @@ function wish1b(kept) {
   ] : [fish('Kind. Nobody kind comes out this far alone.')];
   dlgRun(L.concat([
     fish('First time here, you said. Nobody comes here twice.'),
-    { who: FISHN, text: 'What do you lack, fisherman?', choices: [
+    { who: FISHN, text: 'What would you like, fisherman?', choices: [
       { label: 'Someone to sit with me', pick: () => grant1('company') },
       { label: 'Take me where the fish are', pick: () => grant1('fish') },
       { label: 'A home on the shore', pick: () => grant1('home') },
@@ -2097,7 +2157,7 @@ function wish2() {
   dlgRun([
     { pause: 0.9 },
     fish(greeting2()),
-    { who: FISHN, text: 'What do you lack now?', choices: [
+    { who: FISHN, text: 'And this time?', choices: [
       { label: 'Make this day last forever', pick: () => grant2('forever') },
       { label: 'Let me hear the fish', pick: () => grant2('hear') },
       { label: 'Gold. A boat full of it', pick: () => grant2('gold') },
@@ -2172,16 +2232,16 @@ function companionQuestion(done) {
     dlgRun([narr(yes ? 'He does not turn around.' : 'He goes back to watching the horizon.')], done);
   };
   dlgRun([
-    { who: 'Companion', text: 'Will you stay?', style: 'whisper', mark: true, choices: [
+    comp('Will you stay?', { mark: true, choices: [
       { label: 'Yes', pick: answer(true) },
       { label: 'Say nothing', pick: answer(false) },
-    ] },
+    ] }),
   ], done);
 }
 
 function redLines() {
   const L = STORY.refused === 2 ? ['One wish left. You said you could watch that sun forever, then asked for nothing twice.', 'It wants to see why.']
-    : STORY.kept ? ['That isn’t me pulling. It never was.', 'One wish left. But first, the sun I promised you.', 'You said you could watch it forever. I passed that on.']
+    : STORY.kept ? ['I’m right here, fisherman.', 'One wish left. But first, the sun I promised you.', 'You said you could watch it forever. I passed that on.']
       : ['One wish left. But first, the sun I promised you.', has('forever') ? 'You said forever, then you wished for it. I listened twice.' : 'You said you could watch it forever. I listened.'];
   return L.map(fish);
 }
@@ -2224,11 +2284,11 @@ function wish3() {
     red('Every sun is bait. I should have said. It didn’t come up.'),
     red(nothing ? 'Nobody rows this far to want nothing. So why are you here.' : recountLine()),
   ];
-  if (has('company')) L.push({ who: 'Companion', text: STORY.answered === true ? 'You said you’d stay.' : 'Don’t answer it. Cut the line.', style: 'whisper' });
+  if (has('company')) L.push(comp(STORY.answered === true ? 'You said you’d stay.' : 'Don’t answer it. Cut the line.'));
   if (STORY.kept) L.push(whisperFish('I’m sorry.'));
   L.push(
     red('I sat where you sit. I said what you said. Three times.'),
-    { who: FISHN, text: 'I’d like to go home now. What do you lack, fisherman.', style: 'red', choices: wish3Choices() },
+    { who: FISHN, text: 'I’d like to go home now. What would you like.', style: 'red', choices: wish3Choices() },
   );
   dlgRun(L);
 }
@@ -2251,7 +2311,7 @@ function endCut() {
 }
 function endStay() {
   dlgRun([
-    { who: 'Companion', text: 'Then stay.', style: 'whisper' },
+    comp('Then stay.'),
     red('Someone to sit with you. It’s what you asked for.'),
   ], () => playCine(CINE_STAY, () => showEnding('stay')));
 }
@@ -2346,7 +2406,7 @@ function promptFor(p) {
   if (p === 'reeling') return G.tutorial < 3 ? 'Hold to reel. Let go when it pulls hard.' : 'Hold to reel';
   return '';
 }
-function refreshPrompt() { UI.prompt(G.t < G.saidUntil || !G.arrived ? '' : promptFor(G.phase)); }
+function refreshPrompt() { UI.prompt(G.t < G.thinkUntil || !G.arrived ? '' : promptFor(G.phase)); }
 function setPhase(p) {
   G.phase = p; G.pt = 0;
   refreshPrompt();
@@ -2355,22 +2415,27 @@ function cap(t, dur, style) {
   G.capUntil = G.t + (dur || 2.5);
   UI.caption(t, dur, style);
 }
-const SAID_DUR = 2.6;
-function saidBeat(text) {
-  if (text) G.saidPending.push(text);
-  if (!G.saidPending.length || G.t < G.capUntil) return;
+const THINK_DUR = 3;
+function thinkBeat(text) {
+  if (text) G.thinkPending.push(text);
+  if (!G.thinkPending.length || G.t < G.capUntil) return;
   STORY.said++;
-  showSaid(G.saidPending.shift());
+  thinkLine(G.thinkPending.shift(), 'fisherman');
 }
-function showSaid(text) {
-  cap('“' + text + '”', SAID_DUR, 'said');
-  G.saidUntil = G.capUntil;
+function thinkLine(text, side) {
+  UI.think(text, { who: side === 'fisherman' ? 'Fisherman' : '', side });
+  G.thinkUntil = G.t + THINK_DUR;
   refreshPrompt();
 }
-const SAID_PHASES = ['ready', 'casting', 'waiting'];
-function saidUpdate() {
-  if (G.saidUntil && G.t >= G.saidUntil) { G.saidUntil = 0; refreshPrompt(); }
-  if (G.saidPending.length && G.t >= G.capUntil && SAID_PHASES.indexOf(G.phase) >= 0) saidBeat(null);
+function thinkHide() {
+  G.thinkUntil = 0;
+  UI.thinkHide();
+  refreshPrompt();
+}
+const THINK_PHASES = ['ready', 'casting', 'waiting'];
+function thinkUpdate() {
+  if (G.thinkUntil && G.t >= G.thinkUntil) thinkHide();
+  if (G.thinkPending.length && G.t >= G.capUntil && THINK_PHASES.indexOf(G.phase) >= 0) thinkBeat(null);
 }
 function lose(msg) {
   G.bob = null; G.reel = null; G.holding = false; G.bobDip = 0;
@@ -2496,7 +2561,7 @@ function land() {
   G.bob = null;
   setPhase('landing');
 }
-function showCard(f) { setPhase('card'); UI.card(f); SFX.caught(); }
+function showCard(f) { thinkHide(); setPhase('card'); UI.card(f); SFX.caught(); }
 function closeCard() { UI.cardHide(); afterCatch(); }
 const OPENING_CAPS = { 1: 'Look at that sun.', 2: 'I could watch that sun forever.' };
 function stillCaption() {
@@ -2512,7 +2577,7 @@ function afterCatch() {
   if (STORY.actCatches >= need && !STORY.goldenNext) {
     if (STORY.kept && STORY.act === 1) STORY.keptNext = true; else STORY.goldenNext = true;
     cap(stillCaption(), 3.2);
-  } else saidBeat(STORY.act === 0 ? OPENING_CAPS[STORY.catches] : null);
+  } else thinkBeat(STORY.act === 0 ? OPENING_CAPS[STORY.catches] : null);
   setPhase('ready');
 }
 function fishUpdate(dt) {
@@ -2537,14 +2602,14 @@ function fishUpdate(dt) {
         G.bob = { x: c.tx, y: c.ty, fly: false };
         ring(c.tx, c.ty + 1); splash(c.tx, c.ty, 4);
         SFX.plop();
-        saidBeat(STORY.casts === 1 ? 'First time here.' : null);
+        thinkBeat(STORY.casts === 1 ? 'First time here.' : null);
         startWaiting();
       }
     }
   } else if (ph === 'waiting') {
     G.rodA = lerp(G.rodA, AIM_A, Math.min(1, dt * 3));
     const w = G.wait;
-    if (G.t >= G.saidUntil) w.t += dt; // no nibble or bite while a said caption is on screen
+    if (G.t >= G.thinkUntil) w.t += dt; // no nibble or bite while a thought bubble is up
     if (w.nib.length && w.t >= w.nib[0]) { w.nib.shift(); G.bobDip = 0.16; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
     const glitter = STORY.goldenNext && !STORY.kept; // kept: no sparkles and no chime; the fish is in the boat
     if (glitter && Math.random() < dt * 6) sparkle(G.bob.x + (Math.random() - 0.5) * 10, G.bob.y - Math.random() * 4);
@@ -2594,7 +2659,7 @@ function companionLine() {
 function companionTap() {
   SFX.init(); SFX.resume();
   if (WS.companion <= 0.5) return;
-  showSaid(companionLine());
+  thinkLine(companionLine(), 'companion');
 }
 const COMP_PAD = 3;
 function companionHit(x, y) {
@@ -2608,6 +2673,7 @@ function companionHit(x, y) {
 function press() {
   SFX.init(); SFX.resume();
   const p = G.phase;
+  if (G.t < G.thinkUntil) { thinkHide(); return; } // a tap dismisses a bubble over play instead of acting
   if (p === 'title') startGame();
   else if (p === 'ready') { if (G.arrived) cast(); } // no cast until the boat has rowed in
   else if (p === 'ocean') oceanCast();
@@ -2666,15 +2732,15 @@ function resetAll() {
   resetWS();
   Object.assign(STORY, freshStory());
   loadRun();
-  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, saidUntil: 0, saidPending: [], arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0, hbGap: HB_GAP });
+  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkPending: [], arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0, hbGap: HB_GAP });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
   OCEAN.shad.length = 0; OCEAN.big = null; OCEAN.tr0 = 0;
   cloudT = 0; genEyes();
   WS.farBoat = RUN.count > 0 || loadEndings().length > 0 || sessionEndings.length > 0 ? 1 : 0; // bible, Title
   CINE = null;
-  DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0;
+  DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0; DLG.echo = null; DLG.hold = 0;
   SFX.drone(false);
-  UI.count(0); UI.dlgHide(); UI.cardHide(); UI.endingHide();
+  UI.count(0); UI.dlgHide(); UI.thinkHide(); UI.cardHide(); UI.endingHide();
   setPhase('title');
   UI.title(true, Math.max(loadEndings().length, sessionEndings.length));
 }
@@ -2693,7 +2759,7 @@ function update(dt) {
   updTweens(dt);
   cineUpdate(dt);
   openingUpdate(dt);
-  saidUpdate();
+  thinkUpdate();
   fishUpdate(dt);
   eyesUpdate();
   if (!WS.frozen) cloudT += dt;
@@ -2707,10 +2773,24 @@ function init() {
   resetWS();
 }
 
+function cloudPath(w, h, u) {
+  const b = Math.min(u * 1.5, h / 4);
+  const x0 = b, y0 = b, x1 = w - b, y1 = h - b;
+  const arcs = (ax, ay, bx, by, n, vert) => {
+    let s = '';
+    const c = Math.hypot(bx - ax, by - ay) / n, r = vert ? b + ',' + c / 2 : c / 2 + ',' + b;
+    for (let i = 1; i <= n; i++) s += 'A' + r + ' 0 0 1 ' + (ax + (bx - ax) * i / n).toFixed(1) + ',' + (ay + (by - ay) * i / n).toFixed(1);
+    return s;
+  };
+  const side = y1 - y0 > u * 9 ? 2 : 1;
+  return 'M' + x0 + ',' + y0 + arcs(x0, y0, x1, y0, 4) + arcs(x1, y0, x1, y1, side, true) + arcs(x1, y1, x0, y1, 3) + arcs(x0, y1, x0, y0, side, true) + 'Z';
+}
+const THINK_AT = { fisherman: { left: 122, y: 186, tail: 150, dir: -1 }, companion: { left: 100, y: 190, yAsk: 184, tail: 160, dir: 1 } };
 function makeUI() {
   const $ = id => document.getElementById(id);
   const el = {
     stage: $('stage'), prompt: $('prompt'), caption: $('caption'), count: $('count'),
+    think: $('think'), thinkPath: $('thinkPath'), thinkTail1: $('thinkTail1'), thinkTail2: $('thinkTail2'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'),
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
     title: $('title'), found: $('found'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endFound: $('endFound'),
@@ -2719,8 +2799,57 @@ function makeUI() {
   let capTimer = null;
   const rgb = (i, a) => 'rgba(' + (PALRGB[i * 3] | 0) + ',' + (PALRGB[i * 3 + 1] | 0) + ',' + (PALRGB[i * 3 + 2] | 0) + ',' + (a === undefined ? 1 : a) + ')';
   const mixWhite = (i, k) => 'rgb(' + [0, 1, 2].map(j => Math.round(PALRGB[i * 3 + j] + (255 - PALRGB[i * 3 + j]) * k)).join(',') + ')';
+  const setText = (node, t, mark) => {
+    node.textContent = t;
+    if (!mark || !t.endsWith('?')) return;
+    node.textContent = t.slice(0, -1);
+    const s = document.createElement('span');
+    s.className = 'mark'; s.textContent = '?';
+    node.appendChild(s);
+  };
+  const buttons = (box, list) => {
+    box.innerHTML = '';
+    box.hidden = !list;
+    if (!list) return;
+    list.forEach(c => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'choice'; b.textContent = c.label;
+      b.addEventListener('click', ev => { ev.stopPropagation(); b.blur(); c.cb(); });
+      box.appendChild(b);
+    });
+  };
+  const circle = (c, x, y, r) => { c.setAttribute('cx', x.toFixed(1)); c.setAttribute('cy', y.toFixed(1)); c.setAttribute('r', r.toFixed(1)); };
+  const thinkLayout = side => {
+    const a = THINK_AT[side], u = el.stage.clientWidth / 100;
+    const y = el.think.classList.contains('ask') && a.yAsk ? a.yAsk : a.y;
+    el.think.style.left = (a.left / W * 100).toFixed(2) + '%';
+    el.think.style.bottom = ((H - y) / H * 100).toFixed(2) + '%';
+    const w = el.think.clientWidth, h = el.think.clientHeight, tx = (a.tail - a.left) / W * 100 * u;
+    el.thinkPath.setAttribute('d', cloudPath(w, h, u));
+    circle(el.thinkTail1, tx, h + 1.7 * u, 1.3 * u);
+    circle(el.thinkTail2, tx + a.dir * 2.8 * u, h + 5.6 * u, 0.75 * u);
+  };
   return {
-    el, choices: null,
+    el, choices: null, thinkOwns: false, thinkSide: null,
+    think(text, opts) {
+      opts = opts || {};
+      const side = opts.side || 'fisherman';
+      el.thinkWho.hidden = !opts.who; el.thinkWho.textContent = opts.who || '';
+      setText(el.thinkText, text, opts.mark);
+      buttons(el.thinkChoices, opts.choices || null);
+      if (opts.choices) { this.choices = opts.choices; this.thinkOwns = true; }
+      el.think.classList.toggle('ask', !!opts.choices);
+      this.thinkSide = side;
+      thinkLayout(side);
+      el.think.classList.add('on');
+    },
+    thinkHide() {
+      el.think.classList.remove('on', 'ask');
+      buttons(el.thinkChoices, null);
+      this.thinkSide = null;
+      if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; }
+    },
+    thinkRelayout() { if (this.thinkSide) thinkLayout(this.thinkSide); },
     prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === 'Tap now!'); },
     caption(t, dur, style) {
       el.caption.textContent = t; el.caption.className = 'shade on' + (style ? ' ' + style : '');
@@ -2748,26 +2877,11 @@ function makeUI() {
     },
     cardHide() { el.card.classList.remove('on'); },
     dlgShow(who, style) { el.dlg.className = 'panel on ' + (style || ''); el.who.textContent = who || ''; el.who.hidden = !who; el.more.classList.remove('on'); },
-    dlgText(t, mark) {
-      el.text.textContent = t;
-      if (!mark || !t.endsWith('?')) return;
-      el.text.textContent = t.slice(0, -1);
-      const s = document.createElement('span');
-      s.className = 'mark'; s.textContent = '?';
-      el.text.appendChild(s);
-    },
+    dlgText(t, mark) { setText(el.text, t, mark); },
     dlgChoices(list) {
-      el.choices.innerHTML = '';
-      this.choices = list;
-      if (!list) { el.choices.hidden = true; return; }
-      el.choices.hidden = false;
-      el.choices.classList.toggle('many', list.length > 3);
-      list.forEach(c => {
-        const b = document.createElement('button');
-        b.type = 'button'; b.className = 'choice'; b.textContent = c.label;
-        b.addEventListener('click', ev => { ev.stopPropagation(); b.blur(); c.cb(); });
-        el.choices.appendChild(b);
-      });
+      buttons(el.choices, list);
+      this.choices = list; this.thinkOwns = false;
+      if (list) el.choices.classList.toggle('many', list.length > 3);
     },
     dlgMore(on) { el.more.classList.toggle('on', !!on); },
     dlgHide() { el.dlg.classList.remove('on'); el.choices.innerHTML = ''; el.choices.hidden = true; this.choices = null; },
@@ -2816,6 +2930,7 @@ function boot() {
     stage.style.width = sw + 'px'; stage.style.height = sh + 'px';
     document.documentElement.style.setProperty('--u', sw / 100 + 'px');
     document.getElementById('prompt').style.bottom = ((34 / H) * 100).toFixed(2) + '%';
+    UI.thinkRelayout();
   }
   window.addEventListener('resize', resize);
   resize();

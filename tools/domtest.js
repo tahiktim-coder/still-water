@@ -33,7 +33,7 @@ async function run(plan, label, useKeys) {
     if ($('ending').classList.contains('on')) break;
     if (holdUntil > 0) { if (frame >= holdUntil) { up(); holdUntil = -1; restUntil = frame + 3; } continue; }
     if (frame % 3) continue;
-    const choices = [...$('choices').querySelectorAll('button')];
+    const choices = [...$('choices').querySelectorAll('button'), ...$('thinkChoices').querySelectorAll('button')]; // the companion's question sits under his bubble
     const prompt = $('prompt').textContent;
     if (choices.length) {
       const k = plan[ci++] || 0;

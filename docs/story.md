@@ -26,7 +26,7 @@ The recount at wish 3 always ends with `and the sun you wanted.`
 ## 2. Rules for copy
 
 - Sentence case. Short. Eerie. Dialogue under 90 characters (the wish 3 recount may run to 125), captions under 60, card lines under 60. This file writes apostrophes straight; the game renders every one as the typographic ’.
-- The fisherman speaks three lines in the whole game, all in act 0. Everything later quotes them. His lines and the companion's lines share one "said" caption style, in quotation marks, so the player cannot always tell whose words they are. Narrator captions have no quotes.
+- The fisherman never speaks in the fish's panel and never in the caption strip. His lines appear in a THOUGHT BUBBLE (section 4b): a thin comic-book bubble with small text, floating above him to the right, with a tail of small circles down to his head. He thinks three lines of his own in act 0, thinks each choice he taps for a moment before the fish answers, and thinks "Take me back." on the open sea. Everything else quotes him. The companion's lines use the same bubble on his side of the boat. Narrator captions stay in the caption strip, no quotes.
 - The golden fish is polite, patient and never lies. It gives exactly what was asked for and reads the player's own words back as consent. It never threatens. It is never rude, only accurate. Its rules begin with "Nobody".
 - Never say memory, remember, past, stuck, grief, nostalgia, lure, or "you are the fish". "Bait" appears once in dialogue, at wish 3. The Dark ending's base card keeps its own "bait" because it shipped that way.
 - No line explains a metaphor the picture already shows.
@@ -44,7 +44,16 @@ Endings: `home`, `dark`, `cut`, `stay`, `deep`, `swallowed`. Silent is a variant
 
 ## 4. The script
 
-Speaker labels: **narr** is the unnamed narrator caption, **said** is the quoted caption style for the fisherman and the companion, **Golden fish** is the fish in every act including the red, **Companion** and **The lake** are whisper style in the dialogue panel.
+Speaker labels: **narr** is the unnamed narrator caption, **Fisherman** is a thought bubble by the fisherman (section 4b), **Golden fish** is the fish in the dialogue panel in every act including the red, **Companion** is a bubble by the companion, **The lake** is whisper style in the dialogue panel.
+
+### 4b. The thought bubble
+
+A DOM element over the stage, not drawn in pixels. Thin one-pixel outline in the UI ink colour, a near-transparent fill, a rounded cloud outline (three or four bumps), and a tail of two small circles leading down and left toward the fisherman's head. Text is small (about two thirds of the panel's size), sentence case, no quotation marks, and a tiny label `Fisherman` sits on the bubble's upper edge in the same size. It sits above and to the right of the fisherman so the mountain is behind it: anchor about x 150, y 186 in internal pixels, converted to stage percentages from the live stage size (the boat's position is fixed, the stage height is not), width about 40% of the stage. It never overlaps the fish's panel: when a bubble is up, the panel is hidden, and the reverse.
+
+Three uses:
+1. **His own lines** (the three in act 0, and `Take me back.` on the sea): the bubble fades in with the text already complete, stays about 3 s or until a tap, fades out. No prompt and no bite while it is up.
+2. **Choice echo**: when the player taps any choice, the panel closes, the chosen label appears in his bubble for about 1.2 s, then the fish's reply opens. This is what makes the scene a conversation. Ending choices echo too.
+3. **The companion**: the same bubble, no label, tail toward the companion, anchored above and to his left (about x 160, y 190), for every line in section 6 and for `Will you stay?` (the wrong question mark stays). His question is the one bubble that waits for a choice: the two answers appear as buttons under the bubble.
 
 ### Title
 
@@ -55,11 +64,11 @@ Unchanged text. Two silent additions: three bone pixels of a knife on the gunwal
 The boat rows in from the left at dawn while the title fades (a short dip to black, then `boatX` from -208, off screen, to 0 over 4 s). Casting is not possible until it arrives. Captions, one per beat, in pace with play:
 
 - On start, narr: `Nothing on the lake is moving except you.`
-- When the first cast lands, said: `First time here.`
-- After the first card closes, said: `Look at that sun.`
-- After the second card closes, said: `I could watch that sun forever.`
+- When the first cast lands, Fisherman (bubble): `First time here.`
+- After the first card closes, Fisherman (bubble): `Look at that sun.`
+- After the second card closes, Fisherman (bubble): `I could watch that sun forever.`
 
-While a said caption is on screen the tutorial prompt is hidden and no nibble or bite happens, so two texts never share the stage. A said line that did not get to show carries over to the next beat. `STORY.said` counts them.
+While a bubble is on screen the tutorial prompt is hidden and no nibble or bite happens, so two texts never share the stage. A line that did not get to show carries over to the next beat. `STORY.said` counts them.
 
 ### Act 0, day. Three catches.
 
@@ -83,7 +92,7 @@ Keep it (`kept = true`; the fish is lifted into the boat as a small gold shape b
 
 Both:
 - Golden fish: `First time here, you said. Nobody comes here twice.`
-- Golden fish: `What do you lack, fisherman?`
+- Golden fish: `What would you like, fisherman?`
 - Choice: **Someone to sit with me** / **Take me where the fish are** / **A home on the shore** / **Nothing**
 
 #### Wish 1 grants
@@ -97,7 +106,12 @@ Someone to sit with me:
 
 Take me where the fish are:
 - Golden fish: `Where the fish are. I know a spot. Hold on.`
-- The ocean cutscene (section 8). If the player casts while the big one is under the boat, the Swallowed ending plays and the run ends. If they wait, it leaves and the shore returns closer than before. The shoal stays for the rest of the run: shadows steer toward the horizon at every mood and respawn at the bottom edge when they reach it, so the shoal keeps flowing the same way. Bites come faster for the rest of the game.
+- The ocean cutscene (section 8): the shore sinks into haze, the boat shrinks to a speck on a vast lit sea, huge shapes pass beneath, one stops under the boat.
+- Golden fish: `Told you. I'd let that one pass.`
+- The prompt `Tap to cast` and a window of about 10 s. Cast into it and the Swallowed ending plays. Wait, and it slides away.
+- The camera comes back to the boat, but the shore does not come back. The rest of the run is played on the open sea: no mountains, the horizon a clean line, the huge shapes still passing beneath toward the horizon for the rest of the game, through the sunset, the red sun and every ending. Bites come faster for the rest of the game.
+- Fisherman (bubble): `Take me back.`
+- Golden fish: `You said where the fish are. This is where they are.`
 - Golden fish: `Look how they all go the same way.`
 
 A home on the shore:
@@ -133,7 +147,7 @@ Greeting, by priority: kept and refused once > kept > refused once > default.
 - default: `Back so soon? The lake keeps count.`
 
 Then:
-- Golden fish: `What do you lack now?`
+- Golden fish: `And this time?`
 - Choice: **Make this day last forever** / **Let me hear the fish** / **Gold. A boat full of it** / **Nothing**
 
 #### Wish 2 grants
@@ -147,7 +161,7 @@ Let me hear the fish (`heard = true`):
 
 Gold. A boat full of it (the gold pile appears, then the gold sink cutscene, section 8):
 - Golden fish: `Gold. A boat full of it.`
-- The boat settles to the gunwales. The lantern floats beside it.
+- The boat goes down under him (section 8, Gold sink). He is left chest-deep in the water holding the rod up, the lantern floating beside him. He fishes like that for the rest of the run.
 - Golden fish: `Sorry. Gold is heavy. You can always come back for it.`
 
 Nothing, first refusal (`refused = 1`):
@@ -198,7 +212,7 @@ Released:
 - Golden fish: `You said you could watch it forever. I listened.` (forever wished: `You said forever, then you wished for it. I listened twice.`)
 
 Kept:
-- Golden fish: `That isn't me pulling. It never was.`
+- Golden fish: `I'm right here, fisherman.`
 - Golden fish: `One wish left. But first, the sun I promised you.`
 - Golden fish: `You said you could watch it forever. I passed that on.`
 
@@ -218,7 +232,7 @@ Red style. One voice. The only insertions are the two optional lines marked belo
 4. Optional, companion present and silent: Companion: `Don't answer it. Cut the line.` Companion present and answered: Companion: `You said you'd stay.`
 5. Optional, kept: Golden fish, whisper from the boat: `I'm sorry.`
 6. Golden fish: `I sat where you sit. I said what you said. Three times.`
-7. Golden fish: `I'd like to go home now. What do you lack, fisherman.`
+7. Golden fish: `I'd like to go home now. What would you like.`
 - Choice: **Let me go home** / **Take the light away** / **Cut the line** / **Stay with them** (only if `answered`) / **Let me get my gold** (only if gold) / **Nothing** (only if `refused = 2`)
 
 Buttons are a flex column with smaller padding when there are more than three. Keys 1 to 6 select them. The dialogue panel is capped at 46% of the stage height with the text scrolling, so the buttons never cover the turned companion. Check the five-button case in shots at 320 px width.
@@ -327,9 +341,10 @@ Nothing is locked behind replay.
 Timed functions in the existing cinematic system. Durations are targets.
 
 - **Opening** (4 s, under the title fade): a short dip to black, then `boatX` from -208 (off screen; -120 would leave the hull on screen) to 0, eased out. Row sound, two strokes. No cast until it arrives.
-- **Ocean** (about 25 s): mountains sink toward the horizon and blend into the sky colour until gone (`far` 0 to 1 over 6 s). The boat swaps through three smaller silhouettes to a few pixels at the centre; rod, line, float and lantern hidden while `far > 0.5`. Shadows spawn large and larger (2x to 6x), a dozen, then one the full width of the screen and a third of the water's height; the others scatter from it over 2 s; it stops under the boat. `Told you.` Then the prompt `Tap to cast`. If the player casts within 12 s, the float lands on it and the Swallowed cinematic starts. Otherwise the shape slides off left over 4 s, the boat and mountains return over 4 s, and the mountains land 10 px closer to the horizon than before (`shoreShift`, kept for the rest of the run). No caption about it. Skip fish acts as a cast during the window.
+- **Ocean** (about 25 s): mountains sink toward the horizon and blend into the sky colour until gone (`sea` 0 to 1 over 6 s, and `sea` then stays 1 for the rest of the run). The camera pulls back (`far` 0 to 1 over the same 6 s): the boat swaps through three smaller silhouettes to a few pixels at the centre; rod, line, float and lantern hidden while `far > 0.5`. Shadows spawn large and larger (2x to 6x), a dozen. Then the big one: it does not rise from below and it does not arrive fast. It enters from the left edge of the screen, deep (drawn darker and lower in the water), and crosses left to right over about 8 s, slowing as it comes, rising a little as it slows, and settles under the boat. The others scatter from it as it passes. Its sound is weight, not a scare: a low swell (sub-bass, a slow filtered rumble) that rises over the crossing and holds while it sits under the boat, with no attack, no stinger and no one-shot hit. The player should feel the mass before it stops. `Told you. I'd let that one pass.` Then the prompt `Tap to cast`. If the player casts within about 10 s, the float lands on it and the Swallowed cinematic starts. Otherwise the shape slides off left over 4 s and the camera returns (`far` back to 0 over 4 s) while `sea` stays 1: the boat is back at full size on an empty horizon with the huge shapes still passing beneath. Then the bubble `Take me back.` and the fish's two lines. No shore ever returns on this path; `shoreShift` is not used. Skip fish acts as a cast during the window.
+- **The open sea** (the rest of a fish-wish run): `sea` 1 hides the mountains everywhere they are read (render, sun ring, stalk, jaw). The sunset sets the sun into the sea; the red sun rises from the sea; Home's jaw closes with the sky sliding down onto a fang line at the horizon with no mountains; Still water rows away across open water; Deep and Dark as usual. The cabin and the companion cannot exist on this path (they are wish 1 too). The giant shapes keep passing beneath at a slow rate, all toward the horizon, at every mood.
 - **Swallowed** (7.6 s): the float flies onto the big one and lands at 0.7 s, the caption at 1.1 s, then the water inside a growing circle around the boat goes to the darkest index with a rippling edge (from 1.6 s), the boat drops into it at 4.6 s, black and crunch at 7.1 s.
-- **Gold sink** (5 s): `boatSunk` 0 to 1: the boat drawn with the waterline at the gunwale (hull rows below it masked by water), the lantern floating beside it at water level with its glow on the water, the fisherman's legs under water, bubbles for two seconds. Persists for the rest of the run; the rod and float still work.
+- **Gold sink** (6 s): `boatSunk` 0 to 1. The whole boat sinks: over 4 s the hull descends until it is fully under the surface (rows below the waterline masked by water), with bubbles and two rings, the gold glinting once as it goes. The fisherman does not go with it. From `boatSunk` 0.6 he is drawn as a swimmer: head, shoulders and one arm above the surface holding the rod up, the rest masked by water, at the same x as before; the lantern floats beside him at water level with its glow on the water; the companion, if present, floats too, sitting on the surface at his seat's position, still facing the horizon, as if nothing happened; the kept fish, if present, swims beside the fisherman at the surface, glowing. Persists for the rest of the run: casting, the float and the reel work from the water, the rod tip is lower, and every later cutscene that moved `boatX` moves the swimmer instead. Ending cards on this path swap one verb: Still water and Silent say `You swim until the water is only water.`, Dark says `You hang in the water beside the lantern until it gutters out.` The Deep ending is the natural end of it: he goes down after the boat.
 - **Kept fish**: a sprite about 10 by 4 in the gold indices 13 to 16 with an open-mouth variant used while a Golden fish line is typing (the same talking test as the sky fish), stamped with the reflecting stamp at about (bx + 40, WL - 10). Its alpha follows the ladder in section 3 and returns to 1 whenever it speaks.
 - **Forever** (instant on grant): `frozen = 1`. Cloud drift stops, birds hang, fish-jump rings stop, the sun holds until the sunset cinematic. Nothing says so.
 - **Eyes** (2 s, once in act 2 between casts): `lanternFlicker` to 0.1 for the first second, `eyes` 0 to 1 to 0 over 2 s: about eight pairs of red-eye pixels (index 21) on the two or three surface rows near the boat, positions fixed per run, faint reflections. Reused for one frame in the dark ending's last flicker.
@@ -350,11 +365,12 @@ The world is a set of numbers in `WS`. Every scene below says which of them it O
 | Golden scene 1 | the sky fish (`goldFish`) appears and dives; kept: `goldKept` 0 to 1 and no sky fish | the world |
 | Wish 1 grant | company: `companion` 0 to 1 over 2.2 s. Home: `cabin` 0 to 1 over 2.2 s. Fish: the ocean cutscene, then `fishShadows` 1 and `shoreShift` 10. Nothing: no change | mood 0 |
 | Cost drop (after any granted wish 1) | `sunY` +8, hold 1 s, +8 (about 5 s total), starting as the first cost line begins; `troubled` to 0.22 | mood 0; `sunX` never moves |
-| Ocean | `far` 0 to 1 over 6 s and back over 4 s at the end; mountains fade with `far`; boat silhouettes by `far`; giant shadows; `troubled` 0.15 while `far > 0`; birds hidden while `far > 0.5` | sun, mood, clouds keep drifting; companion stays; the cabin fades with the mountains and returns with them |
+| Ocean | `sea` 0 to 1 over 6 s and then held at 1 for the rest of the run (mountains gone for good); `far` 0 to 1 over 6 s and back to 0 over 4 s at the end (camera only); boat silhouettes by `far`; giant shadows, kept alive at a slow rate for the rest of the run; the big one crosses left to right over about 8 s and settles under the boat, with a rising low swell and no stinger; `troubled` 0.15 while `far > 0`, then 0.22 with the cost; birds hidden while `sea > 0.5` | sun, mood, clouds keep drifting; no companion or cabin can exist on this path |
+| Open sea play (fish-wish runs) | the giant shadows keep passing | `sea` 1; everything else as the equivalent lake scene |
 | Swallowed | the circle radius 0 to three boat widths over 4 s; the boat's y offset drops after 3 s; black at 5.5 s | `far` 1, sun, mood |
 | Act 1 play | nothing | mood 0, sun lowered, troubled 0.22, wish 1 props |
 | Golden scene 2 | sky fish appears and dives; kept: `goldKept` to 1 while speaking, then 0.7 | the world |
-| Wish 2 grant | forever: `frozen` 1. Gold: `gold` 0 to 1 over 1.5 s, then the gold sink (`boatSunk` 0 to 1 over 5 s). Hear, Nothing: no change | mood 0 |
+| Wish 2 grant | forever: `frozen` 1. Gold: `gold` 0 to 1 over 1.5 s, then the gold sink (`boatSunk` 0 to 1 over 6 s; the boat is gone, the fisherman swims). Hear, Nothing: no change | mood 0 |
 | Sunset | `sunY` to `HY + 14` over 7.5 s; `mood` 0 to 1 over t 1 to 8; `sunGlow` to 0.12 (forever: floor 0.4); `horizGlow` to 0.3; `starA` to 1 from t 5 (forever: stays 0); `troubled` to 0.35; `lantern` 1 at 7.8 s | `sunX`, companion, cabin, gold, sunk boat, `frozen` (a frozen sky stays frozen through the night) |
 | Companion question | nothing | the night |
 | Act 2 play | once: `lanternFlicker` 0.1 for 1 s and `eyes` 0 to 1 to 0 over 2 s | mood 1, sun below the horizon, stars as the sunset left them |
@@ -382,8 +398,8 @@ The world is a set of numbers in `WS`. Every scene below says which of them it O
 - **Troubled ladder**: 0, then 0.22 (wish 1), 0.35 (sunset), 0.55 (red), back to 0 at the dawn. Refusals never raise it. The ocean uses 0.15 while `far > 0` and restores the previous value.
 - **The companion** faces the horizon from the moment he appears until the red cinematic's pupil beat, turns back to the horizon at the still-water dawn, and faces the fisherman only in Stay.
 - **Kept fish alpha**: 1 in act 0, 0.7 in act 1, 0.45 in act 2, back to 1 whenever it speaks, 0 when lifted over the side, 0.05 after the silent ending.
-- **`shoreShift`** is set once by the ocean and persists; the jaws in Home close from the shifted position.
-- **Props persist across scenes** unless a row above removes them: companion, cabin, gold, sunk boat, shadows, kept fish, frozen. A new scene never resets a prop it does not own.
+- **`sea`** is set once by the ocean and never cleared: the mountains are gone for the rest of that run, and every scene that read MOUNT (render, sun ring, stalk, jaw) must tolerate an empty shore. Home's jaw still closes; it is the sky and a fang line at the horizon.
+- **Props persist across scenes** unless a row above removes them: companion, cabin, gold, the sunk boat (the swimmer), shadows, kept fish, frozen, the open sea. A new scene never resets a prop it does not own.
 - **Nothing recolours by hand.** All colour comes from the palette built from `mood` and `dim`; a prop that must read the same in every mood uses an accent index.
 
 ## 9. Build phases
