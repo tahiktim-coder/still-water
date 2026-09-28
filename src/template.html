@@ -141,6 +141,9 @@ body {
 #thinkChoices[hidden] { display: none; }
 #thinkChoices .choice { flex: 1 1 auto; text-align: center; padding: calc(var(--u) * 0.7) calc(var(--u) * 1.6); font-size: calc(var(--u) * 3.1); background: var(--ui-panel); }
 #thinkChoices .choice:hover { background: var(--ui-edge); }
+/* The same ▾ 'more' marker as the panel's, inside the bubble's lower right, for a bubble that waits for a tap. */
+#thinkMore { position: absolute; right: calc(var(--u) * 2.4); bottom: calc(var(--u) * 0.6); opacity: 0; font-size: calc(var(--u) * 2.6); line-height: 1; color: var(--ui-accent); }
+#thinkMore.on { opacity: 0.9; animation: nudge 0.9s steps(2, jump-none) infinite; }
 
 #card {
   position: absolute; z-index: 6; left: 13%; right: 13%; top: 27%;
@@ -193,7 +196,7 @@ body {
 @keyframes nudge { 50% { transform: translateY(0.15em); } }
 @keyframes breathe { 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) {
-  #prompt.urgent, #dialog.red.on #text, #more.on, #title .begin { animation: none; }
+  #prompt.urgent, #dialog.red.on #text, #more.on, #thinkMore.on, #title .begin { animation: none; }
 }
 </style>
 </head>
@@ -209,6 +212,7 @@ body {
       <div id="thinkWho" hidden>Fisherman</div>
       <div id="thinkText"></div>
       <div id="thinkChoices" hidden></div>
+      <div id="thinkMore" aria-hidden="true">&#9662;</div>
     </div>
     <div id="card" class="panel" aria-live="polite">
       <canvas id="cardFish" width="8" height="8"></canvas>

@@ -1617,13 +1617,14 @@ const WEIGHT_VOL = 0.22, WEIGHT_OUT = 2;
 // A line is {who, text, style, choices, mark, bubble}, {act: fn} or {pause: seconds}. mark asks the UI for
 // the wrong question mark (the companion's question). A choice whose pick() does not start a new dlgRun
 // lets the current list continue, so a choice can sit in the middle of a scene. A bubble line (the
-// companion's) shows complete in the thought bubble instead of the panel and holds BUBBLE_HOLD seconds or
-// until a tap; with choices it waits for one under the bubble. Every tapped choice echoes in the
-// fisherman's bubble for ECHO_DUR before its pick runs (DLG.echo), so the sim and skipcheck wait that long.
-const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0, echo: null, hold: 0 };
-const ECHO_DUR = 1.2, BUBBLE_HOLD = 3;
+// companion's, or the fisherman's `Take me back.`) shows complete in the thought bubble instead of the panel
+// and stays until a tap, never on a timer (bible, 4b), with the panel's ▾ marker; with choices it waits for
+// one under the bubble. Every tapped choice echoes in the fisherman's bubble for ECHO_DUR before its pick
+// runs (DLG.echo), so the sim and skipcheck wait that long.
+const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0, echo: null };
+const ECHO_DUR = 1.2;
 function dlgRun(lines, done) {
-  DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.hold = 0; DLG.run++;
+  DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.run++;
   setPhase('dialog');
   dlgNext();
 }
@@ -1651,8 +1652,7 @@ function dlgBubble(L) {
   DLG.n = L.text.length; G.thinkUntil = 0;
   UI.dlgHide();
   const side = L.side || 'companion';
-  UI.think(L.text, { side, who: side === 'fisherman' ? L.who : '', mark: L.mark, choices: L.choices ? choiceList(L) : null });
-  if (!L.choices) DLG.hold = BUBBLE_HOLD;
+  UI.think(L.text, { side, who: side === 'fisherman' ? L.who : '', mark: L.mark, choices: L.choices ? choiceList(L) : null, more: !L.choices });
 }
 // The choice buttons for a line. A tap closes the panel (or the bubble), echoes the label in the
 // fisherman's bubble, and only then runs the pick.
@@ -1688,7 +1688,6 @@ function dlgUpdate(dt) {
   if (!DLG.active) return;
   if (DLG.echo) { dlgEcho(dt); return; }
   if (DLG.wait > 0) { DLG.wait -= dt; if (DLG.wait <= 0) { DLG.wait = 0; dlgNext(); } return; }
-  if (DLG.hold > 0) { DLG.hold -= dt; if (DLG.hold <= 0) { DLG.hold = 0; thinkHide(); dlgNext(); } return; }
   const L = DLG.cur;
   if (!L || DLG.n >= L.text.length) return;
   const prev = Math.floor(DLG.n);
@@ -1699,7 +1698,7 @@ function dlgUpdate(dt) {
 function dlgTap() {
   const L = DLG.cur;
   if (!L) return;
-  if (L.bubble) { if (!L.choices) { DLG.hold = 0; thinkHide(); dlgNext(); } return; }
+  if (L.bubble) { if (!L.choices) { thinkHide(); dlgNext(); } return; } // a bubble line waits for this tap
   if (DLG.n < L.text.length) { dlgFull(); return; }
   if (L.choices) return;
   UI.dlgMore(false);
@@ -2436,17 +2435,19 @@ function cap(t, dur, style) {
 }
 // The fisherman's lines (bible, Opening) in his thought bubble. A line that finds a caption on screen
 // waits in G.thinkPending and shows at the next beat (a cast landing or a card closing).
-const THINK_DUR = 3;
 function thinkBeat(text) {
   if (text) G.thinkPending.push(text);
   if (!G.thinkPending.length || G.t < G.capUntil) return;
   STORY.said++;
   thinkLine(G.thinkPending.shift(), 'fisherman');
 }
-// A bubble over play: complete at once, up for THINK_DUR or until a tap, the prompt hidden meanwhile.
+// A bubble over play (his own lines, and the companion's tapped ones): complete at once, with the ▾ marker,
+// up until a tap and never on a timer (bible, 4b), the prompt hidden meanwhile. G.thinkUntil is Infinity
+// while it waits, so the same `G.t < G.thinkUntil` gate hides the prompt, holds bites and makes the next
+// tap a dismissal only (press, companionHit).
 function thinkLine(text, side) {
-  UI.think(text, { who: side === 'fisherman' ? 'Fisherman' : '', side });
-  G.thinkUntil = G.t + THINK_DUR;
+  UI.think(text, { who: side === 'fisherman' ? 'Fisherman' : '', side, more: true });
+  G.thinkUntil = Infinity;
   refreshPrompt();
 }
 function thinkHide() {
@@ -2458,7 +2459,6 @@ function thinkHide() {
 // cascade past the third catch (the fish quotes them right after).
 const THINK_PHASES = ['ready', 'casting', 'waiting'];
 function thinkUpdate() {
-  if (G.thinkUntil && G.t >= G.thinkUntil) thinkHide();
   if (G.thinkPending.length && G.t >= G.capUntil && THINK_PHASES.indexOf(G.phase) >= 0) thinkBeat(null);
 }
 function lose(msg) {
@@ -2710,7 +2710,7 @@ function companionTap() {
 // the red once he has turned and the last choices are showing.
 const COMP_PAD = 3;
 function companionHit(x, y) {
-  if (WS.companion <= 0.5 || WS.far > 0.5) return false;
+  if (WS.companion <= 0.5 || WS.far > 0.5 || G.t < G.thinkUntil) return false; // a tap on a waiting bubble only dismisses it
   const open = G.phase === 'ready' || (G.phase === 'dialog' && !!UI.choices && WS.companionTurn > 0.5);
   if (!open) return false;
   const x0 = boatLeft() + COMP_DX - COMP_PAD, y0 = compY(boatSinkPx()) - COMP_PAD;
@@ -2746,6 +2746,7 @@ function setTestMode(on) {
 const SKIP_BOB = { x: 63, y: 280 };
 function testCatch() {
   if (!TEST) return;
+  if (G.t < G.thinkUntil) thinkHide(); // a waiting bubble goes first, then the skip proceeds
   const p = G.phase;
   if (p === 'title') { startGame(); return; }
   if (p === 'card') { closeCard(); return; }
@@ -2777,12 +2778,17 @@ function openingUpdate(dt) {
     o.stage = 1;
     WS.boatX = ROW_FROM;
     tween(WS, 'boatX', ROW_FROM * 0.25, ROW_DUR / 2, E.out, () =>
-      tween(WS, 'boatX', 0, ROW_DUR / 2, E.out, () => { G.arrived = true; refreshPrompt(); thinkBeat(BAIT_LINE); }));
+      tween(WS, 'boatX', 0, ROW_DUR / 2, E.out, openingLine));
     UI.fade(0, 1.2);
     SFX.row();
-    cap('Nothing on the lake is moving except you.', 3.5);
   } else if (o.stage === 1 && o.t >= OPEN_DIP + ROW_DUR / 2) { o.stage = 2; SFX.row(); }
   else if (o.stage === 2 && G.arrived) G.open = null;
+}
+// The boat has arrived: the narrator's first line in the panel, waiting for a tap (not a timed caption, so it
+// can be read), then the bait bubble, which waits for the next tap, then play. OPENING_LINE is the bible's.
+const OPENING_LINE = 'Nothing on the lake is moving except you.';
+function openingLine() {
+  dlgRun([narr(OPENING_LINE)], () => { G.arrived = true; setPhase('ready'); thinkBeat(BAIT_LINE); });
 }
 function resetAll() {
   resetWS();
@@ -2794,7 +2800,7 @@ function resetAll() {
   cloudT = 0; genEyes();
   WS.farBoat = RUN.count > 0 || loadEndings().length > 0 || sessionEndings.length > 0 ? 1 : 0; // bible, Title
   CINE = null;
-  DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0; DLG.echo = null; DLG.hold = 0;
+  DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0; DLG.echo = null;
   SFX.drone(false); SFX.weight(false);
   UI.count(0); UI.dlgHide(); UI.thinkHide(); UI.cardHide(); UI.endingHide();
   setPhase('title');
@@ -2852,7 +2858,7 @@ function makeUI() {
   const $ = id => document.getElementById(id);
   const el = {
     stage: $('stage'), prompt: $('prompt'), caption: $('caption'), count: $('count'),
-    think: $('think'), thinkPath: $('thinkPath'), thinkTail1: $('thinkTail1'), thinkTail2: $('thinkTail2'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'),
+    think: $('think'), thinkPath: $('thinkPath'), thinkTail1: $('thinkTail1'), thinkTail2: $('thinkTail2'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'), thinkMore: $('thinkMore'),
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
     title: $('title'), found: $('found'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endFound: $('endFound'),
@@ -2897,12 +2903,14 @@ function makeUI() {
   return {
     el, choices: null, thinkOwns: false, thinkSide: null,
     // The thought bubble (bible, 4b): opts.side 'fisherman' (default) or 'companion', opts.who the tiny label,
-    // opts.mark the wrong question mark, opts.choices buttons under it (the companion's question).
+    // opts.mark the wrong question mark, opts.choices buttons under it (the companion's question), opts.more
+    // the ▾ marker in the lower right for a bubble that waits for a tap (the choice echo has none).
     think(text, opts) {
       opts = opts || {};
       const side = opts.side || 'fisherman';
       el.thinkWho.hidden = !opts.who; el.thinkWho.textContent = opts.who || '';
       setText(el.thinkText, text, opts.mark);
+      el.thinkMore.classList.toggle('on', !!opts.more);
       buttons(el.thinkChoices, opts.choices || null);
       if (opts.choices) { this.choices = opts.choices; this.thinkOwns = true; }
       el.think.classList.toggle('ask', !!opts.choices);
@@ -2912,6 +2920,7 @@ function makeUI() {
     },
     thinkHide() {
       el.think.classList.remove('on', 'ask');
+      el.thinkMore.classList.remove('on');
       buttons(el.thinkChoices, null);
       this.thinkSide = null;
       if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; }

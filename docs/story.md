@@ -27,7 +27,7 @@ The recount at wish 3 always ends with `and the sun you wanted.`
 ## 2. Rules for copy
 
 - Sentence case. Short. Eerie. Dialogue under 90 characters (the wish 3 recount may run to 125), captions under 60, card lines under 60. This file writes apostrophes straight; the game renders every one as the typographic ’.
-- The fisherman never speaks in the fish's panel and never in the caption strip. His lines appear in a THOUGHT BUBBLE (section 4b): a thin comic-book bubble with small text, floating above him to the right, with a tail of small circles down to his head. He thinks four lines of his own in act 0 (the bait, the throwaway wish, the sun twice), thinks each choice he taps for a moment before the fish answers, and thinks "Take me back." on the open sea. Everything else quotes him. The companion's lines use the same bubble on his side of the boat. Narrator captions stay in the caption strip, no quotes.
+- The fisherman never speaks in the fish's panel and never in the caption strip. His lines appear in a THOUGHT BUBBLE (section 4b): a thin comic-book bubble with small text, floating above him to the right, with a tail of small circles down to his head. He thinks four lines of his own in act 0 (the bait, the throwaway wish, the sun twice) and "Take me back." on the open sea. A tapped choice is already his line and is never echoed in the bubble. Everything else quotes him. The companion's lines use the same bubble on his side of the boat. Narrator captions stay in the caption strip, no quotes.
 - The golden fish is polite, patient and never lies. It gives exactly what was asked for and reads the player's own words back as consent. It never threatens. It is never rude, only accurate. Its rules begin with "Nobody".
 - Never say memory, remember, past, stuck, grief, nostalgia, lure, or "you are the fish". "Bait" appears once in dialogue, at wish 3. The Dark ending's base card keeps its own "bait" because it shipped that way.
 - No line explains a metaphor the picture already shows.
@@ -52,8 +52,8 @@ Speaker labels: **narr** is the unnamed narrator caption, **Fisherman** is a tho
 A DOM element over the stage, not drawn in pixels. Thin one-pixel outline in the UI ink colour, a near-transparent fill, a rounded cloud outline (three or four bumps), and a tail of two small circles leading down and left toward the fisherman's head. Text is small (about two thirds of the panel's size), sentence case, no quotation marks, and a tiny label `Fisherman` sits on the bubble's upper edge in the same size. It sits above and to the right of the fisherman so the mountain is behind it: anchor about x 150, y 186 in internal pixels, converted to stage percentages from the live stage size (the boat's position is fixed, the stage height is not), width about 40% of the stage. It never overlaps the fish's panel: when a bubble is up, the panel is hidden, and the reverse.
 
 Three uses:
-1. **His own lines** (the three in act 0, and `Take me back.` on the sea): the bubble fades in with the text already complete, stays about 3 s or until a tap, fades out. No prompt and no bite while it is up.
-2. **Choice echo**: when the player taps any choice, the panel closes, the chosen label appears in his bubble for about 1.2 s, then the fish's reply opens. This is what makes the scene a conversation. Ending choices echo too.
+1. **His own lines** (the four in act 0, and `Take me back.` on the sea): the bubble fades in with the text already complete and STAYS UNTIL A TAP, never on a timer, with the same small ▾ marker the fish's panel uses. The tap that dismisses it does nothing else (it does not cast). No prompt and no bite while it is up. The companion's tapped lines behave the same way. No bubble is on a timer.
+2. **No choice echo.** A tapped choice is already his line; it is never repeated in the bubble. The bubble shows only what he thinks unprompted. (An earlier draft echoed the tapped label; it read as the game repeating a menu item and was removed.)
 3. **The companion**: the same bubble, no label, tail toward the companion, anchored above and to his left (about x 160, y 190), for every line in section 6 and for `Will you stay?` (the wrong question mark stays). His question is the one bubble that waits for a choice: the two answers appear as buttons under the bubble.
 
 ### Title
@@ -64,8 +64,8 @@ Unchanged text. Two silent additions: three bone pixels of a knife on the gunwal
 
 The boat rows in from the left at dawn while the title fades (a short dip to black, then `boatX` from -208, off screen, to 0 over 4 s). Casting is not possible until it arrives. Captions, one per beat, in pace with play:
 
-- On start, narr: `Nothing on the lake is moving except you.`
-- When the boat has arrived and before the first cast, Fisherman (bubble): `The stranger's bait. Cursed or blessed, he said, and laughed.` The float carries one gold pixel (index 16, the bright end of the gold ramp; 13 is too dark to read as gold at 3x) on the hook for all of act 0.
+- When the boat has arrived, narr, in the dialogue panel, waiting for a tap: `Nothing on the lake is moving except you.` (not a timed caption: the player must be able to read it).
+- Then, before the first cast, Fisherman (bubble): `The stranger's bait. Cursed or blessed, he said, and laughed.` The float carries one gold pixel (index 16, the bright end of the gold ramp; 13 is too dark to read as gold at 3x) on the hook for all of act 0.
 - When the first cast lands, Fisherman (bubble): `Something interesting, for once.`
 - After the first card closes, Fisherman (bubble): `Look at that sun.`
 - After the second card closes, Fisherman (bubble): `I could watch that sun forever.`
@@ -232,7 +232,7 @@ Then the red cinematic as coded, with three changes: the companion turns at the 
 Red style. One voice. The only insertions are the two optional lines marked below, in their places. Seven lines at most, five in a typical run.
 
 1. Golden fish: `There it is. You can watch it forever now.`
-2. Golden fish: `Every sun is bait. I should have said. It didn't come up.`
+2. Golden fish: `That bait was never for fish. I should have said.` (the stranger's bait from act 0; this is the reveal, and it tells the player who the stranger was without saying so)
 3. Golden fish, the recount: `Everything you asked for.` then the granted wishes in order as short clauses, then `and the sun you wanted.`, then `Your words, not mine.` All in one line, up to 125 characters. The clauses are the player's own labels, shifted to the second person: company `someone to sit with you`, fish `where the fish are`, home `a home on the shore`, forever `a day that lasts forever`, hear `to hear the fish`, gold `a boat full of gold`. Example: `Everything you asked for. Someone to sit with you. A boat full of gold. And the sun you wanted. Your words, not mine.` If nothing was granted: `Nobody rows this far to want nothing. So why are you here.`
 4. Optional, companion present and silent: Companion: `Don't answer it. Cut the line.` Companion present and answered: Companion: `You said you'd stay.`
 5. Optional, kept: Golden fish, whisper from the boat: `I'm sorry.`
@@ -290,13 +290,13 @@ Swallowed. Card: `You asked to be taken where the fish are. Somewhere far above,
 
 ## 5. Cards
 
-Names per act unchanged. One line per species per act:
+Names per act unchanged. The rule for every card line: one plain fact that a fish cannot have (it smells of snow, it has your teeth, it came out dry, it knotted itself on purpose), said flatly, never explained. A line that is merely eerie or merely descriptive is a weak line. One line per species per act:
 
 | Species | Act 0 | Act 1 | Act 2 |
 |---|---|---|---|
 | Glass perch / Glass perch / Eyeless perch | You can see its heart beating through it. | There is an old hook inside it. Not yours. | No eyes. It still turns toward the lantern. |
 | Mirror char / Mirror char / Hollow char | Its scales show you the sky. You check. It matches. | Its scales show you a red sky. | Its scales show your boat from underneath. |
-| Blue smelt / Grinning smelt / Grinning smelt | Small and cold. Not afraid of you at all. | It has teeth. Smelt don't have teeth. | Its teeth point inward. |
+| Blue smelt / Grinning smelt / Grinning smelt | Small and cold. Not afraid of you at all. | It has teeth. They look like yours. | It is dry. It came out of the water dry. |
 | Fjord trout / Fjord trout / Drowned trout | It fought like it had somewhere to be. | It keeps looking at the sun. | It drowned. It is a fish. It drowned. |
 | Needle eel / Knot eel / Endless eel | Longer than it has any right to be. | It knotted itself so you couldn't keep it. | It is still coming out of the water. |
 | Pale grayling / Pale grayling / Ash grayling | It smells of snow. | It smells of smoke. | It smells like you. |
@@ -307,11 +307,13 @@ Conditional replacements: at most one per card, each fires at most once per run 
 - fish, trout act 2: `Its stomach is full of hooks. All of them yours.`
 - fish, the first act 1 card not already replaced: `It swam to the hook. It didn't have to.`
 - home, grayling act 1: `It smells of woodsmoke. Someone's home.`
-- gold, any act 2 card: `Heavy for its size. Something in it clinks.`
+- gold, any act 2 card: `There are coins in it. They are still warm.`
 - refused twice, act 2 card: `It is looking at you the way you look at it.`
 - second run or later, first act 0 card: `There is an old hook in its lip.` When it fired, the perch is excluded from the act 1 picks so the two hook lines never both show.
 
 The act 2 species is chosen from those whose act 1 line was not shown this run.
+
+**How the fish look.** Each species must be told apart on the card at a glance, without reinventing the generator: its own small palette (three or four indices, not the one shared FPAL) and one silhouette signature. Glass perch: pale, translucent-looking, dark vertical bars, a visible dark heart pixel. Mirror char: silver with a pale belly and a scatter of light spots. Blue smelt: slim, silver-blue, almost no markings, a bright eye. Fjord trout: dark olive back, red-brown spots, the deepest body. Needle eel: long, thin, olive-dark, no fins to speak of. Pale grayling: tall sail of a dorsal fin, grey-white. Act 2 versions go grey and darker (the ash and drowned names), the eyeless perch has no eye pixel, the hollow char loses its spots, and the grinning smelt keeps its eye and gains a tooth row. The card canvas may scale the sprite larger than today so these read on a phone.
 
 VOICE, in the accent colour on the act 2 card, only if `heard`, keyed to `firstAsk`:
 - company: `I wished for company too. Now I have plenty.`

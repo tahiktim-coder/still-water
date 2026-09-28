@@ -23,12 +23,27 @@ if (g.phase !== 'ready' || g.STORY.catches !== 0) fail('a skip before the boat a
 let skips = 0;
 const t0 = Date.now();
 let t = 0;
-while (g.phase !== 'dialog' && t < 60) {
+// 2a. Once the boat has arrived the narrator's first line waits in the panel; two presses read it through,
+// then the bait bubble waits: a press dismisses it without casting, and no bubble is on a timer.
+while (g.phase !== 'dialog' && t < 10) { tick(1); t += dt; }
+if (g.phase !== 'dialog' || !g.DLG.cur || g.DLG.cur.text !== 'Nothing on the lake is moving except you.') fail('the opening line should wait in the panel after the row-in, phase=' + g.phase);
+g.press(); g.release(); tick(1); g.press(); g.release(); tick(1);
+if (g.phase !== 'ready' || !g.G.arrived) fail('two presses should read the opening line through to play, phase=' + g.phase);
+if (!(g.G.t < g.G.thinkUntil)) fail('the bait bubble should be waiting after the opening line');
+tick(150); t += 5;
+if (!(g.G.t < g.G.thinkUntil)) fail('a waiting bubble must not time out');
+g.press(); g.release(); tick(1);
+if (g.phase !== 'ready' || g.G.cast || g.G.t < g.G.thinkUntil) fail('the dismissing press must only dismiss the bubble, phase=' + g.phase);
+// 2b. Three skips land three fish and the fourth reaches the golden dialogue; the bubbles after the first two
+// cards ('Look at that sun.', 'I could watch that sun forever.') are dismissed by the skip itself.
+while (!(g.phase === 'dialog' && g.STORY.catches === 3) && t < 60) {
   const p = g.phase;
   if (p === 'ready' || p === 'card' || p === 'lost' || p === 'landing') { g.testCatch(); if (p === 'ready' && g.G.arrived) skips++; }
+  else if (p === 'dialog') { g.press(); g.release(); }
   tick(1); t += dt;
 }
 if (g.phase !== 'dialog') fail('never reached the golden dialogue, phase=' + g.phase);
+if (g.STORY.said !== 3) fail('expected the bait line and the two card bubbles to have shown (said 3), got ' + g.STORY.said);
 if (skips !== 4) fail('expected 4 skips (3 fish + golden) before the dialogue, got ' + skips);
 if (g.STORY.catches !== 3) fail('expected 3 catches, got ' + g.STORY.catches);
 

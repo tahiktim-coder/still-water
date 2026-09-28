@@ -23,7 +23,12 @@ function play(plan, label, opts) {
     if (cur && cur !== lastLine) { lastLine = cur; lines.push((cur.who ? cur.who + ': ' : '') + cur.text); }
     if (p === 'dialog') keptMax = Math.max(keptMax, g.WS.goldKept); // the released path never stamps a kept fish
     if (t - lastAct > 0.25) {
-      if (p === 'ready' && opts.tap && g.WS.companion > 0.5 && tapped < g.STORY.act) { g.companionTap(); tapped = g.STORY.act; lastAct = t; }
+      // A waiting bubble over play (his own lines, the companion's; in 'ready' or 'waiting') holds the float and
+      // is dismissed by a press that does nothing else; the next press casts. The bot taps the companion only
+      // when none is up.
+      const bubbleUp = g.G.t < g.G.thinkUntil;
+      if (bubbleUp) { g.press(); g.release(); lastAct = t; }
+      else if (p === 'ready' && opts.tap && g.WS.companion > 0.5 && tapped < g.STORY.act) { g.companionTap(); tapped = g.STORY.act; lastAct = t; }
       else if (p === 'title' || p === 'ready' || p === 'card') { g.press(); g.release(); lastAct = t; }
       else if (p === 'ocean') { if (!opts.wait) { g.press(); g.release(); } lastAct = t; } // the ocean window: cast into the big one unless the plan waits
       else if (p === 'bite') { g.press(); holding = true; lastAct = t; }

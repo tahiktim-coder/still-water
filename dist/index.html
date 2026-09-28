@@ -141,6 +141,9 @@ body {
 #thinkChoices[hidden] { display: none; }
 #thinkChoices .choice { flex: 1 1 auto; text-align: center; padding: calc(var(--u) * 0.7) calc(var(--u) * 1.6); font-size: calc(var(--u) * 3.1); background: var(--ui-panel); }
 #thinkChoices .choice:hover { background: var(--ui-edge); }
+/* The same ▾ 'more' marker as the panel's, inside the bubble's lower right, for a bubble that waits for a tap. */
+#thinkMore { position: absolute; right: calc(var(--u) * 2.4); bottom: calc(var(--u) * 0.6); opacity: 0; font-size: calc(var(--u) * 2.6); line-height: 1; color: var(--ui-accent); }
+#thinkMore.on { opacity: 0.9; animation: nudge 0.9s steps(2, jump-none) infinite; }
 
 #card {
   position: absolute; z-index: 6; left: 13%; right: 13%; top: 27%;
@@ -193,7 +196,7 @@ body {
 @keyframes nudge { 50% { transform: translateY(0.15em); } }
 @keyframes breathe { 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) {
-  #prompt.urgent, #dialog.red.on #text, #more.on, #title .begin { animation: none; }
+  #prompt.urgent, #dialog.red.on #text, #more.on, #thinkMore.on, #title .begin { animation: none; }
 }
 </style>
 </head>
@@ -209,6 +212,7 @@ body {
       <div id="thinkWho" hidden>Fisherman</div>
       <div id="thinkText"></div>
       <div id="thinkChoices" hidden></div>
+      <div id="thinkMore" aria-hidden="true">&#9662;</div>
     </div>
     <div id="card" class="panel" aria-live="polite">
       <canvas id="cardFish" width="8" height="8"></canvas>
@@ -1750,10 +1754,10 @@ const SFX = {
 };
 const WEIGHT_VOL = 0.22, WEIGHT_OUT = 2;
 
-const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0, echo: null, hold: 0 };
-const ECHO_DUR = 1.2, BUBBLE_HOLD = 3;
+const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0, echo: null };
+const ECHO_DUR = 1.2;
 function dlgRun(lines, done) {
-  DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.hold = 0; DLG.run++;
+  DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.run++;
   setPhase('dialog');
   dlgNext();
 }
@@ -1779,8 +1783,7 @@ function dlgBubble(L) {
   DLG.n = L.text.length; G.thinkUntil = 0;
   UI.dlgHide();
   const side = L.side || 'companion';
-  UI.think(L.text, { side, who: side === 'fisherman' ? L.who : '', mark: L.mark, choices: L.choices ? choiceList(L) : null });
-  if (!L.choices) DLG.hold = BUBBLE_HOLD;
+  UI.think(L.text, { side, who: side === 'fisherman' ? L.who : '', mark: L.mark, choices: L.choices ? choiceList(L) : null, more: !L.choices });
 }
 function choiceList(L) {
   return L.choices.map(c => ({
@@ -1814,7 +1817,6 @@ function dlgUpdate(dt) {
   if (!DLG.active) return;
   if (DLG.echo) { dlgEcho(dt); return; }
   if (DLG.wait > 0) { DLG.wait -= dt; if (DLG.wait <= 0) { DLG.wait = 0; dlgNext(); } return; }
-  if (DLG.hold > 0) { DLG.hold -= dt; if (DLG.hold <= 0) { DLG.hold = 0; thinkHide(); dlgNext(); } return; }
   const L = DLG.cur;
   if (!L || DLG.n >= L.text.length) return;
   const prev = Math.floor(DLG.n);
@@ -1825,7 +1827,7 @@ function dlgUpdate(dt) {
 function dlgTap() {
   const L = DLG.cur;
   if (!L) return;
-  if (L.bubble) { if (!L.choices) { DLG.hold = 0; thinkHide(); dlgNext(); } return; }
+  if (L.bubble) { if (!L.choices) { thinkHide(); dlgNext(); } return; } // a bubble line waits for this tap
   if (DLG.n < L.text.length) { dlgFull(); return; }
   if (L.choices) return;
   UI.dlgMore(false);
@@ -2491,7 +2493,6 @@ function cap(t, dur, style) {
   G.capUntil = G.t + (dur || 2.5);
   UI.caption(t, dur, style);
 }
-const THINK_DUR = 3;
 function thinkBeat(text) {
   if (text) G.thinkPending.push(text);
   if (!G.thinkPending.length || G.t < G.capUntil) return;
@@ -2499,8 +2500,8 @@ function thinkBeat(text) {
   thinkLine(G.thinkPending.shift(), 'fisherman');
 }
 function thinkLine(text, side) {
-  UI.think(text, { who: side === 'fisherman' ? 'Fisherman' : '', side });
-  G.thinkUntil = G.t + THINK_DUR;
+  UI.think(text, { who: side === 'fisherman' ? 'Fisherman' : '', side, more: true });
+  G.thinkUntil = Infinity;
   refreshPrompt();
 }
 function thinkHide() {
@@ -2510,7 +2511,6 @@ function thinkHide() {
 }
 const THINK_PHASES = ['ready', 'casting', 'waiting'];
 function thinkUpdate() {
-  if (G.thinkUntil && G.t >= G.thinkUntil) thinkHide();
   if (G.thinkPending.length && G.t >= G.capUntil && THINK_PHASES.indexOf(G.phase) >= 0) thinkBeat(null);
 }
 function lose(msg) {
@@ -2741,7 +2741,7 @@ function companionTap() {
 }
 const COMP_PAD = 3;
 function companionHit(x, y) {
-  if (WS.companion <= 0.5 || WS.far > 0.5) return false;
+  if (WS.companion <= 0.5 || WS.far > 0.5 || G.t < G.thinkUntil) return false; // a tap on a waiting bubble only dismisses it
   const open = G.phase === 'ready' || (G.phase === 'dialog' && !!UI.choices && WS.companionTurn > 0.5);
   if (!open) return false;
   const x0 = boatLeft() + COMP_DX - COMP_PAD, y0 = compY(boatSinkPx()) - COMP_PAD;
@@ -2772,6 +2772,7 @@ function setTestMode(on) {
 const SKIP_BOB = { x: 63, y: 280 };
 function testCatch() {
   if (!TEST) return;
+  if (G.t < G.thinkUntil) thinkHide(); // a waiting bubble goes first, then the skip proceeds
   const p = G.phase;
   if (p === 'title') { startGame(); return; }
   if (p === 'card') { closeCard(); return; }
@@ -2799,12 +2800,15 @@ function openingUpdate(dt) {
     o.stage = 1;
     WS.boatX = ROW_FROM;
     tween(WS, 'boatX', ROW_FROM * 0.25, ROW_DUR / 2, E.out, () =>
-      tween(WS, 'boatX', 0, ROW_DUR / 2, E.out, () => { G.arrived = true; refreshPrompt(); thinkBeat(BAIT_LINE); }));
+      tween(WS, 'boatX', 0, ROW_DUR / 2, E.out, openingLine));
     UI.fade(0, 1.2);
     SFX.row();
-    cap('Nothing on the lake is moving except you.', 3.5);
   } else if (o.stage === 1 && o.t >= OPEN_DIP + ROW_DUR / 2) { o.stage = 2; SFX.row(); }
   else if (o.stage === 2 && G.arrived) G.open = null;
+}
+const OPENING_LINE = 'Nothing on the lake is moving except you.';
+function openingLine() {
+  dlgRun([narr(OPENING_LINE)], () => { G.arrived = true; setPhase('ready'); thinkBeat(BAIT_LINE); });
 }
 function resetAll() {
   resetWS();
@@ -2816,7 +2820,7 @@ function resetAll() {
   cloudT = 0; genEyes();
   WS.farBoat = RUN.count > 0 || loadEndings().length > 0 || sessionEndings.length > 0 ? 1 : 0; // bible, Title
   CINE = null;
-  DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0; DLG.echo = null; DLG.hold = 0;
+  DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0; DLG.echo = null;
   SFX.drone(false); SFX.weight(false);
   UI.count(0); UI.dlgHide(); UI.thinkHide(); UI.cardHide(); UI.endingHide();
   setPhase('title');
@@ -2868,7 +2872,7 @@ function makeUI() {
   const $ = id => document.getElementById(id);
   const el = {
     stage: $('stage'), prompt: $('prompt'), caption: $('caption'), count: $('count'),
-    think: $('think'), thinkPath: $('thinkPath'), thinkTail1: $('thinkTail1'), thinkTail2: $('thinkTail2'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'),
+    think: $('think'), thinkPath: $('thinkPath'), thinkTail1: $('thinkTail1'), thinkTail2: $('thinkTail2'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'), thinkMore: $('thinkMore'),
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
     title: $('title'), found: $('found'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endFound: $('endFound'),
@@ -2914,6 +2918,7 @@ function makeUI() {
       const side = opts.side || 'fisherman';
       el.thinkWho.hidden = !opts.who; el.thinkWho.textContent = opts.who || '';
       setText(el.thinkText, text, opts.mark);
+      el.thinkMore.classList.toggle('on', !!opts.more);
       buttons(el.thinkChoices, opts.choices || null);
       if (opts.choices) { this.choices = opts.choices; this.thinkOwns = true; }
       el.think.classList.toggle('ask', !!opts.choices);
@@ -2923,6 +2928,7 @@ function makeUI() {
     },
     thinkHide() {
       el.think.classList.remove('on', 'ask');
+      el.thinkMore.classList.remove('on');
       buttons(el.thinkChoices, null);
       this.thinkSide = null;
       if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; }
