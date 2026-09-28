@@ -52,7 +52,7 @@ Unchanged text. Two silent additions: three bone pixels of a knife on the gunwal
 
 ### Opening
 
-The boat rows in from the left at dawn while the title fades (`boatX` from -120 to 0 over 4 s). Casting is not possible until it arrives. Captions, one per beat, in pace with play:
+The boat rows in from the left at dawn while the title fades (a short dip to black, then `boatX` from -208, off screen, to 0 over 4 s). Casting is not possible until it arrives. Captions, one per beat, in pace with play:
 
 - On start, narr: `Nothing on the lake is moving except you.`
 - When the first cast lands, said: `First time here.`
@@ -326,7 +326,7 @@ Nothing is locked behind replay.
 
 Timed functions in the existing cinematic system. Durations are targets.
 
-- **Opening** (4 s, under the title fade): `boatX` from -120 to 0, eased out. Row sound, two strokes. No cast until it arrives.
+- **Opening** (4 s, under the title fade): a short dip to black, then `boatX` from -208 (off screen; -120 would leave the hull on screen) to 0, eased out. Row sound, two strokes. No cast until it arrives.
 - **Ocean** (about 25 s): mountains sink toward the horizon and blend into the sky colour until gone (`far` 0 to 1 over 6 s). The boat swaps through three smaller silhouettes to a few pixels at the centre; rod, line, float and lantern hidden while `far > 0.5`. Shadows spawn large and larger (2x to 6x), a dozen, then one the full width of the screen and a third of the water's height; the others scatter from it over 2 s; it stops under the boat. `Told you.` Then the prompt `Tap to cast`. If the player casts within 12 s, the float lands on it and the Swallowed cinematic starts. Otherwise the shape slides off left over 4 s, the boat and mountains return over 4 s, and the mountains land 10 px closer to the horizon than before (`shoreShift`, kept for the rest of the run). No caption about it. Skip fish acts as a cast during the window.
 - **Swallowed** (6 s): the water inside a growing circle around the boat goes to the darkest index with a rippling edge, the boat drops into it, black, crunch.
 - **Gold sink** (5 s): `boatSunk` 0 to 1: the boat drawn with the waterline at the gunwale (hull rows below it masked by water), the lantern floating beside it at water level with its glow on the water, the fisherman's legs under water, bubbles for two seconds. Persists for the rest of the run; the rod and float still work.
@@ -345,7 +345,7 @@ The world is a set of numbers in `WS`. Every scene below says which of them it O
 | Scene | Owns and changes | Must hold |
 |---|---|---|
 | Title | `farBoat` (1 if any run finished), clouds drift, birds, fish jumps | mood 0, sun at rest, glow 1, troubled 0, no lantern |
-| Opening row-in | `boatX` -120 to 0 over 4 s | everything else as the title |
+| Opening row-in | `boatX` -208 to 0 over 4 s, under a 0.4 s dip to black | everything else as the title |
 | Act 0 play | nothing | mood 0, sun at rest, troubled 0 |
 | Golden scene 1 | the sky fish (`goldFish`) appears and dives; kept: `goldKept` 0 to 1 and no sky fish | the world |
 | Wish 1 grant | company: `companion` 0 to 1 over 2.2 s. Home: `cabin` 0 to 1 over 2.2 s. Fish: the ocean cutscene, then `fishShadows` 1 and `shoreShift` 10. Nothing: no change | mood 0 |

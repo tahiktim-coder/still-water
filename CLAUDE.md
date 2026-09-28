@@ -29,12 +29,12 @@ The internal resolution is 216 wide by H tall. H ranges from 384 to 470, chosen 
 
 Palette: `buildPalette(mood, dim)` fills `PAL` (RGBA) and `PALRGB`.
 - 0–11: the main ramp, blended day, then night, then blood as `WS.mood` goes 0, 1, 2. `dim` darkens it for the Dark ending.
-- 12 bobber, 13–16 gold, 17 lantern, 18 fish eye, 19 black, 20 star, 21 red eyes, 22–23 bone. Each mood's values are in `ACC`.
+- 12 bobber, 13–16 gold, 17 lantern, 18 fish eye, 19 black, 20 star, 21 red eyes, 22–23 bone, 24 eye glint (the dimmer pair under each pair of eyes). Each mood's values are in `ACC`.
 - Sprite strings map characters to indices through `CH`: `0-9 a b` for the ramp, `R d g y w L E K S X` for accents, and `.` for transparent.
 - `dith(f, x, y)` turns a continuous shade into an index, using Bayer dithering only near band edges.
 
 Buffers:
-- `MOUNT` and `CLOUD` are generated once in `init`.
+- `MOUNT` is generated once in `init`. `CLOUDS` holds two cloud layers (the near cumulus at 3 px/s and the far wisps at 1.1 px/s), each a strip `CW = 2W` wide that wraps; `renderTop` samples them with a per-layer offset from `cloudT` (which stops while `WS.frozen`), and `KCOR` cuts the fixed sun corridor at sample time so it never drifts with them.
 - `TOP` holds the sky, sun, clouds and mountains above the horizon.
 - `FRAME` is `TOP` plus the mirrored water.
 - `SPR` holds sprites, with 255 meaning transparent.
@@ -45,7 +45,7 @@ Frame order in `render(t)`:
 2. `renderTop`.
 3. `topExtras`: stars, birds, cabin and the stalk line.
 4. `computeWater`: the mirror with per-row ripple `RIPX`, plus glints.
-5. Rings and fish shadows.
+5. Rings, fish shadows and the eyes (`drawEyes`, in the water, never reflected).
 6. Sprites with reflections, via `plotR` and `stampR`.
 7. `composite`, which includes the jaw shift.
 8. `drawFangs`.
@@ -54,7 +54,7 @@ Frame order in `render(t)`:
 11. `applyGlows`: lantern and cabin light.
 
 State:
-- `WS` holds the world and mood. Each visual beat is a numeric field, such as `mood`, `sunY`, `sunKind`, `pupil`, `stalk`, `jaw`, `lantern`, `ash`, `companion`, `cabin` and `gold`. Animate them with `tween(obj, key, to, dur, ease, done)`.
+- `WS` holds the world and mood. Each visual beat is a numeric field, such as `mood`, `sunY`, `sunKind`, `pupil`, `stalk`, `jaw`, `lantern`, `ash`, `companion`, `cabin` and `gold`. Animate them with `tween(obj, key, to, dur, ease, done)`; `untween` cancels one. Phase 2 fields: `frozen` (the forever wish via `freezeDay`: cloud time, birds and fish jumps stop, cleared at the still-water dawn), `eyes` (the act 2 look from the water, `eyesLook`, once per run through `G.eyesDone`; reused for one beat in `CINE_DARK`), `farBoat` (the title's far boat after any finished run, stamped into `TOP`). The opening row-in lives in `openingUpdate` (`G.open`, `G.arrived` gates the first cast and the test skip); it starts at `ROW_FROM` -208 (off screen; the bible's -120 leaves the boat on screen) after a 0.4 s dip to black. The eyes' positions come from `mulberry32(RUN.count + 7)`, so shots are deterministic.
 - `G` is the fishing state machine. Its phases are title, ready, casting, waiting, bite, reeling, landing, card, lost, dialog, cine and end. The only inputs are `press()` and `release()`.
 - `STORY` holds the act (0–2), catches, `wishes` (granted wishes only, in order), `heard`, `goldenNext`, and the bible's flags: `kept`, `firstAsk` ('company' | 'fish' | 'home' | 'nothing'), `refused` (0–2), `answered` (null | true | false), `ocean` ('none' until phase 5), `said` (how many of the fisherman's three lines have shown), `usedRepl` (keys of the card replacements that have fired this run). Also `casts` (for the opening captions) and `shown1` (species whose act 1 card was shown, so act 2 picks another). `freshStory()` is the reset shape.
 - `RUN` holds `count` (completed runs, from localStorage `stillwater-runs` plus this session) and `last` (the last ending id, `stillwater-last`). `isLaterRun()` gates the second-run lines. It is reloaded in `resetAll`, and `showEnding` bumps it.

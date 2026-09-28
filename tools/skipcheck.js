@@ -15,14 +15,17 @@ if (g.phase !== 'ready') fail('expected ready after title tap, got ' + g.phase);
 g.testCatch(); tick(3);
 if (g.phase !== 'ready') fail('testCatch should do nothing when test mode is off, phase=' + g.phase);
 
-// 2. With test mode on, three skips reach the golden fish dialogue in act 0.
+// 2. With test mode on, a skip does nothing until the boat has rowed in; then three skips reach the
+// golden fish dialogue in act 0.
 g.setTestMode(true);
+g.testCatch(); tick(3);
+if (g.phase !== 'ready' || g.STORY.catches !== 0) fail('a skip before the boat arrives should do nothing, phase=' + g.phase);
 let skips = 0;
 const t0 = Date.now();
 let t = 0;
 while (g.phase !== 'dialog' && t < 60) {
   const p = g.phase;
-  if (p === 'ready' || p === 'card' || p === 'lost' || p === 'landing') { g.testCatch(); if (p === 'ready') skips++; }
+  if (p === 'ready' || p === 'card' || p === 'lost' || p === 'landing') { g.testCatch(); if (p === 'ready' && g.G.arrived) skips++; }
   tick(1); t += dt;
 }
 if (g.phase !== 'dialog') fail('never reached the golden dialogue, phase=' + g.phase);

@@ -66,11 +66,11 @@ const RAMP = {
   night: ['#02030a', '#060a1a', '#0b1128', '#111938', '#172248', '#1e2b58', '#263568', '#314177', '#3e4f86', '#506096', '#6878a8', '#8e9cc4'].map(hexc),
   blood: ['#060103', '#130207', '#24040c', '#380710', '#520b14', '#6e0f17', '#8c1519', '#aa1d1b', '#c62b1f', '#de4426', '#f06838', '#ff9e5e'].map(hexc),
 };
-// 12 bobber, 13-16 gold ramp, 17 lantern, 18 fish eye, 19 black, 20 star, 21 red eyes, 22-23 bone
+// 12 bobber, 13-16 gold ramp, 17 lantern, 18 fish eye, 19 black, 20 star, 21 red eyes, 22-23 bone, 24 eye glint
 const ACC = {
-  day: ['#e2483a', '#5c3a08', '#a86f12', '#e2aa2a', '#ffe27c', '#ffd27a', '#1a0c02', '#000000', '#ffffff', '#ff3322', '#eee4d2', '#a89a86'].map(hexc),
-  night: ['#e0503f', '#3e2a0a', '#7c5614', '#c2902c', '#f2d47c', '#ffc766', '#1a0c02', '#000000', '#e8eeff', '#ff3322', '#c9c6d2', '#7c7a8c'].map(hexc),
-  blood: ['#ffe4cc', '#1e0203', '#5e0808', '#a8140e', '#ff4a22', '#ff3b1f', '#ff2a14', '#000000', '#ffc6a8', '#ff3322', '#f4c9ab', '#a8584a'].map(hexc),
+  day: ['#e2483a', '#5c3a08', '#a86f12', '#e2aa2a', '#ffe27c', '#ffd27a', '#1a0c02', '#000000', '#ffffff', '#ff3322', '#eee4d2', '#a89a86', '#7d1a12'].map(hexc),
+  night: ['#e0503f', '#3e2a0a', '#7c5614', '#c2902c', '#f2d47c', '#ffc766', '#1a0c02', '#000000', '#e8eeff', '#ff3322', '#c9c6d2', '#7c7a8c', '#7d1a12'].map(hexc),
+  blood: ['#ffe4cc', '#1e0203', '#5e0808', '#a8140e', '#ff4a22', '#ff3b1f', '#ff2a14', '#000000', '#ffc6a8', '#ff3322', '#f4c9ab', '#a8584a', '#7d1a12'].map(hexc),
 };
 const PAL = new Uint32Array(32);
 const PALRGB = new Float32Array(32 * 3);
@@ -100,13 +100,42 @@ function buildPalette(mood, dim) {
       setPal(i, c[0] * k, c[1] * k, c[2] * k);
     }
   }
-  for (let j = 0; j < 12; j++) setPal(12 + j, lerp(aa[j][0], ab[j][0], t), lerp(aa[j][1], ab[j][1], t), lerp(aa[j][2], ab[j][2], t));
+  for (let j = 0; j < aa.length; j++) setPal(12 + j, lerp(aa[j][0], ab[j][0], t), lerp(aa[j][1], ab[j][1], t), lerp(aa[j][2], ab[j][2], t));
 }
 
 // ---------------------------------------------------------------- buffers
 const TOP = new Uint8Array(W * HY);          // above-horizon frame (sky, sun, clouds, mountains)
 const MOUNT = new Uint8Array(W * HY).fill(255);
-const CLOUD = new Uint8Array(W * HY).fill(255);
+// Two cloud layers drift at different speeds, each a strip CW wide that wraps seamlessly: the big
+// cumulus (near, faster) and the small wisps high up and by the horizon (far, slower). idx holds the
+// shaded indices. vis holds, per cloud pixel, the least sun-corridor factor (0..255) at which it still
+// shows, so the corridor that keeps the sun's path clear (KCOR, fixed to the screen) is cut at sample
+// time and stays put while the clouds move through it.
+const CW = W * 2;
+const CLOUD_T = 0.3;
+const CLOUDS = [
+  { speed: 3, ph: 0, off: 0, oy: 0, idx: new Uint8Array(CW * HY).fill(255), vis: new Uint8Array(CW * HY) },
+  { speed: 1.1, ph: Math.PI, off: 0, oy: 0, idx: new Uint8Array(CW * HY).fill(255), vis: new Uint8Array(CW * HY) },
+];
+// layer, cx, cy, width, height, puffs, rmin, rmax. The first six are the original sky, in generation
+// order, so their shapes are unchanged; the rest fill the hidden half of the strip.
+const CLOUD_CLUSTERS = [
+  [0, 16, 70, 84, 40, 24, 12, 24],
+  [0, 44, 150, 100, 34, 26, 11, 22],
+  [0, 142, 112, 40, 96, 24, 11, 20],
+  [1, 154, 200, 60, 20, 12, 8, 14],
+  [1, 46, 208, 60, 16, 12, 6, 12],
+  [1, 200, 32, 48, 22, 10, 7, 14],
+  [0, 278, 62, 72, 36, 20, 11, 22],
+  [0, 336, 142, 84, 36, 22, 11, 22],
+  [0, 396, 98, 46, 60, 16, 10, 18],
+  [1, 300, 206, 54, 16, 12, 6, 12],
+  [1, 372, 26, 56, 22, 10, 7, 14],
+  [1, 250, 22, 44, 18, 8, 6, 12],
+  [1, 410, 208, 40, 14, 10, 6, 11],
+];
+const KCOR = new Uint8Array(W * HY);        // the sun corridor: 255 outside, 0 where the sky is kept clear
+let cloudT = 0;                              // cloud time; it stops while the day is frozen
 let FRAME, SPR, IDX, RIPX, OUT32 = null;
 function alloc() {
   FRAME = new Uint8Array(W * H);
@@ -116,48 +145,60 @@ function alloc() {
 }
 
 // ---------------------------------------------------------------- world generation
+// Noise made periodic in x over the strip: the last CLOUD_SEAM columns blend toward column 0.
+const CLOUD_SEAM = 24;
+function tiled(fn, x, y) {
+  const s = x - (CW - CLOUD_SEAM);
+  return s <= 0 ? fn(x, y) : lerp(fn(x, y), fn(x - CW, y), E.io(s / CLOUD_SEAM));
+}
+const wrapX = x => ((x % CW) + CW) % CW;
 function genClouds() {
+  for (let y = 0; y < HY; y++) for (let x = 0; x < W; x++) {
+    const sdx = x - SUNX, sdy = y < SUN0Y ? SUN0Y - y : 0;
+    KCOR[y * W + x] = Math.round(clamp((Math.sqrt(sdx * sdx + sdy * sdy) - 21) / 10, 0, 1) * 255);
+  }
   const rng = mulberry32(1337);
-  const clusters = [ // cx, cy, width, height, puffs, rmin, rmax
-    [16, 70, 84, 40, 24, 12, 24],
-    [44, 150, 100, 34, 26, 11, 22],
-    [142, 112, 40, 96, 24, 11, 20],
-    [154, 200, 60, 20, 12, 8, 14],
-    [46, 208, 60, 16, 12, 6, 12],
-    [200, 32, 48, 22, 10, 7, 14],
-  ];
-  const puffs = [];
-  for (const [cx, cy, cw, chh, n, r0, r1] of clusters) {
+  const puffs = CLOUDS.map(() => []);
+  for (const [layer, cx, cy, cw, chh, n, r0, r1] of CLOUD_CLUSTERS) {
     for (let k = 0; k < n; k++) {
       const u = rng() * 2 - 1, v = rng() * 2 - 1;
       const r = lerp(r0, r1, rng()) * (1 - 0.3 * Math.abs(u));
-      puffs.push({ x: cx + u * cw * 0.5, y: cy + v * chh * 0.5 - r * 0.25, r, base: cy + chh * 0.5 });
+      puffs[layer].push({ x: cx + u * cw * 0.5, y: cy + v * chh * 0.5 - r * 0.25, r, base: cy + chh * 0.5 });
     }
   }
-  const dens = new Float32Array(W * HY);
-  for (let y = 0; y < HY; y++) for (let x = 0; x < W; x++) {
-    let d = 0;
-    for (let k = 0; k < puffs.length; k++) {
-      const p = puffs[k];
-      const dx = x - p.x, dy = (y - p.y) * 1.25;
-      const q = (dx * dx + dy * dy) / (p.r * p.r);
-      if (q < 1) { let kk = 1 - q; kk *= kk; if (y > p.base) kk *= Math.exp(-(y - p.base) / 2); d += kk; }
+  CLOUDS.forEach((L, k) => genCloudLayer(L, puffs[k]));
+}
+function genCloudLayer(L, puffs) {
+  const dens = new Float32Array(CW * HY);
+  for (const p of puffs) { // each puff adds to its own box; x wraps around the strip
+    const x0 = Math.floor(p.x - p.r), x1 = Math.ceil(p.x + p.r);
+    const y0 = Math.max(0, Math.floor(p.y - p.r / 1.25)), y1 = Math.min(HY - 1, Math.ceil(p.y + p.r / 1.25));
+    for (let y = y0; y <= y1; y++) {
+      const dy = (y - p.y) * 1.25;
+      for (let x = x0; x <= x1; x++) {
+        const dx = x - p.x, q = (dx * dx + dy * dy) / (p.r * p.r);
+        if (q >= 1) continue;
+        let kk = 1 - q; kk *= kk;
+        if (y > p.base) kk *= Math.exp(-(y - p.base) / 2);
+        dens[y * CW + wrapX(x)] += kk;
+      }
     }
-    if (d > 0.02) d += (fbm(x * 0.07, y * 0.1, 11, 3) - 0.5) * 0.3 + (fbm(x * 0.25, y * 0.25, 23, 2) - 0.5) * 0.1;
-    const sdx = Math.abs(x - SUNX), sdy = y < SUN0Y ? SUN0Y - y : 0;
-    d *= clamp((Math.sqrt(sdx * sdx + sdy * sdy) - 21) / 10, 0, 1); // keep the sun's path clear
-    dens[y * W + x] = d;
   }
-  const T = 0.3;
+  const n1 = (x, y) => fbm(x * 0.07, y * 0.1, 11, 3), n2 = (x, y) => fbm(x * 0.25, y * 0.25, 23, 2), n3 = (x, y) => vnoise(x * 0.35, y * 0.35, 77);
+  for (let y = 0; y < HY; y++) for (let x = 0; x < CW; x++) {
+    const i = y * CW + x;
+    if (dens[i] > 0.02) dens[i] += (tiled(n1, x, y) - 0.5) * 0.3 + (tiled(n2, x, y) - 0.5) * 0.1;
+  }
+  const T = CLOUD_T;
   const sample = (x, y) => {
-    x = Math.round(x); y = Math.round(y);
-    if (x < 0 || x >= W || y < 0 || y >= HY) return 0;
-    return dens[y * W + x];
+    y = Math.round(y);
+    if (y < 0 || y >= HY) return 0;
+    return dens[y * CW + wrapX(Math.round(x))];
   };
-  for (let y = 0; y < HY; y++) for (let x = 0; x < W; x++) {
-    const d = dens[y * W + x];
+  for (let y = 0; y < HY; y++) for (let x = 0; x < CW; x++) {
+    const i = y * CW + x, d = dens[i];
     if (d <= T) continue;
-    let lx = SUNX - x, ly = SUN0Y + 6 - y;
+    let lx = SUNX + CW * Math.round((x - SUNX) / CW) - x, ly = SUN0Y + 6 - y; // lit toward the nearest copy of the sun
     const ll = Math.hypot(lx, ly) || 1; lx /= ll; ly /= ll;
     const shade = d - sample(x + lx * 4, y + ly * 4);
     const e = d - T;
@@ -168,10 +209,28 @@ function genClouds() {
     if (sample(x, y - 1) <= T) f = Math.max(f, 10.6);          // sky-lit tops
     else if (sample(x, y + 2) <= T) f = Math.min(f, 7.0);     // shaded undersides
     f -= clamp((100 - y) / 100, 0, 1) * 1.0;
-    f += (vnoise(x * 0.35, y * 0.35, 77) - 0.5) * 0.5;
-    CLOUD[y * W + x] = ci(Math.round(f));
+    f += (tiled(n3, x, y) - 0.5) * 0.5;
+    L.idx[i] = ci(Math.round(f));
+    L.vis[i] = Math.min(254, Math.round(255 * T / d));
   }
 }
+// Per-layer offsets for this frame: the drift, and a slow breathing of a pixel or two.
+function cloudTick() {
+  for (const L of CLOUDS) {
+    L.off = Math.floor(cloudT * L.speed) % CW;
+    L.oy = Math.round(Math.sin(cloudT * 0.06 + L.ph) * 1.4);
+  }
+}
+function cloudIdx(x, y) {
+  for (let k = 0; k < CLOUDS.length; k++) {
+    const L = CLOUDS[k];
+    let bx = x + L.off; if (bx >= CW) bx -= CW;
+    const v = L.idx[clamp(y + L.oy, 0, HY - 1) * CW + bx];
+    if (v !== 255) return v;
+  }
+  return 255;
+}
+
 
 function genRidge(pts, rough, seed) {
   const rng = mulberry32(seed);
@@ -248,8 +307,8 @@ function genStars() {
   for (let k = 0; k < 500 && STARS.length < 70; k++) {
     const x = Math.floor(rng() * W), y = Math.floor(rng() * 160);
     const i = y * W + x;
-    if (MOUNT[i] !== 255 || CLOUD[i] !== 255) continue;
-    STARS.push({ i, p: rng() * 6.283, b: rng(), s: 1 + rng() * 2 });
+    if (MOUNT[i] !== 255 || cloudIdx(x, y) !== 255) continue;
+    STARS.push({ i, x, y, p: rng() * 6.283, b: rng(), s: 1 + rng() * 2 });
   }
 }
 
@@ -325,6 +384,10 @@ const CABIN = sprite([
   '.00000000.',
 ]);
 const GOLDPILE = sprite(['...y.w..', '..yygyy.', '.gyygyyg', 'dgggdggd']);
+const FARBOAT = sprite(['....0', '00000']); // the far boat on the title, at the horizon: a hull and a curled prow
+const FAR_X = 206; // the horizon is only open in the centre, so it sits on the lit foot of the right mountain, clear of the prow curl and of the screen edge
+const COMP_DX = 50, COMP_DY = -17; // the companion's seat, from the boat's corner and the waterline
+const KNIFE_X = 12;               // hull column of the knife, beside the lantern pole
 
 function makeBoat() {
   const L = 76, ox = 3, w = L + ox + 6, h = 32, wl = 30;
@@ -339,6 +402,12 @@ function makeBoat() {
     for (let y = top; y <= bot; y++) set(ox + x, y, 0);
   }
   for (let x = 4; x < L - 4; x++) set(ox + x, tops[x] + 2, 1); // plank line
+  // The stern seat, an empty plank exactly where the companion sits, so he visibly fills it (bible, Title).
+  const seatY = wl + COMP_DY + COMP.h - 1;
+  for (let x = COMP_DX - 1; x <= COMP_DX + COMP.w; x++) { set(x, seatY - 1, 3); set(x, seatY, 1); }
+  // The knife: three bone pixels on the gunwale beside the lantern pole.
+  const ky = tops[KNIFE_X] - 1;
+  set(ox + KNIFE_X, ky, 23); set(ox + KNIFE_X + 1, ky, 22); set(ox + KNIFE_X + 2, ky, 22);
   const line = (pts, thick) => {
     for (let k = 0; k < pts.length - 1; k++) {
       const [x0, y0] = pts[k], [x1, y1] = pts[k + 1];
@@ -541,6 +610,7 @@ const G = {
   rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 },
   lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0,
   capUntil: 0, saidUntil: 0, saidPending: [],
+  arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0,
 };
 // wishes holds granted wishes only, in order. kept, firstAsk, refused, answered, ocean, said and usedRepl follow
 // the bible, section 3: said counts the fisherman's lines that have shown, usedRepl the card replacements fired.
@@ -572,8 +642,11 @@ function stubUI() {
 
 // ---------------------------------------------------------------- tweens
 const TW = [];
-function tween(obj, key, to, dur, ease, done) {
+function untween(obj, key) {
   for (let k = TW.length - 1; k >= 0; k--) if (TW[k].obj === obj && TW[k].key === key) TW.splice(k, 1);
+}
+function tween(obj, key, to, dur, ease, done) {
+  untween(obj, key);
   TW.push({ obj, key, from: obj[key], to, dur: Math.max(0.001, dur), t: 0, ease: ease || E.io, done });
 }
 function updTweens(dt) {
@@ -605,6 +678,7 @@ function updParts(dt) {
 }
 function ring(x, y, big) { RINGS.push({ x, y, r: 1, v: big ? 26 : 12, life: 0, max: big ? 2.6 : 1.6 }); }
 function updRings(dt) {
+  if (WS.frozen) return; // frozen, a ring in flight holds, like the birds (bible, 8b)
   for (let k = RINGS.length - 1; k >= 0; k--) {
     const r = RINGS[k];
     r.life += dt;
@@ -654,13 +728,15 @@ function updShadows(dt) {
     if (s.y > H - 20) s.y = H - 20;
   }
 }
+function spawnBirds() {
+  const fromL = Math.random() < 0.5, y = 40 + Math.random() * 80, n = 2 + ((Math.random() * 3) | 0);
+  for (let k = 0; k < n; k++) BIRDS.push({ x: fromL ? -8 - k * 9 : W + 8 + k * 9, y: y + (Math.random() - 0.5) * 12 + k * 3, vx: (fromL ? 1 : -1) * (14 + Math.random() * 4), ph: Math.random() * 3 });
+}
+// Birds only while it is day, the shore is near and the day is not frozen (bible, 8c). Frozen, they hang.
 function updBirds(dt) {
+  if (WS.frozen) return;
   birdTimer -= dt;
-  if (birdTimer <= 0 && WS.mood < 0.5) {
-    birdTimer = 10 + Math.random() * 14;
-    const fromL = Math.random() < 0.5, y = 40 + Math.random() * 80, n = 2 + ((Math.random() * 3) | 0);
-    for (let k = 0; k < n; k++) BIRDS.push({ x: fromL ? -8 - k * 9 : W + 8 + k * 9, y: y + (Math.random() - 0.5) * 12 + k * 3, vx: (fromL ? 1 : -1) * (14 + Math.random() * 4), ph: Math.random() * 3 });
-  }
+  if (birdTimer <= 0 && WS.mood < 0.5 && WS.far < 0.5) { birdTimer = 10 + Math.random() * 14; spawnBirds(); }
   for (let k = BIRDS.length - 1; k >= 0; k--) {
     const b = BIRDS[k];
     b.x += b.vx * dt;
@@ -672,7 +748,7 @@ function updJumps(dt) {
   jumpTimer -= dt;
   if (jumpTimer <= 0) {
     jumpTimer = 5 + Math.random() * 9;
-    if (WS.mood < 1.2 && G.phase !== 'cine') {
+    if (WS.mood < 1.2 && !WS.frozen && WS.far === 0 && G.phase !== 'cine') { // bible, 8c
       const x = 14 + Math.random() * (W - 28), y = HY + 12 + Math.random() * (H - HY - 60);
       splash(x, y, 4); ring(x, y);
     }
@@ -681,6 +757,7 @@ function updJumps(dt) {
 
 // ---------------------------------------------------------------- rendering
 function renderTop(t) {
+  cloudTick();
   const sx = WS.sunX, sy = WS.sunY, sr = WS.sunR;
   const glow = WS.sunGlow, hg = WS.horizGlow;
   const red = WS.sunKind === 1;
@@ -688,6 +765,7 @@ function renderTop(t) {
   const i1 = 1 / (g1 * g1), i2 = 1 / (g2 * g2);
   const srr = (sr + 0.4) * (sr + 0.4);
   const lidH = sr * (1 - WS.lid);
+  const L0 = CLOUDS[0], L1 = CLOUDS[1], idx0 = L0.idx, vis0 = L0.vis, idx1 = L1.idx, vis1 = L1.vis, off0 = L0.off, off1 = L1.off;
   for (let y = 0; y < HY; y++) {
     const ty = y / HY;
     const base = 4.1 + 4.5 * Math.pow(ty, 1.5);
@@ -695,19 +773,30 @@ function renderTop(t) {
     const hb = hg * 1.7 * Math.exp(-(dyh * dyh) / 700);
     const dy = y - sy, dy2 = dy * dy;
     const row = y * W;
+    const row0 = clamp(y + L0.oy, 0, HY - 1) * CW, row1 = clamp(y + L1.oy, 0, HY - 1) * CW;
+    const litY = SUN0Y - y; // a corridor edge this far above the sun is sun-lit where litY < 3.2 |dx|
     for (let x = 0; x < W; x++) {
       const i = row + x;
       const m = MOUNT[i];
       if (m !== 255) { TOP[i] = m; continue; }
       const dx = x - sx, d2 = dx * dx + dy2;
       const g = glow * (2.1 * Math.exp(-d2 * i1) + 1.2 * Math.exp(-d2 * i2)) + hb * Math.exp(-(dx * dx) / 4500);
-      const c = CLOUD[i];
-      if (c !== 255) { TOP[i] = ci(dith(c + g * 0.55, x, y)); continue; }
+      let bx = x + off0; if (bx >= CW) bx -= CW;
+      let cp = row0 + bx, c = idx0[cp], cv = vis0;
+      if (c === 255) { bx = x + off1; if (bx >= CW) bx -= CW; cp = row1 + bx; c = idx1[cp]; cv = vis1; }
+      if (c !== 255) {
+        const k = KCOR[i], v = cv[cp];
+        if (k > v) { // in the corridor a cloud pixel shows only where enough of it is left, and the cut gets a rim
+          if (k < 255 && k < v * 1.2333) c = litY < 3.2 * Math.abs(x - SUNX) ? 11 : c > 0 ? c - 1 : 0;
+          TOP[i] = ci(dith(c + g * 0.55, x, y)); continue;
+        }
+      }
       if (sr > 0 && d2 <= srr && Math.abs(dy) <= lidH) { TOP[i] = sunPix(dx, dy, d2); continue; }
       TOP[i] = ci(dith(base + g, x, y));
     }
   }
 }
+
 function sunPix(dx, dy, d2) {
   const r = WS.sunR;
   if (WS.sunKind === 0) return d2 > (r - 1) * (r - 1) ? 10 : 11;
@@ -741,11 +830,13 @@ function topExtras(t) {
   if (WS.starA > 0.02) {
     for (const s of STARS) {
       const tw = 0.55 + 0.45 * Math.sin(t * s.s + s.p);
-      if (s.b * 0.7 + (1 - tw) * 0.3 < WS.starA && TOP[s.i] < 8) TOP[s.i] = 20;
+      if (s.b * 0.7 + (1 - tw) * 0.3 < WS.starA && TOP[s.i] < 8 && cloudIdx(s.x, s.y) === 255) TOP[s.i] = 20;
     }
   }
-  for (const b of BIRDS) stampTop(BIRD[((t * 5 + b.ph) | 0) & 1], b.x | 0, b.y | 0);
+  const bt = WS.frozen ? G.frozeT : t; // frozen, the wings hold too
+  for (const b of BIRDS) stampTop(BIRD[((bt * 5 + b.ph) | 0) & 1], b.x | 0, b.y | 0);
   if (WS.cabin > 0) stampTop(CABIN, CABIN_X, CABIN_Y, WS.cabin);
+  if (WS.farBoat > 0 && G.phase === 'title') stampTop(FARBOAT, FAR_X, HY - FARBOAT.h); // it reflects for free
   if (WS.stalk > 0) {
     const yEnd = WS.sunY - WS.sunR * 0.9;
     const y1 = yEnd * WS.stalk * (1 - WS.stalkCut);
@@ -755,9 +846,26 @@ function topExtras(t) {
     }
   }
 }
+// The sun's reflection is one pixel larger than the disc (bible, 8c). The white sun is redrawn in the
+// water with the sunPix rule at radius sr + 1 (fill and rim both a pixel further out); the red sun,
+// whose pupil must stay as mirrored, only gets a rim in its edge colour outside the disc.
+function sunRing(y, row, srow, ixr, dyS, darkF, haze) {
+  const sx = WS.sunX, sr = WS.sunR, r0 = (sr + 0.4) * (sr + 0.4), r1 = (sr + 1.4) * (sr + 1.4);
+  const white = WS.sunKind === 0, fill2 = sr * sr, dy2 = dyS * dyS;
+  const x0 = Math.max(0, Math.floor(sx - sr - 2 - ixr)), x1 = Math.min(W - 1, Math.ceil(sx + sr + 2 - ixr));
+  for (let x = x0; x <= x1; x++) {
+    const sxp = clamp(x + ixr, 0, W - 1), dx = sxp - sx, d2 = dx * dx + dy2;
+    if (d2 > r1 || (!white && d2 <= r0)) continue;
+    const si = srow + sxp;
+    if (MOUNT[si] !== 255 || TOP[si] >= 12) continue;
+    const v = white ? (d2 > fill2 ? 10 : 11) : 8;
+    FRAME[row + x] = ci(dith(v - darkF + haze, x, y));
+  }
+}
 function computeWater(t) {
   FRAME.set(TOP, 0);
   const tr = WS.troubled, span = H - HY;
+  const sy = WS.sunY, sr = WS.sunR, lidH = sr * (1 - WS.lid);
   for (let y = HY; y < H; y++) {
     const k = (y - HY) / span;
     const amp = 0.35 + k * 1.5 + tr * (0.5 + k * 2.4);
@@ -775,6 +883,8 @@ function computeWater(t) {
       if (v < 12) v = ci(dith(v - darkF + haze, x, y));
       FRAME[row + x] = v;
     }
+    const dyS = src - sy;
+    if (sr > 0 && Math.abs(dyS) <= lidH + 1) sunRing(y, row, srow, ixr, dyS, darkF, haze);
   }
   const hr = HY * W;
   for (let x = 0; x < W; x++) { const v = FRAME[hr + x]; if (v < 12) FRAME[hr + x] = ci(v + 2); }
@@ -820,6 +930,31 @@ function drawShadows() {
         if (u < 12) FRAME[i] = Math.max(0, u - 2);
       }
     }
+  }
+}
+// The eyes in the water (bible, section 8): about eight pairs of red pixels on the surface rows under
+// the horizon beside the boat, fixed per run, with a dimmer pair a row below as the glint. Never reflected.
+const EYES = [];
+function genEyes() {
+  const rng = mulberry32(RUN.count + 7); // fixed per run, and the shots stay deterministic
+  EYES.length = 0;
+  for (let tries = 0; tries < 60 && EYES.length < 8; tries++) {
+    const right = EYES.length >= 6;
+    const x = right ? 206 + ((rng() * 6) | 0) : 70 + ((rng() * 43) | 0);
+    const y = HY + 1 + ((rng() * 3) | 0);
+    if (EYES.some(e => e.y === y && Math.abs(e.x - x) < 5)) continue;
+    EYES.push({ x, y });
+  }
+}
+function drawEyes() {
+  const a = WS.eyes;
+  if (a <= 0.02) return;
+  for (let k = 0; k < EYES.length; k++) {
+    const e = EYES[k];
+    if (hash2(k, 3, 1) > a) continue; // each pair opens at its own moment
+    const i = e.y * W + e.x;
+    FRAME[i] = 21; FRAME[i + 2] = 21;
+    if (a > 0.6) { const yr = e.y + 1, xr = clamp(e.x + RIPX[yr], 0, W - 3), j = yr * W + xr; FRAME[j] = 24; FRAME[j + 2] = 24; }
   }
 }
 function plot(x, y, v) {
@@ -883,7 +1018,7 @@ function drawBoatGroup(t) {
   }
   G.lanternPos = { x: lx + 1, y: ly + 1.5 };
   if (WS.gold > 0) stampR(GOLDPILE, bx + 32, WL - 10 + dy, WL, WS.gold);
-  if (WS.companion > 0) stampR(WS.companionTurn > 0.5 ? COMP_TURN : COMP, bx + 50, WL - 17 + dy, WL, WS.companion);
+  if (WS.companion > 0) stampR(WS.companionTurn > 0.5 ? COMP_TURN : COMP, bx + COMP_DX, WL + COMP_DY + dy, WL, WS.companion);
   const fx = bx + 18, fy = WL - 24 + dy;
   stampR(FISHER, fx, fy, WL);
   G.hand = { x: fx, y: fy + 9 };
@@ -1082,6 +1217,7 @@ function render(t) {
   computeWater(t);
   drawRings();
   drawShadows();
+  drawEyes();
   SPR.fill(255);
   drawBoatGroup(t);
   drawBobber();
@@ -1165,6 +1301,7 @@ const SFX = {
   snap() { this.noise(0.14, 0.2, 'highpass', 2500, null, 0.6); this.tone(700, 0.22, 'sawtooth', 0.08, 90); },
   snapLow() { this.tone(140, 0.9, 'sawtooth', 0.07, 60); this.noise(0.8, 0.08, 'lowpass', 500, 120); },
   splash() { this.noise(0.55, 0.2, 'lowpass', 3200, 380, 0.7); },
+  row() { this.noise(0.9, 0.07, 'lowpass', 160, 520, 0.6); this.noise(0.28, 0.05, 'bandpass', 1400, 600, 1.1, 0.55); }, // one oar stroke
   caught() { this.tone(660, 0.12, 'triangle', 0.1); this.tone(880, 0.22, 'triangle', 0.1, null, 0.1); },
   chime() { [784, 988, 1175, 1568].forEach((f, i) => this.tone(f, 1.8, 'sine', 0.07, null, i * 0.11)); },
   select() { this.tone(520, 0.08, 'triangle', 0.08); },
@@ -1336,6 +1473,8 @@ const CINE_DARK = {
     at('cap', 2, () => { if (!STORY.kept) cap('Something gold circles the boat. It has time.', 3); }); // the dim is still under half
     if (t > 6 && t < 8) WS.lanternFlicker = Math.random() < 0.5 ? 1 : 0.1;
     else if (t >= 8) WS.lanternFlicker = 0;
+    WS.eyes = t > 7.5 && t < 7.8 ? 1 : 0; // one look from the water before the lantern dies
+    if (WS.eyes) WS.lanternFlicker = 0.1;
     at('out', 8, () => SFX.hiss(0.6));
     at('fade', 8.3, () => UI.fade(1, 1));
   },
@@ -1374,7 +1513,7 @@ const cutCine = silent => ({
     WS.starA = t < 3 ? 0 : t < 6 ? (t - 3) / 3 : 1 - clamp((t - 6) / 3, 0, 1);
     WS.troubled = lerp(s.tr0, 0, clamp((t - 3) / 8, 0, 1));
     at('dawn', 6, () => {
-      WS.sunKind = 0; WS.sunR = 8; WS.stalk = 0; WS.stalkCut = 0; WS.companionTurn = 0;
+      WS.sunKind = 0; WS.sunR = 8; WS.stalk = 0; WS.stalkCut = 0; WS.companionTurn = 0; WS.frozen = 0;
       if (silent) G.bob = null;
       if (WS.cabin > 0) tween(WS, 'cabin', 0, 1.5);
     });
@@ -1526,7 +1665,7 @@ function wish2() {
 }
 const GRANT2 = {
   forever: () => [
-    { act: () => { WS.frozen = 1; SFX.chime(); } },
+    { act: freezeDay },
     fish('That’s twice you’ve said forever. It’s a long time for a sun.'),
     fish('This one is tired. I know one that never sets.'),
   ],
@@ -1541,6 +1680,9 @@ const GRANT2 = {
     fish('Sorry. Gold is heavy. You can always come back for it.'),
   ],
 };
+// Forever: the clouds stop, the birds hang, the fish stop jumping and the sun holds until the sunset
+// cinematic, which drives it directly (bible, 8b). Nothing says so.
+function freezeDay() { WS.frozen = 1; G.frozeT = G.t; untween(WS, 'sunY'); SFX.chime(); }
 function grant2(w) {
   STORY.wishes.push(w);
   dlgRun(GRANT2[w]().concat([
@@ -1724,7 +1866,7 @@ function promptFor(p) {
   return '';
 }
 // The tutorial prompt is hidden while a said caption is on screen, so two texts never share the stage.
-function refreshPrompt() { UI.prompt(G.t < G.saidUntil ? '' : promptFor(G.phase)); }
+function refreshPrompt() { UI.prompt(G.t < G.saidUntil || !G.arrived ? '' : promptFor(G.phase)); }
 function setPhase(p) {
   G.phase = p; G.pt = 0;
   refreshPrompt();
@@ -1761,8 +1903,29 @@ function cast() {
   const tx = 34 + Math.random() * 58, ty = 262 + Math.random() * 36;
   G.cast = { t: 0, tx, ty, from: null };
   STORY.casts++;
+  eyesCast();
   setPhase('casting');
   SFX.whoosh();
+}
+// The eyes (bible, Act 2 play), once per run, between casts: on the first ready phase that lasts six
+// seconds without a cast, on the second ordinary act 2 cast if the player is quick, or, once the act 2
+// catch has made the next cast golden, half a second after the card closes (under "The water goes very
+// still"). A player who casts even faster than that gets them on the golden cast itself; at 2 s they are
+// over well before the earliest bite (3.7 s). The lantern dips for a second while they show.
+const EYES_WAIT = 6, EYES_WAIT_STILL = 0.5;
+function eyesLook() {
+  if (G.eyesDone) return;
+  G.eyesDone = true;
+  WS.lanternFlicker = 0.1;
+  tween(WS, 'eyes', 1, 1, E.io, () => { tween(WS, 'eyes', 0, 1, E.io); tween(WS, 'lanternFlicker', 1, 0.6, E.out); });
+}
+function eyesCast() {
+  if (STORY.act !== 2) return;
+  if (STORY.goldenNext || ++G.act2Casts === 2) eyesLook(); // the golden cast is the last chance this run
+}
+function eyesUpdate() {
+  if (G.eyesDone || STORY.act !== 2 || G.phase !== 'ready' || G.pt < (STORY.goldenNext ? EYES_WAIT_STILL : EYES_WAIT)) return;
+  eyesLook();
 }
 // In act 2 the golden cast has nothing bite for slightly too long.
 const RED_BITE_DELAY = 1.8;
@@ -1947,7 +2110,7 @@ function press() {
   SFX.init(); SFX.resume();
   const p = G.phase;
   if (p === 'title') startGame();
-  else if (p === 'ready') cast();
+  else if (p === 'ready') { if (G.arrived) cast(); } // no cast until the boat has rowed in
   else if (p === 'waiting') lose(STORY.goldenNext ? 'Too early.' : 'Too early. Nothing was biting yet.');
   else if (p === 'bite') hook();
   else if (p === 'reeling') G.holding = true;
@@ -1972,23 +2135,48 @@ function testCatch() {
   const p = G.phase;
   if (p === 'title') { startGame(); return; }
   if (p === 'card') { closeCard(); return; }
+  if (p === 'ready' && !G.arrived) return; // no skip before the boat has rowed in either
   if (p !== 'ready' && p !== 'casting' && p !== 'waiting' && p !== 'bite' && p !== 'reeling' && p !== 'lost') return;
   G.cast = null; G.wait = null; G.holding = false; G.bobDip = 0;
   G.bob = { x: SKIP_BOB.x, y: SKIP_BOB.y, fly: false };
+  eyesCast(); // a skip counts as a cast for the eyes
   hook();
   if (G.phase === 'reeling' && G.reel) { G.reel.p = 1; land(); }
 }
+// The opening (bible, section 8): a short dip to black under the title fade, then the boat rows in from
+// off screen left in two eased strokes over 4 s, under the first caption. No cast until it has arrived.
+// The bible says -120, but BOAT_X is 118 and the hull 85 wide, so -120 would leave the boat on screen;
+// -208 is the value that actually starts it off the left edge. The dip hides the jump from the title's boat.
+const ROW_FROM = -208, ROW_DUR = 4, OPEN_DIP = 0.4;
 function startGame() {
   UI.title(false);
+  UI.fade(1, OPEN_DIP - 0.05);
+  G.arrived = false; G.open = { t: 0, stage: 0 };
   setPhase('ready');
-  cap('Nothing on the lake is moving except you.', 3.5);
+}
+function openingUpdate(dt) {
+  const o = G.open;
+  if (!o) return;
+  o.t += dt;
+  if (o.stage === 0 && o.t >= OPEN_DIP) {
+    o.stage = 1;
+    WS.boatX = ROW_FROM;
+    tween(WS, 'boatX', ROW_FROM * 0.25, ROW_DUR / 2, E.out, () =>
+      tween(WS, 'boatX', 0, ROW_DUR / 2, E.out, () => { G.arrived = true; refreshPrompt(); }));
+    UI.fade(0, 1.2);
+    SFX.row();
+    cap('Nothing on the lake is moving except you.', 3.5);
+  } else if (o.stage === 1 && o.t >= OPEN_DIP + ROW_DUR / 2) { o.stage = 2; SFX.row(); }
+  else if (o.stage === 2 && G.arrived) G.open = null;
 }
 function resetAll() {
   resetWS();
   Object.assign(STORY, freshStory());
   loadRun();
-  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, saidUntil: 0, saidPending: [] });
+  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, saidUntil: 0, saidPending: [], arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0 });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
+  cloudT = 0; genEyes();
+  WS.farBoat = RUN.count > 0 || loadEndings().length > 0 || sessionEndings.length > 0 ? 1 : 0; // bible, Title
   CINE = null;
   DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0;
   SFX.drone(false);
@@ -2010,8 +2198,11 @@ function update(dt) {
   G.t += dt; G.pt += dt;
   updTweens(dt);
   cineUpdate(dt);
+  openingUpdate(dt);
   saidUpdate();
   fishUpdate(dt);
+  eyesUpdate();
+  if (!WS.frozen) cloudT += dt;
   dlgUpdate(dt);
   updParts(dt); updRings(dt); updAsh(dt); updShadows(dt); updBirds(dt); updJumps(dt);
   ambientUpdate(dt);
@@ -2210,7 +2401,7 @@ if (IS_BROWSER) {
     setOut(buf) { OUT32 = buf; },
     setH(h) { H = h; alloc(); },
     get H() { return H; }, W, HY,
-    spawnShadows, SHAD, RUN, ENDING_COUNT,
+    spawnShadows, SHAD, spawnBirds, BIRDS, RUN, ENDING_COUNT,
   };
 }
 })();
