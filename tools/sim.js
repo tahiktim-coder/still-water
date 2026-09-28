@@ -16,7 +16,7 @@ function play(plan, label, opts) {
   UI.log.length = 0;
   let t = 0, ci = 0, lastAct = 0, holding = false, frames = 0, lastLine = null, stalled = '', tapped = -1, keptMax = 0;
   const dt = 1 / 30;
-  const trace = [], lines = [];
+  const trace = [], lines = [], labels = new Set();
   while (t < 900) {
     const p = g.phase;
     const cur = g.DLG.cur;
@@ -34,6 +34,7 @@ function play(plan, label, opts) {
       else if (p === 'bite') { g.press(); holding = true; lastAct = t; }
       else if (p === 'dialog') {
         if (UI.choices) {
+          UI.choices.forEach(o => labels.add(o.label)); // every label offered, for the no-echo check below
           const k = plan[ci++] || 0, c = UI.choices[k] || UI.choices[0]; // a missing index falls back to 0 (bible, section 9)
           if (!c) { stalled = 'no choices at all'; break; }
           trace.push('choose:' + c.label); c.cb();
@@ -65,6 +66,10 @@ function play(plan, label, opts) {
   // (!STORY.kept || goldKept <= 0.01) skips the stamp on every frame of the dialogue.
   let ok = g.phase === 'end';
   if (!S.kept && keptMax > 0) { ok = false; console.log('   a kept fish was drawn on a released path (goldKept ' + keptMax + ')'); }
+  // Bible, 4b: a tapped choice is already his line and is never echoed in the bubble, so no bubble text may
+  // equal a label from any menu this run offered.
+  const echoed = UI.log.filter(l => l[0] === 'think' && labels.has(l[1])).map(l => l[1]);
+  if (echoed.length) { ok = false; console.log('   a choice label was echoed in the bubble: ' + echoed.join(' / ')); }
   return { ok, id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '' };
 }
 const plans = [

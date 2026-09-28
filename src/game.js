@@ -577,7 +577,7 @@ const SPECIES = [
 const DESC = {
   perch: ['You can see its heart beating through it.', 'There is an old hook inside it. Not yours.', 'No eyes. It still turns toward the lantern.'],
   char: ['Its scales show you the sky. You check. It matches.', 'Its scales show you a red sky.', 'Its scales show your boat from underneath.'],
-  smelt: ['Small and cold. Not afraid of you at all.', 'It has teeth. Smelt don\u2019t have teeth.', 'Its teeth point inward.'],
+  smelt: ['Small and cold. Not afraid of you at all.', 'It has teeth. They look like yours.', 'It is dry. It came out of the water dry.'],
   trout: ['It fought like it had somewhere to be.', 'It keeps looking at the sun.', 'It drowned. It is a fish. It drowned.'],
   eel: ['Longer than it has any right to be.', 'It knotted itself so you couldn\u2019t keep it.', 'It is still coming out of the water.'],
   grayling: ['It smells of snow.', 'It smells of smoke.', 'It smells like you.'],
@@ -1619,10 +1619,9 @@ const WEIGHT_VOL = 0.22, WEIGHT_OUT = 2;
 // lets the current list continue, so a choice can sit in the middle of a scene. A bubble line (the
 // companion's, or the fisherman's `Take me back.`) shows complete in the thought bubble instead of the panel
 // and stays until a tap, never on a timer (bible, 4b), with the panel's ▾ marker; with choices it waits for
-// one under the bubble. Every tapped choice echoes in the fisherman's bubble for ECHO_DUR before its pick
-// runs (DLG.echo), so the sim and skipcheck wait that long.
-const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0, echo: null };
-const ECHO_DUR = 1.2;
+// one under the bubble. A tapped choice is already the fisherman's line and is never echoed in his bubble
+// (bible, 4b): the tap closes the panel and runs its pick at once.
+const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0 };
 function dlgRun(lines, done) {
   DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.run++;
   setPhase('dialog');
@@ -1654,8 +1653,8 @@ function dlgBubble(L) {
   const side = L.side || 'companion';
   UI.think(L.text, { side, who: side === 'fisherman' ? L.who : '', mark: L.mark, choices: L.choices ? choiceList(L) : null, more: !L.choices });
 }
-// The choice buttons for a line. A tap closes the panel (or the bubble), echoes the label in the
-// fisherman's bubble, and only then runs the pick.
+// The choice buttons for a line. A tap closes the panel (or the bubble) and runs the pick at once; the
+// label never shows in the bubble. A pick that did not start a new dlgRun lets the list continue.
 function choiceList(L) {
   return L.choices.map(c => ({
     label: c.label,
@@ -1663,19 +1662,11 @@ function choiceList(L) {
       if (DLG.cur !== L) return;
       UI.dlgChoices(null); DLG.cur = null; SFX.select();
       UI.dlgHide(); thinkHide();
-      UI.think(c.label, { who: 'Fisherman' });
-      DLG.echo = { t: ECHO_DUR, pick: c.pick };
+      const run = DLG.run;
+      c.pick();
+      if (DLG.run === run && DLG.active) dlgNext();
     },
   }));
-}
-function dlgEcho(dt) {
-  DLG.echo.t -= dt;
-  if (DLG.echo.t > 0) return;
-  const e = DLG.echo; DLG.echo = null;
-  thinkHide();
-  const run = DLG.run;
-  e.pick();
-  if (DLG.run === run && DLG.active) dlgNext();
 }
 function dlgFull() {
   const L = DLG.cur;
@@ -1686,7 +1677,6 @@ function dlgFull() {
 }
 function dlgUpdate(dt) {
   if (!DLG.active) return;
-  if (DLG.echo) { dlgEcho(dt); return; }
   if (DLG.wait > 0) { DLG.wait -= dt; if (DLG.wait <= 0) { DLG.wait = 0; dlgNext(); } return; }
   const L = DLG.cur;
   if (!L || DLG.n >= L.text.length) return;
@@ -2285,7 +2275,7 @@ function wish3() {
   const nothing = STORY.wishes.length === 0;
   const L = [
     red('There it is. You can watch it forever now.'),
-    red('Every sun is bait. I should have said. It didn’t come up.'),
+    red('That bait was never for fish. I should have said.'),
     red(nothing ? 'Nobody rows this far to want nothing. So why are you here.' : recountLine()),
   ];
   if (has('company')) L.push(comp(STORY.answered === true ? 'You said you’d stay.' : 'Don’t answer it. Cut the line.'));
@@ -2533,7 +2523,7 @@ function cardLine(id, a) {
     || (a === 2 && id === 'trout' && has('fish') && once('trout2', 'Its stomach is full of hooks. All of them yours.'))
     || (a === 1 && has('fish') && once('fish1', 'It swam to the hook. It didn’t have to.'))
     || (a === 1 && id === 'grayling' && has('home') && once('home1', 'It smells of woodsmoke. Someone’s home.'))
-    || (a === 2 && has('gold') && once('gold2', 'Heavy for its size. Something in it clinks.'))
+    || (a === 2 && has('gold') && once('gold2', 'There are coins in it. They are still warm.'))
     || (a === 2 && STORY.refused === 2 && once('refused2', 'It is looking at you the way you look at it.'))
     || (a === 0 && first && isLaterRun() && once('lip', 'There is an old hook in its lip.'));
   return line || DESC[id][a];
@@ -2800,7 +2790,7 @@ function resetAll() {
   cloudT = 0; genEyes();
   WS.farBoat = RUN.count > 0 || loadEndings().length > 0 || sessionEndings.length > 0 ? 1 : 0; // bible, Title
   CINE = null;
-  DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0; DLG.echo = null;
+  DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0;
   SFX.drone(false); SFX.weight(false);
   UI.count(0); UI.dlgHide(); UI.thinkHide(); UI.cardHide(); UI.endingHide();
   setPhase('title');
@@ -2904,7 +2894,7 @@ function makeUI() {
     el, choices: null, thinkOwns: false, thinkSide: null,
     // The thought bubble (bible, 4b): opts.side 'fisherman' (default) or 'companion', opts.who the tiny label,
     // opts.mark the wrong question mark, opts.choices buttons under it (the companion's question), opts.more
-    // the ▾ marker in the lower right for a bubble that waits for a tap (the choice echo has none).
+    // the ▾ marker in the lower right for a bubble that waits for a tap (every bubble does).
     think(text, opts) {
       opts = opts || {};
       const side = opts.side || 'fisherman';
