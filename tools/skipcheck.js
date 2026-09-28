@@ -30,7 +30,7 @@ if (skips !== 4) fail('expected 4 skips (3 fish + golden) before the dialogue, g
 if (g.STORY.catches !== 3) fail('expected 3 catches, got ' + g.STORY.catches);
 
 // 3. Skipping through the whole game with a fixed plan reaches an ending fast.
-const plan = [1, 0, 1, 2]; // keep, company, hear, cut
+const plan = [1, 0, 0, 1, 0, 2]; // keep, company, someone, hear, yes, cut
 let ci = 0, last = -1;
 while (g.phase !== 'end' && t < 400) {
   const p = g.phase;

@@ -446,19 +446,82 @@ const SPECIES = [
   { id: 'eel', names: ['Needle eel', 'Knot eel', 'Endless eel'], len: 24, ht: 3, tail: 2, eel: true, wt: [0.3, 0.9], d: 1.1 },
   { id: 'grayling', names: ['Pale grayling', 'Pale grayling', 'Ash grayling'], len: 14, ht: 6, tail: 4, dorsalH: 4, fork: true, wt: [0.3, 0.8], d: 1.0 },
 ];
+// One card line per species per act (story bible, section 5).
 const DESC = {
-  perch: ['You can see its heart beating through it.', 'Its heart isn\u2019t beating.', 'It\u2019s warm. Fish shouldn\u2019t be warm.'],
-  char: ['Its scales show you the sky.', 'Its scales show you a red sky.', 'Its scales show someone sitting behind you.'],
-  smelt: ['Small, cold, perfect.', 'It has teeth. Smelt don\u2019t have teeth.', 'It is smiling at you.'],
-  trout: ['It fought like it had somewhere to be.', 'It keeps looking at the sun.', 'It was already dead. It fought anyway.'],
-  eel: ['Longer than it has any right to be.', 'It tied itself in a knot so you\u2019d let go.', 'It is still coming out of the water.'],
+  perch: ['You can see its heart beating through it.', 'There is an old hook inside it. Not yours.', 'No eyes. It still turns toward the lantern.'],
+  char: ['Its scales show you the sky. You check. It matches.', 'Its scales show you a red sky.', 'Its scales show your boat from underneath.'],
+  smelt: ['Small and cold. Not afraid of you at all.', 'It has teeth. Smelt don\u2019t have teeth.', 'Its teeth point inward.'],
+  trout: ['It fought like it had somewhere to be.', 'It keeps looking at the sun.', 'It drowned. It is a fish. It drowned.'],
+  eel: ['Longer than it has any right to be.', 'It knotted itself so you couldn\u2019t keep it.', 'It is still coming out of the water.'],
   grayling: ['It smells of snow.', 'It smells of smoke.', 'It smells like you.'],
 };
-const VOICES = ['\u201CWhen it asks for your last wish, cut the line.\u201D', '\u201CThat sun is bait.\u201D', '\u201CDon\u2019t look at the horizon.\u201D'];
+// The act 2 card voice, only if the player asked to hear the fish, keyed to the first wish.
+const VOICE = {
+  company: 'I wished for company too. Now I have plenty.',
+  fish: 'I wished for more fish too. Here I am.',
+  home: 'I wished for a home too. This is it.',
+  nothing: 'I wanted nothing too. It waited.',
+};
+const ENDING_COUNT = 3; // raised as later phases add Stay, Deep and Swallowed
 const ENDINGS = {
   home: { title: 'Home', text: 'The lake is quiet again. The fish are hungry. Somewhere, a new sun is rising for the next fisherman.' },
   dark: { title: 'Dark', text: 'You sit with the lantern until it gutters out. Sometimes something takes the bait. You never reel it in.' },
   cut: { title: 'Still water', text: 'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.' },
+};
+const SILENT_TEXT = 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.';
+// One variant sentence per ending card (bible, section 4 Ending cards): kept, else the most relevant
+// wish in the order given per ending, else refused twice, else (Still water only) the one-refusal line.
+const END_VARIANTS = {
+  home: {
+    kept: 'The golden fish slips out of the boat as you go in.',
+    refused2: 'You asked for nothing, and then for home. Home was the only thing it had.',
+    order: ['home', 'company', 'gold', 'fish', 'hear', 'forever'],
+    lines: {
+      home: 'The light on the shore goes out. Nobody was inside.',
+      company: 'The seat behind you is empty now. It was your turn.',
+      gold: 'The gold goes down first. It has done this before.',
+      fish: 'The lake is full. It was always full.',
+      hear: 'You know the words already. You will say them.',
+      forever: 'The day does not end. You aren\u2019t in it.',
+    },
+  },
+  dark: {
+    kept: 'The golden fish dries in the bottom of the boat. It stops asking before you do.',
+    refused2: 'Nothing was what you wanted, and nothing is what there is to see.',
+    order: ['hear', 'fish', 'forever', 'company', 'gold', 'home'],
+    lines: {
+      hear: 'The lake keeps talking. You stop answering.',
+      fish: 'Something is always biting. You let them.',
+      forever: 'The day never ends. It never begins either.',
+      company: 'Someone breathes behind you all night. You do not turn around.',
+      gold: 'The boat rides low. You do not bail.',
+      home: 'The light on the shore stays on. Nobody comes down.',
+    },
+  },
+  cut: {
+    kept: 'You lifted it over the side. It let you.',
+    refused2: 'Twice you said nothing. The knife said it a third time.',
+    refused1: 'You asked once for nothing. It kept count.',
+    order: ['company', 'home', 'fish', 'gold', 'forever', 'hear'],
+    lines: {
+      company: 'There is someone in the stern. You do not ask. You row.',
+      home: 'The cabin is dark. You do not check whether anyone left.',
+      fish: 'The fish behind you all face one way. You do not look.',
+      gold: 'The gold is on the bottom. Your hands stayed on the oars.',
+      forever: 'Dawn comes anyway. You had forgotten it could.',
+      hear: 'You can still hear them from the shore. You stop listening.',
+    },
+  },
+};
+// The wish button labels, read back on the ending card.
+const WISH_LABELS = {
+  company: 'Someone to sit with me', fish: 'Take me where the fish are', home: 'A home on the shore',
+  forever: 'Make this day last forever', hear: 'Let me hear the fish', gold: 'Gold. A boat full of it',
+};
+// The recount at wish 3: the player's own labels shifted to the second person, one clause per granted wish, in order.
+const RECOUNT = {
+  company: 'someone to sit with you', fish: 'where the fish are', home: 'a home on the shore',
+  forever: 'a day that lasts forever', hear: 'to hear the fish', gold: 'a boat full of gold',
 };
 
 // ---------------------------------------------------------------- state
@@ -469,15 +532,28 @@ function resetWS() {
     pupil: 0, pupilDx: 0, stalk: 0, stalkCut: 0, troubled: 0, starA: 0, lantern: 0, lanternFlicker: 1,
     jaw: 0, companion: 0, companionTurn: 0, cabin: 0, fishShadows: 0, gold: 0, boatSink: 0, boatX: 0, ash: 0,
     lineCut: false, goldFish: null,
+    // story bible, section 3. Only frozen is read in this phase; the rest are drawn by later phases.
+    goldKept: 0, boatSunk: 0, frozen: 0, far: 0, eyes: 0, farBoat: 0,
   });
 }
 const G = {
   phase: 'title', t: 0, pt: 0, holding: false, bob: null, cast: null, wait: null, reel: null, land: null,
   rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 },
   lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0,
+  capUntil: 0, saidUntil: 0, saidPending: [],
 };
-const STORY = { act: 0, catches: 0, actCatches: 0, wishes: [], heard: false, goldenNext: false, lastSpecies: null, voiceI: 0 };
+// wishes holds granted wishes only, in order. kept, firstAsk, refused, answered, ocean, said and usedRepl follow
+// the bible, section 3: said counts the fisherman's lines that have shown, usedRepl the card replacements fired.
+// casts counts casts for the opening captions; shown1 lists the species whose act 1 card was shown, for the act 2 pick.
+const freshStory = () => ({
+  act: 0, catches: 0, actCatches: 0, wishes: [], heard: false, goldenNext: false, lastSpecies: null,
+  kept: false, firstAsk: null, refused: 0, answered: null, ocean: 'none', said: 0, usedRepl: [], casts: 0, shown1: [],
+});
+const STORY = freshStory();
 const has = w => STORY.wishes.indexOf(w) >= 0;
+// Across runs (bible, section 7): completed runs and the last ending, from storage plus this session.
+const RUN = { count: 0, last: null };
+const isLaterRun = () => RUN.count > 0;
 
 // ---------------------------------------------------------------- UI (DOM in browser, stub elsewhere)
 let UI = null;
@@ -549,21 +625,33 @@ function updAsh(dt) {
     }
   }
 }
+// The shoal. Every shadow faces the horizon from the moment it spawns and drifts toward the sun's
+// column; one that reaches the horizon comes back in at the bottom, so they all keep going the same way.
+const SHAD_TOP = HY + 12;
+function shadowHeading(s) { return Math.atan2(HY - 200 - s.y, WS.sunX - s.x); }
 function spawnShadows() {
   SHAD.length = 0;
-  for (let k = 0; k < 16; k++) SHAD.push({ x: Math.random() * W, y: HY + 16 + Math.random() * (H - HY - 40), a: Math.random() * 6.28, sp: 6 + Math.random() * 8 });
+  for (let k = 0; k < 16; k++) {
+    const s = { x: Math.random() * W, y: HY + 16 + Math.random() * (H - HY - 40), a: 0, sp: 6 + Math.random() * 8, dir: 1 };
+    s.a = shadowHeading(s) + (Math.random() - 0.5) * 0.6;
+    s.dir = Math.cos(s.a) >= 0 ? 1 : -1;
+    SHAD.push(s);
+  }
 }
 function updShadows(dt) {
   if (!WS.fishShadows) return;
   for (const s of SHAD) {
-    s.a += (hash2(s.x | 0, s.y | 0, (G.t * 2) | 0) - 0.5) * 3 * dt;
-    if (WS.mood > 1.3) { const da = Math.atan2(WL + 18 - s.y, 150 - s.x); s.a += Math.sin(da - s.a) * 2 * dt; }
+    s.a += (hash2(s.x | 0, s.y | 0, (G.t * 2) | 0) - 0.5) * 1.2 * dt;
+    s.a += Math.sin(shadowHeading(s) - s.a) * 2 * dt;
+    if (Math.sin(s.a) > 0) s.a = -s.a; // never past horizontal: every shadow keeps moving toward the horizon
     s.x += Math.cos(s.a) * s.sp * dt;
     s.y += Math.sin(s.a) * s.sp * 0.3 * dt;
+    const cx = Math.cos(s.a);
+    if (Math.abs(cx) > 0.15) s.dir = cx >= 0 ? 1 : -1;
     if (s.x < -10) s.x = W + 8;
     if (s.x > W + 10) s.x = -8;
-    if (s.y < HY + 12) { s.y = HY + 12; s.a = -s.a; }
-    if (s.y > H - 20) { s.y = H - 20; s.a = -s.a; }
+    if (s.y < SHAD_TOP) { s.y = H - 22 - Math.random() * 12; s.x = Math.random() * W; s.a = shadowHeading(s); }
+    if (s.y > H - 20) s.y = H - 20;
   }
 }
 function updBirds(dt) {
@@ -721,7 +809,7 @@ function drawRings() {
 function drawShadows() {
   if (!WS.fishShadows) return;
   for (const s of SHAD) {
-    const dir = Math.cos(s.a) >= 0 ? 1 : -1;
+    const dir = s.dir;
     for (let k = -5; k <= 4; k++) {
       const tail = k * dir < -3;
       const hgt = tail ? 0 : Math.round(1.3 * Math.sqrt(Math.max(0, 1 - (k / 4.6) * (k / 4.6))));
@@ -1104,9 +1192,12 @@ const SFX = {
 };
 
 // ---------------------------------------------------------------- dialogue
-const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false };
+// A line is {who, text, style, choices, mark}, {act: fn} or {pause: seconds}. mark asks the UI for the
+// wrong question mark (the companion's question). A choice whose pick() does not start a new dlgRun
+// lets the current list continue, so a choice can sit in the middle of a scene.
+const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0 };
 function dlgRun(lines, done) {
-  DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0;
+  DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.run++;
   setPhase('dialog');
   dlgNext();
 }
@@ -1117,7 +1208,7 @@ function dlgNext() {
     if (L.pause) { DLG.cur = null; DLG.wait = L.pause; UI.dlgHide(); return; }
     DLG.cur = L; DLG.n = 0;
     UI.dlgShow(L.who || '', L.style || '');
-    UI.dlgText('');
+    UI.dlgText('', L.mark);
     UI.dlgChoices(null);
     return;
   }
@@ -1129,11 +1220,17 @@ function dlgNext() {
 function dlgFull() {
   const L = DLG.cur;
   DLG.n = L.text.length;
-  UI.dlgText(L.text);
+  UI.dlgText(L.text, L.mark);
   if (L.choices) {
     UI.dlgChoices(L.choices.map(c => ({
       label: c.label,
-      cb: () => { if (DLG.cur !== L) return; UI.dlgChoices(null); DLG.cur = null; SFX.select(); c.pick(); },
+      cb: () => {
+        if (DLG.cur !== L) return;
+        UI.dlgChoices(null); DLG.cur = null; SFX.select();
+        const run = DLG.run;
+        c.pick();
+        if (DLG.run === run && DLG.active) dlgNext();
+      },
     })));
   } else UI.dlgMore(true);
 }
@@ -1144,7 +1241,7 @@ function dlgUpdate(dt) {
   if (!L || DLG.n >= L.text.length) return;
   const prev = Math.floor(DLG.n);
   DLG.n = Math.min(L.text.length, DLG.n + dt * 42);
-  if (Math.floor(DLG.n) !== prev) UI.dlgText(L.text.slice(0, Math.floor(DLG.n)));
+  if (Math.floor(DLG.n) !== prev) UI.dlgText(L.text.slice(0, Math.floor(DLG.n)), L.mark);
   if (DLG.n >= L.text.length) dlgFull();
 }
 function dlgTap() {
@@ -1171,40 +1268,49 @@ function cineUpdate(dt) {
   c.def.update(c.t, dt, at, c.st);
   if (CINE === c && c.t >= c.def.dur) { CINE = null; if (c.done) c.done(); }
 }
-const CINE_SUNSET = {
+// The sunset. After a refusal the caption changes. If the day was wished to last forever the stars
+// never come up and the glow under the horizon never fully dies.
+const sunsetCine = refused => ({
   dur: 10,
   init(s) { s.y0 = WS.sunY; s.tr0 = WS.troubled; },
   update(t, dt, at, s) {
     at('snd', 0, () => SFX.swell());
-    at('cap', 0.4, () => UI.caption('The sun slips into the lake like a coin into a well.', 4.8));
+    at('cap', 0.4, () => cap(refused ? 'The sun sets the way suns do.' : 'The sun slips into the lake like a coin into a well.', 4.8));
     const k = clamp(t / 7.5, 0, 1);
     WS.sunY = lerp(s.y0, HY + 14, E.io(k));
     WS.mood = clamp((t - 1) / 7, 0, 1);
-    WS.sunGlow = lerp(1, 0.12, E.io(clamp((t - 3) / 5, 0, 1)));
+    WS.sunGlow = Math.max(WS.frozen ? 0.4 : 0, lerp(1, 0.12, E.io(clamp((t - 3) / 5, 0, 1))));
     WS.horizGlow = lerp(1, 0.3, clamp((t - 4) / 5, 0, 1));
-    WS.starA = clamp((t - 5) / 4, 0, 1);
+    WS.starA = WS.frozen ? 0 : clamp((t - 5) / 4, 0, 1);
     WS.troubled = lerp(s.tr0, 0.35, k);
-    at('lan', 7.8, () => { tween(WS, 'lantern', 1, 0.7); UI.caption('You light the lantern.', 2.6); SFX.match(); });
+    at('lan', 7.8, () => { tween(WS, 'lantern', 1, 0.7); cap('You light the lantern.', 2.6); SFX.match(); });
   },
-};
+});
+// The red sun. The companion turns at the pupil beat, before anyone speaks. The pupil slides toward
+// the boat only if the player ever asked for something. If the fish were heard, the lake whispers.
 const CINE_RED = {
   dur: 15.5,
-  init(s) { WS.sunKind = 1; WS.sunR = 16; WS.sunY = HY + 24; WS.sunGlow = 0; WS.pupil = 0; WS.pupilDx = 0; WS.stalk = 0; s.tr0 = WS.troubled; s.hg0 = WS.horizGlow; },
+  init(s) {
+    WS.sunKind = 1; WS.sunR = 16; WS.sunY = HY + 24; WS.sunGlow = 0; WS.pupil = 0; WS.pupilDx = 0; WS.stalk = 0;
+    s.tr0 = WS.troubled; s.hg0 = WS.horizGlow; s.asked = STORY.wishes.length > 0;
+  },
   update(t, dt, at, s) {
     at('drone', 0.2, () => SFX.drone(true));
-    at('c1', 0.6, () => UI.caption('Something rises where the sun went down.', 4));
+    at('c1', 0.6, () => cap('Something rises where the sun went down.', 4));
     const k = clamp((t - 1) / 8.5, 0, 1);
     WS.sunY = lerp(HY + 24, 178, E.out(k));
     WS.mood = 1 + clamp((t - 1.5) / 7.5, 0, 1);
     WS.sunGlow = lerp(0, 1.25, clamp((t - 1) / 6, 0, 1));
     WS.horizGlow = lerp(s.hg0, 1.3, clamp((t - 1) / 6, 0, 1));
-    WS.starA = 1 - clamp((t - 2) / 4, 0, 1);
+    WS.starA = WS.frozen ? 0 : 1 - clamp((t - 2) / 4, 0, 1);
     WS.troubled = lerp(s.tr0, 0.55, clamp(t / 9, 0, 1));
     WS.ash = clamp((t - 6) / 4, 0, 1);
     WS.stalk = clamp((t - 9.2) / 2.3, 0, 1);
+    at('lake', 9.2, () => { if (STORY.heard) cap('i could watch that sun forever. i could watch that sun forever.', 3.2, 'whisper'); });
     WS.pupil = clamp((t - 12) / 1.3, 0, 1);
-    at('c3', 12.2, () => UI.caption('It is not a sun.', 2.8));
-    WS.pupilDx = clamp((t - 13.6) / 1.0, 0, 1) * 4;
+    at('c3', 12.2, () => cap('It is not a sun.', 2.8));
+    WS.pupilDx = s.asked ? clamp((t - 13.6) / 1.0, 0, 1) * 4 : 0;
+    at('turn', 13.6, () => { if (WS.companion > 0) tween(WS, 'companionTurn', 1, 0.4); });
     at('hb', 13.6, () => SFX.heartbeat());
   },
 };
@@ -1213,6 +1319,7 @@ const CINE_JAWS = {
   update(t, dt, at) {
     WS.jaw = E.in(clamp(t / 4.2, 0, 1));
     at('rumble', 0.1, () => SFX.rumble());
+    at('cap', 1.5, () => { if (!STORY.kept) cap('Something gold slips by you on the way down.', 3); });
     at('snap', 4.15, () => { SFX.crunch(); UI.fade(1, 0.12); });
   },
 };
@@ -1226,19 +1333,36 @@ const CINE_DARK = {
     WS.dim = 11 * E.io(clamp((t - 1) / 4.5, 0, 1));
     WS.ash = 1 - clamp(t / 3, 0, 1);
     at('drone', 2, () => SFX.drone(false));
+    at('cap', 2, () => { if (!STORY.kept) cap('Something gold circles the boat. It has time.', 3); }); // the dim is still under half
     if (t > 6 && t < 8) WS.lanternFlicker = Math.random() < 0.5 ? 1 : 0.1;
     else if (t >= 8) WS.lanternFlicker = 0;
     at('out', 8, () => SFX.hiss(0.6));
     at('fade', 8.3, () => UI.fade(1, 1));
   },
 };
-const CINE_CUT = {
+// The released sky fish drops below the horizon with a splash (the cut and silent endings).
+function goldFishDrop() {
+  const g = WS.goldFish;
+  if (!g) return;
+  tween(g, 'y', g.surf - GOLD.h + 2, 0.45, E.in, () => {
+    splash(g.x + 12, g.surf, 8); ring(g.x + 12, g.surf + 1); SFX.splash();
+    tween(g, 'a', 0, 0.2, E.lin, () => { if (WS.goldFish === g) WS.goldFish = null; });
+  });
+}
+// The cut, or (silent) the line going slack: no snap, and the stalk sinks with the disc. No caption on
+// the cut itself: the interrupted word, the snap and the splash say it. Silent gets `The line goes slack.`
+const cutCine = silent => ({
   dur: 17.5,
   init(s) { s.y0 = WS.sunY; s.tr0 = WS.troubled; },
   update(t, dt, at, s) {
-    at('cut', 0.15, () => { WS.lineCut = true; G.bob = null; SFX.snap(); if (WS.goldFish) tween(WS.goldFish, 'a', 0, 0.9); splash(SUNX - 3, HY + 2, 6); });
-    at('stalk', 1.0, () => SFX.snap());
-    if (t > 1.0) WS.stalkCut = clamp((t - 1) / 0.7, 0, 1);
+    at('cut', 0.15, () => {
+      if (silent) { if (G.bob) G.bob.taut = false; SFX.splash(); }
+      else { WS.lineCut = true; G.bob = null; SFX.snap(); if (WS.gold > 0) tween(WS, 'gold', 0, 0.8); }
+      goldFishDrop();
+      splash(SUNX - 3, HY + 2, 6);
+    });
+    at('stalk', 1.0, () => { if (!silent) SFX.snap(); });
+    if (t > 1.0 && !silent) WS.stalkCut = clamp((t - 1) / 0.7, 0, 1);
     if (t < 6) WS.sunY = lerp(s.y0, HY + 28, E.in(clamp((t - 1.1) / 1.5, 0, 1)));
     at('hiss', 2.5, () => { SFX.hiss(2.2); ring(SUNX, HY + 3, true); ring(SUNX, HY + 3); WS.pupil = 0; SFX.drone(false); });
     if (t < 6) {
@@ -1249,7 +1373,11 @@ const CINE_CUT = {
     WS.ash = 1 - clamp((t - 2) / 3, 0, 1);
     WS.starA = t < 3 ? 0 : t < 6 ? (t - 3) / 3 : 1 - clamp((t - 6) / 3, 0, 1);
     WS.troubled = lerp(s.tr0, 0, clamp((t - 3) / 8, 0, 1));
-    at('dawn', 6, () => { WS.sunKind = 0; WS.sunR = 8; WS.stalk = 0; WS.stalkCut = 0; WS.companionTurn = 0; });
+    at('dawn', 6, () => {
+      WS.sunKind = 0; WS.sunR = 8; WS.stalk = 0; WS.stalkCut = 0; WS.companionTurn = 0;
+      if (silent) G.bob = null;
+      if (WS.cabin > 0) tween(WS, 'cabin', 0, 1.5);
+    });
     if (t >= 6) {
       const kd = clamp((t - 6) / 6.5, 0, 1);
       WS.sunY = lerp(HY + 14, SUN0Y, E.out(kd));
@@ -1258,12 +1386,17 @@ const CINE_CUT = {
     }
     if (t > 9) WS.lantern = 1 - clamp((t - 9) / 2, 0, 1);
     WS.boatX = t > 11 ? E.io(clamp((t - 11) / 6.5, 0, 1)) * 120 : 0;
-    at('cap', 3.4, () => UI.caption('You cut the line.', 3));
+    at('cap', 3.4, () => { if (silent) cap('The line goes slack.', 3); });
   },
-};
+});
 
 // ---------------------------------------------------------------- story
-const FISHN = 'Golden fish', THE_FISH = 'The fish';
+// The script is docs/story.md. The golden fish speaks in every act, including the red.
+const FISHN = 'Golden fish';
+const narr = text => ({ who: '', text, style: 'narr' });
+const fish = text => ({ who: FISHN, text });
+const red = text => ({ who: FISHN, text, style: 'red' });
+const whisperFish = text => ({ who: FISHN, text, style: 'whisper' });
 function goldenScene() {
   G.bob = null;
   WS.goldFish = { x: 26, y: 240, a: 0, surf: 263 };
@@ -1279,186 +1412,363 @@ function goldenDive() {
   SFX.splash();
   tween(g, 'a', 0, 0.5, E.io, () => { if (WS.goldFish === g) WS.goldFish = null; });
 }
+function startAct(act) { STORY.act = act; STORY.actCatches = 0; }
+
+// -- golden scene 1 and wish 1
+// The fish's first line changes on a later run (bible, sections 4 and 7).
+function greeting1() {
+  if (!isLaterRun()) return 'Wait. Don’t gut me, fisherman.';
+  return RUN.last === 'home' ? 'Back out already? It doesn’t usually let go.' : 'You again. Or someone wearing you.';
+}
 function wish1() {
   dlgRun([
-    { pause: 0.9 },
-    { who: FISHN, text: 'Wait. Don\u2019t gut me, fisherman.' },
-    { who: FISHN, text: 'Put me back, and I\u2019ll grant you a wish. Three, if you\u2019re patient.', choices: [
+    { pause: 3 },
+    fish(greeting1()),
+    { who: FISHN, text: 'Put me back and I’ll grant you a wish. Three, if you’re patient.', choices: [
       { label: 'Let it go', pick: () => wish1b(false) },
       { label: 'Keep it', pick: () => wish1b(true) },
     ] },
   ]);
 }
+// Keep it is text and state only for now: the boat fish sprite and the kept flow are a later phase.
 function wish1b(kept) {
+  STORY.kept = kept;
   const L = kept ? [
-    { who: '', text: 'You tighten your grip. It slides through your fingers like water.', style: 'narr' },
-    { who: FISHN, text: 'Cold hands can\u2019t hold me. Now. A wish.' },
-  ] : [
-    { who: FISHN, text: 'Kind. Kindness is rare out here.' },
-  ];
-  L.push({ who: FISHN, text: 'Tell me what you want.', choices: [
-    { label: 'Someone to sit with me', pick: () => grant1('company') },
-    { label: 'More fish', pick: () => grant1('fish') },
-    { label: 'A home on the shore', pick: () => grant1('home') },
-  ] });
-  dlgRun(L);
-}
-function grant1(w) {
-  STORY.wishes.push(w);
-  const L = {
-    company: [
-      { act: () => { tween(WS, 'companion', 1, 2.2); SFX.chime(); } },
-      { who: FISHN, text: 'Done. Someone will keep you company.' },
-      { who: FISHN, text: 'Don\u2019t ask them who they are.' },
-    ],
-    fish: [
-      { act: () => { WS.fishShadows = 1; spawnShadows(); SFX.chime(); } },
-      { who: FISHN, text: 'Done. This lake will never be empty again.' },
-    ],
-    home: [
-      { act: () => { tween(WS, 'cabin', 1, 2.2); SFX.chime(); } },
-      { who: FISHN, text: 'Done. Look, a light on the shore.' },
-      { who: FISHN, text: 'It was always yours. You just never noticed.' },
-    ],
-  }[w];
+    narr('You lift it into the boat. It is heavier than a fish.'),
+    fish('Cold hands. He had cold hands too.'),
+    fish('Keep me, then. The wish comes anyway.'),
+  ] : [fish('Kind. Nobody kind comes out this far alone.')];
   dlgRun(L.concat([
-    { who: FISHN, text: 'When you want the next wish, just cast.' },
+    fish('First time here, you said. Nobody comes here twice.'),
+    { who: FISHN, text: 'What do you lack, fisherman?', choices: [
+      { label: 'Someone to sit with me', pick: () => grant1('company') },
+      { label: 'Take me where the fish are', pick: () => grant1('fish') },
+      { label: 'A home on the shore', pick: () => grant1('home') },
+      { label: 'Nothing', pick: refuse1 },
+    ] },
+  ]));
+}
+const GRANT1 = {
+  company: () => [
+    { who: FISHN, text: 'Who?', choices: [{ label: 'Doesn’t matter. Someone.', pick() { /* the list continues */ } }] },
+    { act: () => { tween(WS, 'companion', 1, 2.2); SFX.chime(); } },
+    fish('Someone. Nobody asks who.'),
+    fish('If they ask you anything, don’t answer.'),
+  ],
+  fish: () => [
+    fish('Where the fish are. I know a spot. Hold on.'),
+    { act: () => { WS.fishShadows = 1; spawnShadows(); SFX.chime(); } }, // the ocean cutscene is a later phase
+    { pause: 1.2 },
+    fish('Look how they all go the same way.'),
+  ],
+  home: () => [
+    { act: () => { tween(WS, 'cabin', 1, 2.2); SFX.chime(); } },
+    fish('A home on the shore. One has just come free.'),
+    fish('Every light out here is for someone. That one is for you.'),
+  ],
+};
+// The cost: the sun starts dropping as the first cost line begins. No caption; the drop is the sentence.
+function grant1(w) {
+  STORY.wishes.push(w); STORY.firstAsk = w;
+  dlgRun(GRANT1[w]().concat([
+    { act: sunDrop },
+    fish('A wish costs a little daylight. You said you could watch that sun forever.'),
+    fish('You’ll get to.'),
     { act: goldenDive },
     { pause: 0.8 },
   ]), () => {
-    STORY.act = 1; STORY.actCatches = 0;
-    tween(WS, 'sunY', SUN0Y + 10, 5); tween(WS, 'troubled', 0.22, 5);
-    UI.caption('The sun sits a little lower now.', 3);
+    startAct(1);
     setPhase('ready');
   });
+}
+// The sun drops in two visible steps, about 16 px over 5 s, and the water grows a little troubled.
+const SUN_STEP = 8;
+function sunDrop() {
+  const y0 = WS.sunY;
+  tween(WS, 'sunY', y0 + SUN_STEP, 1.6, E.io, () =>
+    tween(WS, 'sunY', y0 + SUN_STEP, 1.4, E.lin, () =>
+      tween(WS, 'sunY', y0 + 2 * SUN_STEP, 1.6, E.io)));
+  tween(WS, 'troubled', 0.22, 5);
+}
+function refuse1() {
+  STORY.refused = 1; STORY.firstAsk = 'nothing';
+  dlgRun([
+    { pause: 1.2 },
+    fish('Nothing. Nobody asks for nothing. I’ll ask again.'),
+    { act: goldenDive },
+    { pause: 0.8 },
+  ], () => {
+    startAct(1);
+    cap('The lake stays glass.', 3);
+    setPhase('ready');
+  });
+}
+
+// -- golden scene 2 and wish 2
+// Greeting by priority: kept and refused once > kept > refused once > default (bible, Golden scene 2).
+function greeting2() {
+  if (STORY.kept && STORY.refused === 1) return 'You cast anyway. Habit. Still wanting nothing?';
+  if (STORY.kept) return 'You cast anyway. Habit.';
+  if (STORY.refused === 1) return 'Back again. Still wanting nothing?';
+  return 'Back so soon? The lake keeps count.';
 }
 function wish2() {
   dlgRun([
     { pause: 0.9 },
-    { who: FISHN, text: 'Back so soon? The lake remembers every wish.' },
-    { who: FISHN, text: 'Your second?', choices: [
+    fish(greeting2()),
+    { who: FISHN, text: 'What do you lack now?', choices: [
       { label: 'Make this day last forever', pick: () => grant2('forever') },
-      { label: 'Let me understand the fish', pick: () => grant2('hear') },
+      { label: 'Let me hear the fish', pick: () => grant2('hear') },
       { label: 'Gold. A boat full of it', pick: () => grant2('gold') },
+      { label: 'Nothing', pick: refuse2 },
     ] },
   ]);
 }
+const GRANT2 = {
+  forever: () => [
+    { act: () => { WS.frozen = 1; SFX.chime(); } },
+    fish('That’s twice you’ve said forever. It’s a long time for a sun.'),
+    fish('This one is tired. I know one that never sets.'),
+  ],
+  hear: () => [
+    { act: () => { STORY.heard = true; SFX.chime(); } },
+    fish('Listen, then. They all say the same thing.'),
+  ],
+  gold: () => [
+    fish('Gold. A boat full of it.'),
+    { act: () => { tween(WS, 'gold', 1, 1.5); tween(WS, 'boatSink', 2, 3); SFX.chime(); } }, // the sink cutscene is a later phase
+    { pause: 1.6 },
+    fish('Sorry. Gold is heavy. You can always come back for it.'),
+  ],
+};
 function grant2(w) {
   STORY.wishes.push(w);
-  const L = {
-    forever: [
-      { who: FISHN, text: 'Forever is a long time for a sun.' },
-      { who: FISHN, text: 'Let this one rest. I know a sun that never sets.' },
-    ],
-    hear: [
-      { act: () => { STORY.heard = true; SFX.chime(); } },
-      { who: FISHN, text: 'Listen, then.' },
-      { who: FISHN, text: 'They talk about me constantly.' },
-    ],
-    gold: [
-      { act: () => { tween(WS, 'gold', 1, 1.5); tween(WS, 'boatSink', 2, 3); SFX.chime(); } },
-      { who: FISHN, text: 'Gold is heavy. Mind the waterline.' },
-    ],
-  }[w];
-  dlgRun(L.concat([
-    { who: FISHN, text: w === 'forever' ? 'Watch.' : 'Look how late it\u2019s gotten.' },
+  dlgRun(GRANT2[w]().concat([
+    fish((STORY.refused === 1 ? 'That was my first, too.' : 'That was my second, too.') + ' This one costs the rest of the day.'),
+    fish('You’ll miss the sun. I’ll bring you another.'),
     { act: goldenDive },
     { pause: 0.6 },
-  ]), () => playCine(CINE_SUNSET, () => { STORY.act = 2; STORY.actCatches = 0; setPhase('ready'); }));
+  ]), () => playCine(sunsetCine(false), afterSunset));
+}
+function refuse2() {
+  STORY.refused++;
+  const L = STORY.refused === 2 ? [
+    { pause: 1.2 },
+    fish('Twice. Nobody asks for nothing twice. What are you?'),
+  ] : [fish('Full already? It’s a little late for that.')];
+  dlgRun(L.concat([
+    fish('Then the sun keeps its own hours. You’ll miss it. I’ll bring you another.'),
+    { act: goldenDive },
+    { pause: 0.6 },
+  ]), () => playCine(sunsetCine(true), afterSunset));
+}
+function afterSunset() {
+  startAct(2);
+  if (has('company')) companionQuestion(() => setPhase('ready'));
+  else setPhase('ready');
+}
+// The companion's one question, right after the lantern lights. The mark is drawn wrong.
+function companionQuestion(done) {
+  const answer = yes => () => {
+    STORY.answered = yes;
+    dlgRun([narr(yes ? 'He does not turn around.' : 'He goes back to watching the horizon.')], done);
+  };
+  dlgRun([
+    { who: 'Companion', text: 'Will you stay?', style: 'whisper', mark: true, choices: [
+      { label: 'Yes', pick: answer(true) },
+      { label: 'Say nothing', pick: answer(false) },
+    ] },
+  ], done);
+}
+
+// -- the red sequence and wish 3
+// Refused twice replaces the whole set on either path (bible, Red sequence).
+function redLines() {
+  const L = STORY.refused === 2 ? ['One wish left. You said you could watch that sun forever, then asked for nothing twice.', 'It wants to see why.']
+    : STORY.kept ? ['That isn’t me pulling. It never was.', 'One wish left. But first, the sun I promised you.', 'You said you could watch it forever. I passed that on.']
+      : ['One wish left. But first, the sun I promised you.', has('forever') ? 'You said forever, then you wished for it. I listened twice.' : 'You said you could watch it forever. I listened.'];
+  return L.map(fish);
 }
 function redSequence() {
   STORY.goldenNext = false;
   G.holding = false;
   if (G.bob) { G.bob.taut = true; tween(G.bob, 'x', SUNX - 3, 2.6); tween(G.bob, 'y', HY + 5, 2.6); }
+  if (has('gold')) tween(WS, 'boatSink', WS.boatSink + 2, 2.6);
   SFX.snapLow();
   dlgRun([
     { pause: 1.4 },
-    { who: '', text: 'The line goes taut. Something is pulling it toward the horizon.', style: 'narr' },
+    narr('The line goes taut. You did not feel a bite.'),
+    // The fish appears above the horizon where the sun set. (Kept: it should speak from the boat, a later phase.)
     { act: () => { WS.goldFish = { x: SUNX - 14, y: HY - 24, a: 0, surf: HY + 1 }; tween(WS.goldFish, 'a', 1, 0.9); SFX.chime(); } },
-    { pause: 0.9 },
-    { who: FISHN, text: 'One wish left.' },
-    { who: FISHN, text: 'But first, the sun I promised you.' },
-  ], () => playCine(CINE_RED, wish3));
+    { act: () => cap('It is where the sun was.', 2.4) },
+    { pause: 2 },
+  ].concat(redLines()), () => playCine(CINE_RED, wish3));
 }
-function wish3() {
-  const L = [
-    { who: THE_FISH, text: 'Every sun is bait, fisherman. Look up. Do you see the line?', style: 'red' },
-    { who: THE_FISH, text: 'You thought you were fishing. You were swimming toward the light.', style: 'red' },
-    { who: THE_FISH, text: 'And those were never mountains.', style: 'red' },
-  ];
-  if (has('company')) L.push({ act: () => tween(WS, 'companionTurn', 1, 0.4) }, { pause: 0.7 }, { who: 'Companion', text: 'Don\u2019t answer it. Cut the line.', style: 'whisper' });
-  if (has('home')) L.push({ who: THE_FISH, text: 'The light on the shore was mine too. It always is.', style: 'red' });
-  if (has('fish')) L.push({ who: THE_FISH, text: 'All those fish I gave you. Did you think they were food?', style: 'red' });
-  if (has('gold')) L.push({ who: THE_FISH, text: 'And all that gold. You\u2019ll sink so nicely.', style: 'red' });
-  if (has('forever')) L.push({ who: THE_FISH, text: 'You wanted a sun that never sets. Here it is.', style: 'red' });
-  if (STORY.heard) L.push({ who: 'The lake', text: 'cut the line cut the line cut the line', style: 'whisper' });
-  L.push({ who: THE_FISH, text: 'Make your last wish.', style: 'red', choices: [
+const sentence = s => s.charAt(0).toUpperCase() + s.slice(1) + '.';
+// One line, up to 120 characters: the granted wishes in order, the answered clause, and always the sun.
+function recountLine() {
+  const parts = STORY.wishes.map(w => RECOUNT[w]);
+  if (STORY.answered === true) parts.push('someone who will stay');
+  return 'Everything you asked for. ' + parts.map(sentence).join(' ') + ' And the sun you wanted. Your words, not mine.';
+}
+function wish3Choices() {
+  const c = [
     { label: 'Let me go home', pick: endHome },
-    { label: 'Take the red sun away', pick: endDark },
+    { label: 'Take the light away', pick: endDark },
     { label: 'Cut the line', pick: endCut },
-  ] });
+    // Stay with them (if answered) and Let me get my gold (if gold) are added by later phases, here.
+  ];
+  if (STORY.refused === 2) c.push({ label: 'Nothing', pick: endSilent });
+  return c;
+}
+// The bible's ordered list: seven lines at most before the buttons, five in a typical run.
+function wish3() {
+  const nothing = STORY.wishes.length === 0;
+  const L = [
+    red('There it is. You can watch it forever now.'),
+    red('Every sun is bait. I should have said. It didn’t come up.'),
+    red(nothing ? 'Nobody rows this far to want nothing. So why are you here.' : recountLine()),
+  ];
+  if (has('company')) L.push({ who: 'Companion', text: STORY.answered === true ? 'You said you’d stay.' : 'Don’t answer it. Cut the line.', style: 'whisper' });
+  if (STORY.kept) L.push(whisperFish('I’m sorry.'));
+  L.push(
+    red('I sat where you sit. I said what you said. Three times.'),
+    { who: FISHN, text: 'I’d like to go home now. What do you lack, fisherman.', style: 'red', choices: wish3Choices() },
+  );
   dlgRun(L);
 }
+
+// -- endings
 function endHome() {
-  dlgRun([
-    { who: THE_FISH, text: 'Home. Yes.', style: 'red' },
-    { who: THE_FISH, text: 'Come inside.', style: 'red' },
-  ], () => playCine(CINE_JAWS, () => showEnding('home')));
+  const L = [red('Home. Yes. Come inside.')];
+  if (STORY.kept) L.push(whisperFish('Thank you.'));
+  dlgRun(L, () => playCine(CINE_JAWS, () => showEnding('home')));
 }
 function endDark() {
-  dlgRun([
-    { who: THE_FISH, text: 'As you wish.', style: 'red' },
-    { who: THE_FISH, text: 'Without light, you won\u2019t see the teeth. That is my kindness.', style: 'red' },
-  ], () => playCine(CINE_DARK, () => showEnding('dark')));
+  const L = [red('As you wish. Without light you won’t see the teeth.')];
+  if (STORY.kept) L.push(whisperFish('Don’t leave me in the boat.'));
+  dlgRun(L, () => playCine(CINE_DARK, () => showEnding('dark')));
 }
 function endCut() {
   dlgRun([
-    { who: '', text: 'You draw your knife across the line.', style: 'narr' },
-    { who: THE_FISH, text: 'No. Nobody cuts the', style: 'red' },
-  ], () => playCine(CINE_CUT, () => showEnding('cut')));
+    narr('You reach for the knife on the gunwale.'),
+    red('No. Nobody cuts the'),
+  ], () => playCine(cutCine(false), () => showEnding('cut')));
 }
-function loadEndings() {
-  try { const v = JSON.parse((IS_BROWSER && window.localStorage.getItem('stillwater-endings')) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+// Silent: nothing, asked a third time. Counts as Still water. Kept: the boat fish dims with no caption.
+function endSilent() {
+  const L = [narr('You say nothing.'), { pause: 3 }, narr('It waits. Then it splashes its tail once and goes down.')];
+  if (STORY.kept) L.push({ act: () => tween(WS, 'goldKept', 0.05, 1.5) });
+  dlgRun(L, () => playCine(cutCine(true), () => showEnding('cut', 'silent')));
 }
+function loadJSON(key, fallback) {
+  try { const v = JSON.parse((IS_BROWSER && window.localStorage.getItem(key)) || 'null'); return v === null ? fallback : v; } catch (e) { return fallback; }
+}
+function saveJSON(key, v) {
+  try { if (IS_BROWSER) window.localStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* storage unavailable */ }
+}
+function loadEndings() { const v = loadJSON('stillwater-endings', []); return Array.isArray(v) ? v : []; }
 function saveEnding(id) {
   const list = loadEndings();
   if (list.indexOf(id) < 0) list.push(id);
-  try { if (IS_BROWSER) window.localStorage.setItem('stillwater-endings', JSON.stringify(list)); } catch (e) { /* storage unavailable */ }
+  saveJSON('stillwater-endings', list);
   return list;
 }
+let sessionRuns = 0, sessionLast = null;
+function loadRun() {
+  RUN.count = Math.max(sessionRuns, +loadJSON('stillwater-runs', 0) || 0);
+  RUN.last = sessionLast || loadJSON('stillwater-last', null);
+}
+function saveRun(id) {
+  sessionRuns++; sessionLast = id;
+  saveJSON('stillwater-runs', Math.max(sessionRuns, +loadJSON('stillwater-runs', 0) || 0));
+  saveJSON('stillwater-last', id);
+}
+// The ending card: the base text, one variant sentence, and what was asked for.
+// Priority: kept > the most relevant wish (order per ending) > refused twice > one refusal (Still water only).
+function endingVariant(id) {
+  const v = END_VARIANTS[id];
+  if (STORY.kept) return v.kept;
+  for (const w of v.order) if (has(w)) return v.lines[w];
+  if (v.refused2 && STORY.refused === 2) return v.refused2;
+  if (v.refused1 && STORY.refused === 1) return v.refused1;
+  return '';
+}
+function askedLine() {
+  const labels = STORY.wishes.map(w => WISH_LABELS[w]);
+  if (!labels.length) return 'You asked for nothing.';
+  const head = STORY.refused === 1 ? 'You asked for nothing, once. And for: ' : 'You asked for: ';
+  return head + labels.join('. ') + '.';
+}
+function composeEnding(id, variant) {
+  const e = ENDINGS[id];
+  const text = variant === 'silent' ? SILENT_TEXT : (e.text + ' ' + endingVariant(id)).trim();
+  return { id, variant: variant || '', title: e.title, text, asked: askedLine() };
+}
 let sessionEndings = [];
-function showEnding(id) {
+function showEnding(id, variant) {
   setPhase('end');
   if (sessionEndings.indexOf(id) < 0) sessionEndings.push(id);
   const saved = saveEnding(id);
   const n = Math.max(saved.length, sessionEndings.length);
-  UI.ending(ENDINGS[id], n);
+  saveRun(id);
+  UI.ending(composeEnding(id, variant), n);
 }
 
 // ---------------------------------------------------------------- fishing
+function promptFor(p) {
+  if (p === 'ready') return 'Tap to cast';
+  if (p === 'waiting' && G.tutorial < 2) return 'Wait for the float to dip';
+  if (p === 'bite') return 'Tap now!';
+  if (p === 'reeling') return G.tutorial < 3 ? 'Hold to reel. Let go when it pulls hard.' : 'Hold to reel';
+  return '';
+}
+// The tutorial prompt is hidden while a said caption is on screen, so two texts never share the stage.
+function refreshPrompt() { UI.prompt(G.t < G.saidUntil ? '' : promptFor(G.phase)); }
 function setPhase(p) {
   G.phase = p; G.pt = 0;
-  let msg = '';
-  if (p === 'ready') msg = 'Tap to cast';
-  else if (p === 'waiting' && G.tutorial < 2) msg = 'Wait for the float to dip';
-  else if (p === 'bite') msg = 'Tap now!';
-  else if (p === 'reeling') msg = G.tutorial < 3 ? 'Hold to reel. Let go when it pulls hard.' : 'Hold to reel';
-  UI.prompt(msg);
+  refreshPrompt();
+}
+// Captions, with their end time tracked so the said lines can wait their turn.
+function cap(t, dur, style) {
+  G.capUntil = G.t + (dur || 2.5);
+  UI.caption(t, dur, style);
+}
+// The fisherman's lines (bible, Opening): quoted, in the said style. A line that finds another caption on
+// screen waits in G.saidPending and shows at the next beat (a cast landing or a card closing).
+const SAID_DUR = 2.6;
+function saidBeat(text) {
+  if (text) G.saidPending.push(text);
+  if (!G.saidPending.length || G.t < G.capUntil) return;
+  STORY.said++;
+  cap('“' + G.saidPending.shift() + '”', SAID_DUR, 'said');
+  G.saidUntil = G.capUntil;
+  refreshPrompt();
+}
+// A carried-over line also shows as soon as the stage is free during play, so the three lines cannot
+// cascade past the third catch (the fish quotes them right after).
+const SAID_PHASES = ['ready', 'casting', 'waiting'];
+function saidUpdate() {
+  if (G.saidUntil && G.t >= G.saidUntil) { G.saidUntil = 0; refreshPrompt(); }
+  if (G.saidPending.length && G.t >= G.capUntil && SAID_PHASES.indexOf(G.phase) >= 0) saidBeat(null);
 }
 function lose(msg) {
   G.bob = null; G.reel = null; G.holding = false; G.bobDip = 0;
   setPhase('lost');
-  UI.caption(msg, 1.8);
+  cap(msg, 1.8);
 }
 function cast() {
   const tx = 34 + Math.random() * 58, ty = 262 + Math.random() * 36;
   G.cast = { t: 0, tx, ty, from: null };
+  STORY.casts++;
   setPhase('casting');
   SFX.whoosh();
 }
+// In act 2 the golden cast has nothing bite for slightly too long.
+const RED_BITE_DELAY = 1.8;
 function startWaiting() {
   const golden = STORY.goldenNext;
-  const bite = golden ? 1.6 + Math.random() * 0.8 : 1.6 + Math.random() * 3.2 * (WS.fishShadows ? 0.4 : 1);
+  const bite = golden ? (1.6 + Math.random() * 0.8) * (STORY.act === 2 ? RED_BITE_DELAY : 1) : 1.6 + Math.random() * 3.2 * (WS.fishShadows ? 0.4 : 1);
   const nib = [];
   if (!golden) {
     const n = (Math.random() * 3) | 0;
@@ -1468,17 +1778,43 @@ function startWaiting() {
   G.wait = { t: 0, bite, nib };
   setPhase('waiting');
 }
+// The act 2 species is chosen from those whose act 1 line was not shown this run. After the later-run
+// hook line, the perch is excluded from the act 1 picks so the two hook lines never both show.
 function pickSpecies() {
-  let s;
-  do { s = SPECIES[(Math.random() * SPECIES.length) | 0]; } while (s.id === STORY.lastSpecies);
+  let pool = SPECIES.filter(s => s.id !== STORY.lastSpecies);
+  if (STORY.act === 1 && usedRepl('lip')) pool = pool.filter(s => s.id !== 'perch');
+  if (STORY.act === 2) { const unseen = pool.filter(s => STORY.shown1.indexOf(s.id) < 0); if (unseen.length) pool = unseen; }
+  const s = pool[(Math.random() * pool.length) | 0];
   STORY.lastSpecies = s.id;
   return s;
+}
+// Conditional card replacements (bible, section 5): at most one per card, each fires at most once per run
+// (STORY.usedRepl), first match wins. once() returns null when the replacement has already fired.
+const usedRepl = key => STORY.usedRepl.indexOf(key) >= 0;
+function once(key, text) {
+  if (usedRepl(key)) return null;
+  STORY.usedRepl.push(key);
+  return text;
+}
+function cardLine(id, a) {
+  const first = STORY.actCatches === 0;
+  const line = (a === 2 && id === 'char' && has('company') && once('char2', 'Its scales show someone sitting behind you.'))
+    || (a === 1 && first && STORY.kept && once('kept1', 'There is a gold scale in its mouth.'))
+    || (a === 2 && id === 'trout' && has('fish') && once('trout2', 'Its stomach is full of hooks. All of them yours.'))
+    || (a === 1 && has('fish') && once('fish1', 'It swam to the hook. It didn’t have to.'))
+    || (a === 1 && id === 'grayling' && has('home') && once('home1', 'It smells of woodsmoke. Someone’s home.'))
+    || (a === 2 && has('gold') && once('gold2', 'Heavy for its size. Something in it clinks.'))
+    || (a === 2 && STORY.refused === 2 && once('refused2', 'It is looking at you the way you look at it.'))
+    || (a === 0 && first && isLaterRun() && once('lip', 'There is an old hook in its lip.'));
+  return line || DESC[id][a];
 }
 function makeCatch(sp) {
   const a = Math.min(2, STORY.act);
   const spr = makeFish({ len: sp.len, ht: sp.ht, tail: sp.tail, dorsalH: sp.dorsalH, stripes: sp.stripes, spots: sp.spots, spotC: sp.spotC, fork: sp.fork, eel: sp.eel, noEye: a === 2 && sp.id === 'perch', seed: (Math.random() * 1000) | 0, pal: FPAL });
-  const voice = STORY.heard ? VOICES[Math.min(VOICES.length - 1, STORY.voiceI++)] : '';
-  return { name: sp.names[a], weight: lerp(sp.wt[0], sp.wt[1], Math.random()), desc: DESC[sp.id][a], spr, voice };
+  const desc = cardLine(sp.id, a);
+  if (a === 1) STORY.shown1.push(sp.id);
+  const voice = STORY.heard && a === 2 ? VOICE[STORY.firstAsk] || '' : '';
+  return { name: sp.names[a], weight: lerp(sp.wt[0], sp.wt[1], Math.random()), desc, spr, voice };
 }
 const REEL_END = { x: BOAT_X - 4, y: WL + 5 };
 function hook() {
@@ -1531,14 +1867,21 @@ function land() {
 }
 function showCard(f) { setPhase('card'); UI.card(f); SFX.caught(); }
 function closeCard() { UI.cardHide(); afterCatch(); }
+// The fisherman's other two lines, after the first and second cards close.
+const OPENING_CAPS = { 1: 'Look at that sun.', 2: 'I could watch that sun forever.' };
+function stillCaption() {
+  if (STORY.act === 0) return 'The water goes very still.';
+  if (STORY.act === 1) return STORY.kept ? 'The water goes very still. The fish in the boat does not.' : 'The water goes very still again.';
+  return STORY.kept ? 'The water goes very still. The flame leans toward your feet.' : 'The water goes very still. The lantern flame leans toward it.';
+}
 function afterCatch() {
   STORY.catches++; STORY.actCatches++; G.tutorial++;
   UI.count(STORY.catches);
   const need = [3, 2, 1][STORY.act];
   if (STORY.actCatches >= need && !STORY.goldenNext) {
     STORY.goldenNext = true;
-    UI.caption(['The water goes very still.', 'Something gold turns beneath the surface.', 'The lantern flame leans toward the water.'][STORY.act], 3.2);
-  }
+    cap(stillCaption(), 3.2);
+  } else saidBeat(STORY.act === 0 ? OPENING_CAPS[STORY.catches] : null);
   setPhase('ready');
 }
 function fishUpdate(dt) {
@@ -1563,13 +1906,14 @@ function fishUpdate(dt) {
         G.bob = { x: c.tx, y: c.ty, fly: false };
         ring(c.tx, c.ty + 1); splash(c.tx, c.ty, 4);
         SFX.plop();
+        saidBeat(STORY.casts === 1 ? 'First time here.' : null);
         startWaiting();
       }
     }
   } else if (ph === 'waiting') {
     G.rodA = lerp(G.rodA, AIM_A, Math.min(1, dt * 3));
     const w = G.wait;
-    w.t += dt;
+    if (G.t >= G.saidUntil) w.t += dt; // no nibble or bite while a said caption is on screen
     if (w.nib.length && w.t >= w.nib[0]) { w.nib.shift(); G.bobDip = 0.16; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
     if (STORY.goldenNext && Math.random() < dt * 6) sparkle(G.bob.x + (Math.random() - 0.5) * 10, G.bob.y - Math.random() * 4);
     if (w.t >= w.bite) {
@@ -1620,7 +1964,7 @@ let TEST = false;
 function setTestMode(on) {
   TEST = !!on;
   if (UI.el && UI.el.skip) UI.el.skip.hidden = !TEST;
-  UI.caption(TEST ? 'Test mode on' : 'Test mode off', 1.5);
+  cap(TEST ? 'Test mode on' : 'Test mode off', 1.5);
 }
 const SKIP_BOB = { x: 63, y: 280 };
 function testCatch() {
@@ -1637,12 +1981,13 @@ function testCatch() {
 function startGame() {
   UI.title(false);
   setPhase('ready');
-  UI.caption('The lake is so still it could be glass.', 3.5);
+  cap('Nothing on the lake is moving except you.', 3.5);
 }
 function resetAll() {
   resetWS();
-  Object.assign(STORY, { act: 0, catches: 0, actCatches: 0, wishes: [], heard: false, goldenNext: false, lastSpecies: null, voiceI: 0 });
-  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0 });
+  Object.assign(STORY, freshStory());
+  loadRun();
+  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, saidUntil: 0, saidPending: [] });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
   CINE = null;
   DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0;
@@ -1665,6 +2010,7 @@ function update(dt) {
   G.t += dt; G.pt += dt;
   updTweens(dt);
   cineUpdate(dt);
+  saidUpdate();
   fishUpdate(dt);
   dlgUpdate(dt);
   updParts(dt); updRings(dt); updAsh(dt); updShadows(dt); updBirds(dt); updJumps(dt);
@@ -1683,7 +2029,7 @@ function makeUI() {
     stage: $('stage'), prompt: $('prompt'), caption: $('caption'), count: $('count'),
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
-    title: $('title'), found: $('found'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endFound: $('endFound'),
+    title: $('title'), found: $('found'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endFound: $('endFound'),
     again: $('again'), fade: $('fade'), mute: $('mute'), skip: $('skip'),
   };
   let capTimer = null;
@@ -1692,8 +2038,8 @@ function makeUI() {
   return {
     el, choices: null,
     prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === 'Tap now!'); },
-    caption(t, dur) {
-      el.caption.textContent = t; el.caption.classList.add('on');
+    caption(t, dur, style) {
+      el.caption.textContent = t; el.caption.className = 'shade on' + (style ? ' ' + style : '');
       clearTimeout(capTimer);
       capTimer = setTimeout(() => el.caption.classList.remove('on'), (dur || 2.5) * 1000);
     },
@@ -1718,12 +2064,21 @@ function makeUI() {
     },
     cardHide() { el.card.classList.remove('on'); },
     dlgShow(who, style) { el.dlg.className = 'panel on ' + (style || ''); el.who.textContent = who || ''; el.who.hidden = !who; el.more.classList.remove('on'); },
-    dlgText(t) { el.text.textContent = t; },
+    // mark: the one line whose question mark is drawn wrong. Only that glyph gets a span; everything is text.
+    dlgText(t, mark) {
+      el.text.textContent = t;
+      if (!mark || !t.endsWith('?')) return;
+      el.text.textContent = t.slice(0, -1);
+      const s = document.createElement('span');
+      s.className = 'mark'; s.textContent = '?';
+      el.text.appendChild(s);
+    },
     dlgChoices(list) {
       el.choices.innerHTML = '';
       this.choices = list;
       if (!list) { el.choices.hidden = true; return; }
       el.choices.hidden = false;
+      el.choices.classList.toggle('many', list.length > 3);
       list.forEach(c => {
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'choice'; b.textContent = c.label;
@@ -1733,10 +2088,10 @@ function makeUI() {
     },
     dlgMore(on) { el.more.classList.toggle('on', !!on); },
     dlgHide() { el.dlg.classList.remove('on'); el.choices.innerHTML = ''; el.choices.hidden = true; this.choices = null; },
-    title(on, found) { el.title.classList.toggle('on', !!on); el.found.textContent = found ? 'Endings found: ' + found + ' of 3' : ''; },
+    title(on, found) { el.title.classList.toggle('on', !!on); el.found.textContent = found ? 'Endings found: ' + found + ' of ' + ENDING_COUNT : ''; },
     ending(e, n) {
-      el.endTitle.textContent = e.title; el.endText.textContent = e.text;
-      el.endFound.textContent = 'Endings found: ' + n + ' of 3';
+      el.endTitle.textContent = e.title; el.endText.textContent = e.text; el.endAsked.textContent = e.asked || '';
+      el.endFound.textContent = 'Endings found: ' + n + ' of ' + ENDING_COUNT;
       el.ending.classList.add('on');
       setTimeout(() => { try { el.again.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }, 60);
     },
@@ -1797,7 +2152,7 @@ function boot() {
   window.addEventListener('contextmenu', e => e.preventDefault());
   window.addEventListener('keydown', e => {
     if (e.repeat) return;
-    if (/^Digit[1-3]$/.test(e.code) && UI.choices) {
+    if (/^Digit[1-6]$/.test(e.code) && UI.choices) {
       const c = UI.choices[+e.code.slice(5) - 1];
       if (c) { e.preventDefault(); c.cb(); }
       return;
@@ -1855,7 +2210,7 @@ if (IS_BROWSER) {
     setOut(buf) { OUT32 = buf; },
     setH(h) { H = h; alloc(); },
     get H() { return H; }, W, HY,
-    spawnShadows,
+    spawnShadows, SHAD, RUN, ENDING_COUNT,
   };
 }
 })();

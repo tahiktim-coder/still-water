@@ -28,7 +28,7 @@ function play(plan, prefix, offsets) {
       if (p === 'title' || p === 'ready' || p === 'card') { g.press(); g.release(); lastAct = t; }
       else if (p === 'bite') { g.press(); holding = true; lastAct = t; }
       else if (p === 'dialog') {
-        if (UI.choices) { const c = UI.choices[plan[ci++] || 0]; if (ci === 4) tFinal = t; c.cb(); } else { g.press(); g.release(); }
+        if (UI.choices) { const c = UI.choices[plan[ci++] || 0]; if (g.WS.sunKind === 1) tFinal = t; c.cb(); } else { g.press(); g.release(); }
         lastAct = t;
       }
     }
@@ -43,7 +43,9 @@ function play(plan, prefix, offsets) {
     if (shots.length && ref >= 0 && t - ref >= shots[0][0]) { g.render(t); write(prefix + shots[0][1] + '.png'); shots.shift(); }
   }
 }
-play([0, 0, 0, 0], 'e_', [[6, 'redrise', 'red'], [3.5, 'jaw']]);
+// Plans are choice indices in menu order (see tools/sim.js). tFinal is the wish 3 choice, made under the red sun.
+play([0, 0, 0, 0, 0, 0], 'e_', [[6, 'redrise', 'red'], [3.5, 'jaw']]);
 play([0, 1, 1, 1], 'e_', [[5, 'dark']]);
 play([0, 2, 2, 2], 'e_', [[2.2, 'cutfall'], [18, 'cutdawn']]);
+play([0, 3, 3, 3], 'e_', [[2.2, 'silentfall'], [18, 'silentdawn']]);
 console.log('wrote tools/out/e_*.png');

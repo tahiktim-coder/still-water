@@ -51,12 +51,12 @@ async function run(plan, label, useKeys) {
   console.log('stage size:', $('stage').style.width, $('stage').style.height, 'canvas', $('c').width + 'x' + $('c').height, 'title on:', $('title').classList.contains('on'));
   $('mute').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
   console.log('mute label after click:', $('mute').textContent);
-  await run([0, 0, 0, 2], 'mouse, company+forever -> cut', false);
+  await run([0, 0, 0, 0, 0, 2], 'mouse, company+forever, yes -> cut', false);
   $('again').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
   await new Promise(r => setTimeout(r, 800));
   pump(5);
   console.log('after Cast again: title on =', $('title').classList.contains('on'), 'ending on =', $('ending').classList.contains('on'), 'found =', $('found').textContent);
-  await run([1, 1, 2, 0], 'keys, fish+gold -> home', true);
+  await run([1, 1, 2, 0], 'keys, keep, fish+gold -> home', true);
   console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'NO ERRORS');
   process.exit(0);
 })();

@@ -9,7 +9,7 @@ Premise: it starts as a calm fishing game, and a golden fish grants three wishes
 ## Commands
 - `npm install`: run once. It only installs the dev tools, pngjs and jsdom.
 - `npm run build`: writes `dist/index.html` by inlining `src/game.js` into `src/template.html` at `/*GAME*/`. Never edit `dist/` by hand.
-- `npm run sim`: a headless bot plays through every ending. It must print `ALL ENDINGS REACHED`.
+- `npm run sim`: a headless bot plays through every ending (plans are choice indices in menu order, listed at the top of `tools/sim.js`). It must print `ALL ENDINGS REACHED`.
 - `npm run shots`: renders scene states and ending frames to `tools/out/*.png`. Look at them after any visual change.
 - `npm run domtest`: plays the built page in jsdom with the canvas stubbed. It is slow and takes a few minutes.
 - `npm run skipcheck`: verifies the temporary test mode below. It takes under a second.
@@ -56,7 +56,8 @@ Frame order in `render(t)`:
 State:
 - `WS` holds the world and mood. Each visual beat is a numeric field, such as `mood`, `sunY`, `sunKind`, `pupil`, `stalk`, `jaw`, `lantern`, `ash`, `companion`, `cabin` and `gold`. Animate them with `tween(obj, key, to, dur, ease, done)`.
 - `G` is the fishing state machine. Its phases are title, ready, casting, waiting, bite, reeling, landing, card, lost, dialog, cine and end. The only inputs are `press()` and `release()`.
-- `STORY` holds the act (0–2), catches, wishes, `heard` and `goldenNext`.
+- `STORY` holds the act (0–2), catches, `wishes` (granted wishes only, in order), `heard`, `goldenNext`, and the bible's flags: `kept`, `firstAsk` ('company' | 'fish' | 'home' | 'nothing'), `refused` (0–2), `answered` (null | true | false), `ocean` ('none' until phase 5), `said` (how many of the fisherman's three lines have shown), `usedRepl` (keys of the card replacements that have fired this run). Also `casts` (for the opening captions) and `shown1` (species whose act 1 card was shown, so act 2 picks another). `freshStory()` is the reset shape.
+- `RUN` holds `count` (completed runs, from localStorage `stillwater-runs` plus this session) and `last` (the last ending id, `stillwater-last`). `isLaterRun()` gates the second-run lines. It is reloaded in `resetAll`, and `showEnding` bumps it.
 
 Fishing loop:
 - Cast, then nibbles, then a bite. The bite window is 0.95 s, or 3.2 s for the golden fish.
@@ -64,13 +65,15 @@ Fishing loop:
 - When progress `reel.p` reaches 1 the fish lands and a card appears.
 - Species are in `SPECIES` and per-act descriptions are in `DESC`.
 
-Story:
-- Act 0 needs 3 catches, then the golden fish offers wish 1: company, fish or home.
-- Act 1 needs 2 catches, then wish 2: forever, hear or gold. This is followed by `CINE_SUNSET`.
-- Act 2 needs 1 catch. The golden hook triggers `redSequence`, then `CINE_RED`, then `wish3`, whose lines depend on the earlier wishes.
-- The endings are Home (`CINE_JAWS`), Dark (`CINE_DARK`) and Still water (`CINE_CUT`). Endings found are saved in localStorage under `stillwater-endings`.
+Story (the script is `docs/story.md`; phase 1 of its build plan is in, text and state only, copy verbatim from the bible):
+- Captions go through `cap(text, dur, style)`, which tracks the end time in `G.capUntil`. The fisherman's three lines are quoted 'said' captions (`saidBeat`): they fire when the first cast lands and after the first and second cards close (`OPENING_CAPS`), wait in `G.saidPending` if another caption is on and carry over to the next beat, hide the prompt (`refreshPrompt`) and hold nibbles and bites while on screen (`G.saidUntil`), and count in `STORY.said`.
+- Act 0 needs 3 catches, then golden scene 1 (`wish1`, `wish1b`): `greeting1` gives the later-run first line (from `RUN`), then Let it go / Keep it (`STORY.kept`, text and state only for now; the boat fish is phase 3), then wish 1: company (the "Who?" exchange), fish (the existing shadows, all drifting to the horizon; the ocean is phase 5), home, or Nothing (`refuse1`). A granted wish drops the sun in two steps (`sunDrop`) as the cost line begins, with no caption.
+- Act 1 needs 2 catches, then golden scene 2 (`greeting2`: kept and refused once > kept > refused once > default), then wish 2: forever (`WS.frozen`, starless sunset), hear, gold, or Nothing (`refuse2`). Then `sunsetCine(refused)`, and if company, the companion's question (`companionQuestion`, `STORY.answered`, the wrong question mark via `mark`).
+- Act 2 needs 1 catch (species picked from those whose act 1 line was not shown). The golden hook triggers `redSequence` (`redLines` per released / kept / refused twice, the two-second hold), then `CINE_RED` (companion turn and pupil slide inside it, the lake's whisper if heard), then `wish3` (the bible's ordered list; `recountLine` is one line ending "And the sun you wanted. Your words, not mine."; `wish3Choices`).
+- The endings are Home (`CINE_JAWS`), Dark (`CINE_DARK`), Still water (`cutCine(false)`, no caption; the released sky fish drops with a splash via `goldFishDrop`) and Silent (`cutCine(true)`, "The line goes slack.", counts as 'cut'). Home and Dark carry the released "Something gold" captions. `composeEnding` builds the card: base + one variant sentence (`END_VARIANTS`, `endingVariant`: kept > wish order > refused twice > one refusal) + the "You asked for" line (`askedLine`, with the one-refusal header). `ENDING_COUNT` is the "of N" on the counter. Endings found are saved in localStorage under `stillwater-endings`.
+- Cards: `cardLine` applies the bible's conditional replacements over `DESC`: one per card, first match wins, each at most once per run through `once(key, text)` and `STORY.usedRepl`; after the later-run 'lip' line `pickSpecies` excludes the perch in act 1. `VOICE` is keyed to `STORY.firstAsk` on the act 2 card when heard.
 
-Dialogue: `dlgRun(lines, done)`. A line is `{who, text, style, choices}`, `{act: fn}` or `{pause: seconds}`. The styles are '', 'narr', 'whisper' and 'red'. Choices are `{label, pick}`.
+Dialogue: `dlgRun(lines, done)`. A line is `{who, text, style, choices, mark}`, `{act: fn}` or `{pause: seconds}`. The styles are '', 'narr', 'whisper' and 'red'. Choices are `{label, pick}`; a choice whose `pick` does not start a new `dlgRun` lets the list continue, so choices can sit mid-scene. `mark` flips the trailing question mark (the companion's question). `UI.caption(text, dur, style)` accepts 'whisper' and 'said'; call it through `cap`. The dialogue panel is capped at 46% of the stage with the text scrolling, so up to six buttons never cover the companion.
 
 Cinematics: `playCine(def, done)`, where `def = {dur, init(s), update(t, dt, at, s)}` and `at(key, time, fn)` fires once.
 
@@ -81,4 +84,4 @@ UI: the DOM overlay lives in `src/template.html` and is wired up in `makeUI()`. 
 ## Known issues
 - Home ending: the jaw composite leaves a horizontal seam mid-screen, which the darkening and fangs mostly hide.
 - Upscaling isn't an integer multiple on some screens, so pixel sizes are slightly uneven.
-- The keyboard controls (Space/Enter, and 1–3 for choices) are only lightly tested.
+- The keyboard controls (Space/Enter, and 1–6 for choices) are only lightly tested.

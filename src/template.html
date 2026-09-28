@@ -77,6 +77,8 @@ body {
   opacity: 0; transition: opacity 0.9s ease; pointer-events: none;
 }
 #caption.on { opacity: 1; }
+#caption.whisper { color: var(--ui-dim); letter-spacing: 0.08em; }
+#caption.said { font-weight: 600; } /* the fisherman's and the companion's lines; the quotes are in the text */
 #prompt {
   position: absolute; z-index: 5; left: 6%; right: 6%; bottom: 9%; text-align: center;
   font-size: calc(var(--u) * 3.7); color: var(--ui-ink);
@@ -87,19 +89,23 @@ body {
 
 #dialog {
   position: absolute; z-index: 6; left: 4%; right: 4%; bottom: calc(var(--u) * 4);
+  max-height: 46%; display: flex; flex-direction: column;
   padding: calc(var(--u) * 3) calc(var(--u) * 4) calc(var(--u) * 3.4);
   opacity: 0; transform: translateY(calc(var(--u) * 2)); transition: opacity 0.25s ease, transform 0.25s ease;
   pointer-events: none;
 }
 #dialog.on { opacity: 1; transform: none; pointer-events: auto; }
-#who { font-weight: 600; font-size: calc(var(--u) * 3.4); color: var(--ui-accent); margin-bottom: calc(var(--u) * 1.2); }
-#text { min-height: 2.7em; max-width: 34em; }
+#who { flex: 0 0 auto; font-weight: 600; font-size: calc(var(--u) * 3.4); color: var(--ui-accent); margin-bottom: calc(var(--u) * 1.2); }
+#text { flex: 0 1 auto; min-height: 2.7em; overflow-y: auto; max-width: 34em; }
 #dialog.narr #text, #dialog.whisper #text { color: var(--ui-dim); }
 #dialog.whisper #text { letter-spacing: 0.08em; }
+#text .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
 #dialog.red #who { color: var(--ui-edge); }
 #dialog.red.on #text { animation: shiver 0.14s steps(2, jump-none) infinite; }
-#choices { display: flex; flex-direction: column; gap: calc(var(--u) * 1.8); margin-top: calc(var(--u) * 2.8); }
+#choices { flex: 0 0 auto; display: flex; flex-direction: column; gap: calc(var(--u) * 1.8); margin-top: calc(var(--u) * 2.8); }
 #choices[hidden] { display: none; }
+#choices.many { gap: calc(var(--u) * 1.1); margin-top: calc(var(--u) * 2.2); }
+#choices.many .choice { padding: calc(var(--u) * 1.05) calc(var(--u) * 2.4); font-size: calc(var(--u) * 4); }
 .choice {
   font: inherit; text-align: left; color: var(--ui-ink); background: transparent; cursor: pointer;
   border: calc(var(--u) * 0.5) solid var(--ui-edge);
@@ -147,6 +153,7 @@ body {
 #ending.on { opacity: 1; pointer-events: auto; }
 #ending h2 { margin: 0; font-size: calc(var(--u) * 10); font-weight: 600; line-height: 1.05; color: #fff; }
 #endText { margin: calc(var(--u) * 4) 0 0; color: #f3ece4; max-width: 30em; }
+#endAsked { margin: calc(var(--u) * 2.4) 0 0; color: #f3ece4; max-width: 30em; }
 #endFound { margin: calc(var(--u) * 4) 0 0; font-size: calc(var(--u) * 3.2); color: #c9b9a8; }
 #again {
   margin-top: calc(var(--u) * 5); font: inherit; color: #fff; background: transparent; cursor: pointer;
@@ -195,6 +202,7 @@ body {
     <div id="ending" aria-live="polite">
       <h2 id="endTitle"></h2>
       <p id="endText"></p>
+      <p id="endAsked"></p>
       <p id="endFound"></p>
       <button id="again" type="button">Cast again</button>
     </div>
