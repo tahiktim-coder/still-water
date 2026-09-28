@@ -84,3 +84,35 @@ if (which === 'all' || which === 'deep') shot('out_deep.png', (ws, G) => { redSk
 // Phase 7, the still-water dawn with the shoal: the fish wish's shadows steer to the horizon at full weight
 // and leave as they arrive (shoalOut), under the returning sun.
 if (which === 'all' || which === 'cut_shoal') shot('out_cut_shoal.png', (ws) => { ws.mood = 0.6; ws.sunY = g.HY + 10; ws.sunGlow = 0.4; ws.horizGlow = 0.5; ws.starA = 0.4; ws.lantern = 1; sea(ws); ws.shoalOut = 1; g.setPhase('cine'); for (let i = 0; i < 90; i++) g.update(1 / 30); }, 8);
+// Phase 13, the catch cards: every species in every act at 6x on the card panel's colour, acts 0 and 1
+// under the day palette and act 2 under the night one (the card takes the live palette). out_cards.png is
+// the sheet, one row per species and one column per act; fish_<id>_<act>.png is each sprite alone.
+const CARD_BG = [16, 30, 56], FISH_SC = 6, CELL_W = 34, CELL_H = 20;
+function fishPng(w, h) {
+  const png = new PNG({ width: w, height: h });
+  for (let i = 0; i < w * h; i++) { png.data[i * 4] = CARD_BG[0]; png.data[i * 4 + 1] = CARD_BG[1]; png.data[i * 4 + 2] = CARD_BG[2]; png.data[i * 4 + 3] = 255; }
+  return png;
+}
+function blitFish(png, s, x0, y0) {
+  for (let y = 0; y < s.h * FISH_SC; y++) for (let x = 0; x < s.w * FISH_SC; x++) {
+    const v = s.data[Math.floor(y / FISH_SC) * s.w + Math.floor(x / FISH_SC)];
+    if (v === 255) continue;
+    const p = g.PAL[v], i = ((y0 + y) * png.width + x0 + x) * 4;
+    png.data[i] = p & 255; png.data[i + 1] = (p >>> 8) & 255; png.data[i + 2] = (p >>> 16) & 255;
+  }
+}
+function fishSheet() {
+  const sheet = fishPng(CELL_W * FISH_SC * 3, CELL_H * FISH_SC * g.SPECIES.length);
+  g.SPECIES.forEach((sp, row) => {
+    for (let a = 0; a < 3; a++) {
+      g.buildPalette(a === 2 ? 1 : 0, 0);
+      const s = g.makeFish(g.fishOpts(sp, a, 5));
+      const one = fishPng((s.w + 2) * FISH_SC, (s.h + 2) * FISH_SC);
+      blitFish(one, s, FISH_SC, FISH_SC);
+      fs.writeFileSync(path.join(OUT_DIR, 'fish_' + sp.id + '_' + a + '.png'), PNG.sync.write(one));
+      blitFish(sheet, s, (a * CELL_W + 2) * FISH_SC, (row * CELL_H + Math.floor((CELL_H - s.h) / 2)) * FISH_SC);
+    }
+  });
+  fs.writeFileSync(path.join(OUT_DIR, 'out_cards.png'), PNG.sync.write(sheet));
+}
+if (which === 'all' || which === 'cards') fishSheet();

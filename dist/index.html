@@ -146,7 +146,7 @@ body {
 #thinkMore.on { opacity: 0.9; animation: nudge 0.9s steps(2, jump-none) infinite; }
 
 #card {
-  position: absolute; z-index: 6; left: 13%; right: 13%; top: 27%;
+  position: absolute; z-index: 6; left: 10%; right: 10%; top: 27%;
   padding: calc(var(--u) * 4) calc(var(--u) * 4) calc(var(--u) * 3.4); text-align: center;
   opacity: 0; transform: scale(0.96); transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none;
 }
@@ -711,8 +711,8 @@ function makeFish(o) {
     for (let y = top; y <= bot; y++) {
       const v = (y - top) / Math.max(1, bot - top);
       let c = v < 0.36 ? P.b : v < 0.68 ? P.m : P.l;
-      if (o.stripes && v < 0.62 && x > L * 0.28 && x < L * 0.86 && x % o.stripes === 0) c = P.o;
-      if (o.spots && v < 0.6 && hash2(x, y, o.seed || 3) > 0.84) c = o.spotC !== undefined ? o.spotC : P.l;
+      if (o.stripes && v < 0.62 && x > L * 0.28 && x < L * 0.86 && x % o.stripes === 0) c = P.bar !== undefined ? P.bar : P.o;
+      if (o.spots && v < 0.6 && hash2(x, y, o.seed || 3) > 0.84) c = o.spotC !== undefined ? o.spotC : P.spot !== undefined ? P.spot : P.l;
       set(bar + x, y, c);
     }
   }
@@ -740,7 +740,16 @@ function makeFish(o) {
     const y0 = Math.round(cy + 1);
     out[y0 * w + bar - 1] = P.o; out[(y0 + 1) * w + bar - 2] = P.o; out[(y0 + 2) * w + bar - 3] = P.o;
   }
+  fishMarks(o, out, w, L, bar, cy);
   return { w, h, data: out, cy: Math.round(cy), bar };
+}
+function fishMarks(o, out, w, L, bar, cy) {
+  const P = o.pal;
+  if (P.heart !== undefined) out[Math.round(cy + 1) * w + bar + Math.round(L * 0.3)] = P.heart;
+  if (o.teeth) {
+    const y = Math.round(cy) + 1;
+    for (let k = 0; k < o.teeth; k++) out[y * w + bar + 1 + k * 2] = P.tooth !== undefined ? P.tooth : 22;
+  }
 }
 const FPAL = { o: 3, b: 6, m: 8, l: 10, s: 11, f: 5, e: 1 };
 const GPAL = { o: 13, b: 14, m: 15, l: 16, s: 16, f: 14, e: 18 };
@@ -778,13 +787,29 @@ function buildSprites() {
 }
 
 const SPECIES = [
-  { id: 'perch', names: ['Glass perch', 'Glass perch', 'Eyeless perch'], len: 12, ht: 7, tail: 4, dorsalH: 2, stripes: 3, fork: true, wt: [0.2, 0.6], d: 0.9 },
-  { id: 'char', names: ['Mirror char', 'Mirror char', 'Hollow char'], len: 15, ht: 6, tail: 4, dorsalH: 1, spots: true, fork: true, wt: [0.5, 1.4], d: 1.0 },
-  { id: 'smelt', names: ['Blue smelt', 'Grinning smelt', 'Grinning smelt'], len: 9, ht: 4, tail: 3, dorsalH: 1, fork: true, wt: [0.05, 0.2], d: 0.7 },
-  { id: 'trout', names: ['Fjord trout', 'Fjord trout', 'Drowned trout'], len: 17, ht: 7, tail: 5, dorsalH: 1, spots: true, spotC: 3, fork: false, wt: [0.8, 2.2], d: 1.25 },
-  { id: 'eel', names: ['Needle eel', 'Knot eel', 'Endless eel'], len: 24, ht: 3, tail: 2, eel: true, wt: [0.3, 0.9], d: 1.1 },
-  { id: 'grayling', names: ['Pale grayling', 'Pale grayling', 'Ash grayling'], len: 14, ht: 6, tail: 4, dorsalH: 4, fork: true, wt: [0.3, 0.8], d: 1.0 },
+  { id: 'perch', names: ['Glass perch', 'Glass perch', 'Eyeless perch'], len: 12, ht: 7, tail: 4, dorsalH: 2, stripes: 2, fork: true, wt: [0.2, 0.6], d: 0.9,
+    pal: { o: 7, b: 10, m: 10, l: 11, s: 11, f: 9, e: 18, bar: 4, heart: 24 },
+    pal2: { o: 4, b: 23, m: 23, l: 22, s: 22, f: 9, e: 18, bar: 2, heart: 24 } },
+  { id: 'char', names: ['Mirror char', 'Mirror char', 'Hollow char'], len: 15, ht: 6, tail: 4, dorsalH: 1, spots: true, fork: true, wt: [0.5, 1.4], d: 1.0,
+    pal: { o: 3, b: 7, m: 9, l: 10, s: 9, f: 6, e: 18, spot: 11 },
+    pal2: { o: 1, b: 5, m: 7, l: 9, s: 9, f: 4, e: 18 } },
+  { id: 'smelt', names: ['Blue smelt', 'Grinning smelt', 'Grinning smelt'], len: 9, ht: 4, tail: 3, dorsalH: 1, fork: true, wt: [0.05, 0.2], d: 0.7,
+    pal: { o: 3, b: 6, m: 8, l: 10, s: 11, f: 6, e: 20, tooth: 22 },
+    pal2: { o: 1, b: 4, m: 6, l: 8, s: 9, f: 4, e: 20, tooth: 22 } },
+  { id: 'trout', names: ['Fjord trout', 'Fjord trout', 'Drowned trout'], len: 17, ht: 8, tail: 5, dorsalH: 1, spots: true, fork: false, wt: [0.8, 2.2], d: 1.25,
+    pal: { o: 18, b: 13, m: 23, l: 22, s: 14, f: 13, e: 18, spot: 24 },
+    pal2: { o: 0, b: 1, m: 3, l: 23, s: 4, f: 1, e: 18, spot: 24 } },
+  { id: 'eel', names: ['Needle eel', 'Knot eel', 'Endless eel'], len: 24, ht: 3, tail: 2, eel: true, wt: [0.3, 0.9], d: 1.1,
+    pal: { o: 19, b: 18, m: 13, l: 14, s: 15, f: 13, e: 22 },
+    pal2: { o: 19, b: 0, m: 1, l: 23, s: 3, f: 0, e: 22 } },
+  { id: 'grayling', names: ['Pale grayling', 'Pale grayling', 'Ash grayling'], len: 14, ht: 6, tail: 4, dorsalH: 5, fork: true, wt: [0.3, 0.8], d: 1.0,
+    pal: { o: 4, b: 23, m: 22, l: 11, s: 11, f: 7, e: 18 },
+    pal2: { o: 1, b: 3, m: 23, l: 22, s: 22, f: 4, e: 18 } },
 ];
+function fishOpts(sp, a, seed) {
+  return { len: sp.len, ht: sp.ht, tail: sp.tail, dorsalH: sp.dorsalH, stripes: sp.stripes, spots: sp.spots, fork: sp.fork, eel: sp.eel,
+    noEye: a === 2 && sp.id === 'perch', teeth: sp.id === 'smelt' && a >= 1 ? 3 : 0, seed, pal: a === 2 ? sp.pal2 : sp.pal };
+}
 const DESC = {
   perch: ['You can see its heart beating through it.', 'There is an old hook inside it. Not yours.', 'No eyes. It still turns toward the lantern.'],
   char: ['Its scales show you the sky. You check. It matches.', 'Its scales show you a red sky.', 'Its scales show your boat from underneath.'],
@@ -2572,7 +2597,7 @@ function cardLine(id, a) {
 }
 function makeCatch(sp) {
   const a = Math.min(2, STORY.act);
-  const spr = makeFish({ len: sp.len, ht: sp.ht, tail: sp.tail, dorsalH: sp.dorsalH, stripes: sp.stripes, spots: sp.spots, spotC: sp.spotC, fork: sp.fork, eel: sp.eel, noEye: a === 2 && sp.id === 'perch', seed: (Math.random() * 1000) | 0, pal: FPAL });
+  const spr = makeFish(fishOpts(sp, a, (Math.random() * 1000) | 0));
   const desc = cardLine(sp.id, a);
   if (a === 1) STORY.shown1.push(sp.id);
   const voice = STORY.heard && a === 2 ? VOICE[STORY.firstAsk] || '' : '';
@@ -2858,6 +2883,11 @@ function cloudPath(w, h, u) {
   return 'M' + x0 + ',' + y0 + arcs(x0, y0, x1, y0, 4) + arcs(x1, y0, x1, y1, side, true) + arcs(x1, y1, x0, y1, 3) + arcs(x0, y1, x0, y0, side, true) + 'Z';
 }
 const THINK_AT = { fisherman: { left: 122, y: 186, tail: 150, dir: -1 }, companion: { left: 100, y: 190, yAsk: 184, tail: 160, dir: 1 } };
+const CARD_FISH_W = 0.6, CARD_FISH_H = 26, CARD_FISH_MIN = 2, CARD_FISH_MAX = 8;
+function cardFishScale(w, h, stageW, panelW) {
+  const u = stageW / 100;
+  return clamp(Math.floor(Math.min((CARD_FISH_W * (panelW || 80 * u)) / w, (CARD_FISH_H * u) / h)), CARD_FISH_MIN, CARD_FISH_MAX);
+}
 function makeUI() {
   const $ = id => document.getElementById(id);
   const el = {
@@ -2939,8 +2969,7 @@ function makeUI() {
       const o = new Uint32Array(im.data.buffer);
       for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) { const v = s.data[y * s.w + x]; if (v !== 255) o[(y + 1) * cv.width + x + 1] = PAL[v]; }
       cx.putImageData(im, 0, 0);
-      const u = el.stage.clientWidth / 100;
-      const sc = Math.max(2, Math.floor(Math.min((50 * u) / cv.width, (18 * u) / cv.height)));
+      const sc = cardFishScale(cv.width, cv.height, el.stage.clientWidth, el.card.clientWidth);
       cv.style.width = cv.width * sc + 'px'; cv.style.height = cv.height * sc + 'px';
       el.cardName.textContent = f.name;
       el.cardMeta.textContent = f.weight.toFixed(2) + ' kg';
@@ -3078,7 +3107,7 @@ if (IS_BROWSER) {
   UI = stubUI();
   module.exports = {
     init, render, update, press, release, resetAll, setPhase, setTestMode, testCatch, companionTap, companionHit,
-    WS, G, STORY, DLG, SPECIES, makeFish, FPAL, GPAL,
+    WS, G, STORY, DLG, SPECIES, makeFish, fishOpts, cardFishScale, buildPalette, PAL, FPAL, GPAL,
     get UI() { return UI; },
     get phase() { return G.phase; },
     setOut(buf) { OUT32 = buf; },
