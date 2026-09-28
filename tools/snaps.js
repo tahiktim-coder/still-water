@@ -50,7 +50,8 @@ function play(plan, prefix, offsets, opts) {
 }
 // Plans are choice indices in menu order (see tools/sim.js). tFinal is the wish 3 choice, made under the red sun.
 play([0, 0, 0, 0, 0, 0], 'e_', [[6, 'redrise', 'red'], [3.5, 'jaw']]);
-play([0, 1, 1, 1], 'e_', [[5, 'dark']]);
+play([0, 2, 1, 1], 'e_', [[3.4, 'dark_cap'], [5, 'dark']]); // released, with a cabin: the sky fish gone, the boat still readable under the caption at 3.4 s
+play([0, 2, 1, 0], 'e_', [[2.6, 'jaw_cabin']]); // Home with a cabin: the window glow slides down with the cabin
 play([0, 2, 2, 2], 'e_', [[2.2, 'cutfall'], [18, 'cutdawn']]);
 play([0, 3, 3, 3], 'e_', [[2.2, 'silentfall'], [18, 'silentdawn']]);
 play([0, 2, 2, 3], 'e_', [[5, 'deepmid'], [11, 'deep']]); // the descent: the horizon half way up, then the mirror filling the frame after the glint
@@ -61,4 +62,6 @@ play([0, 2, 2, 2], 'e_', [[13.5, 'cutswim'], [18, 'cutdawn_swim']]);
 // Phase 14, Stay, timed from the cinematic's start: mid-leap, the impact frame (the glow spike, the eye closed),
 // mid-drop with him riding the disc down, and the night boat alone with the lantern once the disc and the companion are gone.
 play([0, 0, 0, 0, 0, 3], 'e_', [[2.8, 'stay_leap', 'cine'], [3.6, 'stay_hit', 'cine'], [4.7, 'stay_fall', 'cine'], [12, 'stay_after', 'cine']]);
+// Phase 17, Stay on a sunk run: he floats (no standing frame) before the leap, then leaps from the water.
+play([0, 0, 0, 2, 0, 3], 'e_', [[1.5, 'stay_sunk_wait', 'cine'], [2.8, 'stay_sunk_leap', 'cine']]);
 console.log('wrote tools/out/e_*.png');
