@@ -11,6 +11,7 @@ Premise: it starts as a calm fishing game, and a golden fish grants three wishes
 - `npm run build`: writes `dist/index.html` by inlining `src/game.js` into `src/template.html` at `/*GAME*/`. Never edit `dist/` by hand.
 - `npm run sim`: a headless bot plays through every ending (plans are choice indices in menu order, listed at the top of `tools/sim.js`). It must print `ALL ENDINGS REACHED`.
 - `npm run shots`: renders scene states and ending frames to `tools/out/*.png`. Look at them after any visual change.
+- `node tools/cloudshots.js`: renders the sky alone to `tools/out/clouds_*.png` (day at t 0 and 40 s, night, red, and the wrap seam at 20, 60 and 133 s) and times `render()` 300 times. Use it when touching the clouds.
 - `npm run domtest`: plays the built page in jsdom with the canvas stubbed. It is slow and takes a few minutes.
 - `npm run skipcheck`: verifies the temporary test mode below. It takes under a second.
 - `npm run build:test`: writes `tools/out/test.html`, a copy of the game with test mode already on. Publish that file when someone needs to play through the story on a phone without fishing. It is gitignored and must never be uploaded to itch.io.
@@ -34,7 +35,7 @@ Palette: `buildPalette(mood, dim)` fills `PAL` (RGBA) and `PALRGB`.
 - `dith(f, x, y)` turns a continuous shade into an index, using Bayer dithering only near band edges.
 
 Buffers:
-- `MOUNT` is generated once in `init`. `CLOUDS` holds two cloud layers (the near cumulus at 3 px/s and the far wisps at 1.1 px/s), each a strip `CW = 2W` wide that wraps; `renderTop` samples them with a per-layer offset from `cloudT` (which stops while `WS.frozen`), and `KCOR` cuts the fixed sun corridor at sample time so it never drifts with them.
+- `MOUNT` is generated once in `init`. `CLOUDS` holds two cloud layers (the near cumulus at 3 px/s and the far wisps by the horizon at 1.1 px/s), each a strip `CW = 2W` wide that wraps. `CUMULUS` lists each cloud (layer, centre, flat base, size, bumps); `makeCumulus` builds it as a union of circles with a lifted top row, `cloudField` takes the signed distance to the silhouette (roughened by tiled noise so the strip wraps) and `shadeCloud` lights it: a 2 to 4 px band of index 11 along the upper contour facing the sun, a softer band under it, a mid body, a flat dark base, Bayer dither only at tone edges. `renderTop` samples the layers with a per-layer offset from `cloudT` (which stops while `WS.frozen`), and `KCOR` cuts the fixed sun corridor at sample time so it never drifts with them.
 - `TOP` holds the sky, sun, clouds and mountains above the horizon.
 - `FRAME` is `TOP` plus the mirrored water.
 - `SPR` holds sprites, with 255 meaning transparent.

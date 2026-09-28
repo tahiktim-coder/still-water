@@ -44,4 +44,6 @@ const night = ws => { ws.mood = 1; ws.sunY = g.HY + 14; ws.sunGlow = 0.12; ws.ho
 if (which === 'all' || which === 'open') shot('out_open.png', (ws) => { g.setPhase('ready'); ws.boatX = -60; }, 1.2); // mid row-in
 if (which === 'all' || which === 'frozen') shot('out_frozen.png', (ws) => { ws.frozen = 1; g.spawnBirds(); g.BIRDS.forEach((b, k) => { b.x = 66 + k * 14; b.y = 96 + k * 3; }); }, 3.3);
 if (which === 'all' || which === 'eyes') shot('out_eyes.png', (ws) => { night(ws); ws.eyes = 1; ws.lanternFlicker = 0.1; }, 5);
+if (which === 'all' || which === 'clouds_night') shot('out_clouds_night.png', (ws) => { night(ws); ws.companion = 0; ws.lantern = 0; }, 20); // the cumulus at night, drifted
+if (which === 'all' || which === 'clouds_red') shot('out_clouds_red.png', (ws) => { ws.mood = 2; ws.sunKind = 1; ws.sunR = 16; ws.sunY = 178; ws.sunGlow = 1.25; ws.horizGlow = 1.3; ws.pupil = 1; ws.ash = 1; ws.troubled = 0.55; }, 20); // the cumulus in the red
 if (which === 'all' || which === 'title_far') shot('out_title_far.png', (ws) => { ws.farBoat = 1; }, 3.3);

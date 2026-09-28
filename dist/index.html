@@ -323,27 +323,23 @@ const MOUNT = new Uint8Array(W * HY).fill(255);
 // shows, so the corridor that keeps the sun's path clear (KCOR, fixed to the screen) is cut at sample
 // time and stays put while the clouds move through it.
 const CW = W * 2;
-const CLOUD_T = 0.3;
 const CLOUDS = [
   { speed: 3, ph: 0, off: 0, oy: 0, idx: new Uint8Array(CW * HY).fill(255), vis: new Uint8Array(CW * HY) },
   { speed: 1.1, ph: Math.PI, off: 0, oy: 0, idx: new Uint8Array(CW * HY).fill(255), vis: new Uint8Array(CW * HY) },
 ];
-// layer, cx, cy, width, height, puffs, rmin, rmax. The first six are the original sky, in generation
-// order, so their shapes are unchanged; the rest fill the hidden half of the strip.
-const CLOUD_CLUSTERS = [
-  [0, 16, 70, 84, 40, 24, 12, 24],
-  [0, 44, 150, 100, 34, 26, 11, 22],
-  [0, 142, 112, 40, 96, 24, 11, 20],
-  [1, 154, 200, 60, 20, 12, 8, 14],
-  [1, 46, 208, 60, 16, 12, 6, 12],
-  [1, 200, 32, 48, 22, 10, 7, 14],
-  [0, 278, 62, 72, 36, 20, 11, 22],
-  [0, 336, 142, 84, 36, 22, 11, 22],
-  [0, 396, 98, 46, 60, 16, 10, 18],
-  [1, 300, 206, 54, 16, 12, 6, 12],
-  [1, 372, 26, 56, 22, 10, 7, 14],
-  [1, 250, 22, 44, 18, 8, 6, 12],
-  [1, 410, 208, 40, 14, 10, 6, 11],
+// Cumulus: layer, cx, base y, width, height, bumps, rmin, rmax. Each is a union of circles: a row along
+// the flat base with the largest in the middle and a lifted second row on top (the cauliflower). The
+// first half of the strip is the sky on screen at t = 0; the rest fills the hidden half.
+const CUMULUS = [
+  [0, 36, 94, 118, 46, 9, 9, 14],
+  [0, 178, 54, 90, 38, 8, 8, 13],
+  [0, 48, 168, 100, 26, 9, 7, 11],
+  [0, 150, 140, 62, 30, 6, 7, 11],
+  [0, 294, 76, 120, 46, 9, 9, 14],
+  [0, 368, 152, 92, 30, 8, 7, 12],
+  [0, 412, 98, 60, 30, 6, 7, 11],
+  [1, 64, 213, 50, 10, 5, 4, 6],
+  [1, 332, 207, 56, 10, 5, 4, 6],
 ];
 const KCOR = new Uint8Array(W * HY);        // the sun corridor: 255 outside, 0 where the sky is kept clear
 let cloudT = 0;                              // cloud time; it stops while the day is frozen
@@ -369,61 +365,71 @@ function genClouds() {
     KCOR[y * W + x] = Math.round(clamp((Math.sqrt(sdx * sdx + sdy * sdy) - 21) / 10, 0, 1) * 255);
   }
   const rng = mulberry32(1337);
-  const puffs = CLOUDS.map(() => []);
-  for (const [layer, cx, cy, cw, chh, n, r0, r1] of CLOUD_CLUSTERS) {
-    for (let k = 0; k < n; k++) {
-      const u = rng() * 2 - 1, v = rng() * 2 - 1;
-      const r = lerp(r0, r1, rng()) * (1 - 0.3 * Math.abs(u));
-      puffs[layer].push({ x: cx + u * cw * 0.5, y: cy + v * chh * 0.5 - r * 0.25, r, base: cy + chh * 0.5 });
-    }
-  }
-  CLOUDS.forEach((L, k) => genCloudLayer(L, puffs[k]));
+  const clouds = CUMULUS.map(c => makeCumulus(c, rng));
+  CLOUDS.forEach((L, k) => { L.idx.fill(255); L.vis.fill(0); genCloudLayer(L, clouds.filter(c => c.layer === k)); });
 }
-function genCloudLayer(L, puffs) {
-  const dens = new Float32Array(CW * HY);
-  for (const p of puffs) { // each puff adds to its own box; x wraps around the strip
-    const x0 = Math.floor(p.x - p.r), x1 = Math.ceil(p.x + p.r);
-    const y0 = Math.max(0, Math.floor(p.y - p.r / 1.25)), y1 = Math.min(HY - 1, Math.ceil(p.y + p.r / 1.25));
-    for (let y = y0; y <= y1; y++) {
-      const dy = (y - p.y) * 1.25;
-      for (let x = x0; x <= x1; x++) {
-        const dx = x - p.x, q = (dx * dx + dy * dy) / (p.r * p.r);
-        if (q >= 1) continue;
-        let kk = 1 - q; kk *= kk;
-        if (y > p.base) kk *= Math.exp(-(y - p.base) / 2);
-        dens[y * CW + wrapX(x)] += kk;
-      }
+// One cumulus as circles: a base row whose bottoms sit just under the flat base, and a lifted top row.
+function makeCumulus([layer, cx, base, w, h, n, r0, r1], rng) {
+  const circles = [], half = w * 0.5 - r0;
+  const bump = (u, k) => lerp(r0, r1, (1 - Math.pow(Math.abs(u), 1.5)) * (0.75 + 0.25 * rng())) * k;
+  for (let k = 0; k < n; k++) {
+    const u = (n > 1 ? (k / (n - 1)) * 2 - 1 : 0) + (rng() - 0.5) * 0.25, r = bump(u, 1);
+    circles.push({ x: cx + u * half, y: base - r + 2, r });
+  }
+  const m = Math.max(2, Math.ceil(n / 2));
+  for (let k = 0; k < m; k++) {
+    const u = ((k / (m - 1)) * 2 - 1) * 0.6 + (rng() - 0.5) * 0.2, r = bump(u, 0.9);
+    const mid = 1 - Math.abs(u);
+    circles.push({ x: cx + u * half, y: base - r - Math.max(0, h - 2 * r) * (0.55 + 0.45 * mid), r });
+  }
+  return { layer, cx, base, top: base - h, w, h, r1, circles };
+}
+// Signed distance to the silhouette (negative inside), the owning cloud's base and top per pixel.
+function cloudField(clouds) {
+  const sd = new Float32Array(CW * HY).fill(99), cb = new Float32Array(CW * HY), ct = new Float32Array(CW * HY);
+  for (const c of clouds) {
+    const x0 = Math.floor(c.cx - c.w * 0.5 - c.r1), x1 = Math.ceil(c.cx + c.w * 0.5 + c.r1);
+    const y0 = Math.max(0, Math.floor(c.top - c.r1 - 4)), y1 = Math.min(HY - 1, c.base + 4);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      let d = 99;
+      for (const k of c.circles) { const dd = Math.hypot(x - k.x, y - k.y) - k.r; if (dd < d) d = dd; }
+      d = Math.max(d, y - c.base);
+      const i = y * CW + wrapX(x);
+      if (d < sd[i]) { sd[i] = d; cb[i] = c.base; ct[i] = c.top; }
     }
   }
-  const n1 = (x, y) => fbm(x * 0.07, y * 0.1, 11, 3), n2 = (x, y) => fbm(x * 0.25, y * 0.25, 23, 2), n3 = (x, y) => vnoise(x * 0.35, y * 0.35, 77);
-  for (let y = 0; y < HY; y++) for (let x = 0; x < CW; x++) {
+  const n1 = (x, y) => fbm(x * 0.07, y * 0.1, 11, 3), n2 = (x, y) => fbm(x * 0.25, y * 0.25, 23, 2);
+  for (let y = 0; y < HY; y++) for (let x = 0; x < CW; x++) { // the tiled noise roughens the arcs
     const i = y * CW + x;
-    if (dens[i] > 0.02) dens[i] += (tiled(n1, x, y) - 0.5) * 0.3 + (tiled(n2, x, y) - 0.5) * 0.1;
+    if (sd[i] < 50) sd[i] += (tiled(n1, x, y) - 0.5) * 4 + (tiled(n2, x, y) - 0.5) * 2;
   }
-  const T = CLOUD_T;
-  const sample = (x, y) => {
-    y = Math.round(y);
-    if (y < 0 || y >= HY) return 0;
-    return dens[y * CW + wrapX(Math.round(x))];
-  };
+  return { sd, cb, ct };
+}
+function genCloudLayer(L, clouds) {
+  const { sd, cb, ct } = cloudField(clouds);
+  const at = (x, y) => sd[clamp(y, 0, HY - 1) * CW + wrapX(x)];
   for (let y = 0; y < HY; y++) for (let x = 0; x < CW; x++) {
-    const i = y * CW + x, d = dens[i];
-    if (d <= T) continue;
-    let lx = SUNX + CW * Math.round((x - SUNX) / CW) - x, ly = SUN0Y + 6 - y; // lit toward the nearest copy of the sun
-    const ll = Math.hypot(lx, ly) || 1; lx /= ll; ly /= ll;
-    const shade = d - sample(x + lx * 4, y + ly * 4);
-    const e = d - T;
-    let f = 8.3 + clamp(shade * 5, -2.4, 2.2);
-    if (e < 0.07 && shade > 0) f = 11;
-    else if (e < 0.05) f -= 0.8;
-    else if (Math.abs(d - 0.72) < 0.025) f = shade > 0.02 ? Math.max(f, 10.3) : Math.min(f, 7.2);
-    if (sample(x, y - 1) <= T) f = Math.max(f, 10.6);          // sky-lit tops
-    else if (sample(x, y + 2) <= T) f = Math.min(f, 7.0);     // shaded undersides
-    f -= clamp((100 - y) / 100, 0, 1) * 1.0;
-    f += (tiled(n3, x, y) - 0.5) * 0.5;
-    L.idx[i] = ci(Math.round(f));
-    L.vis[i] = Math.min(254, Math.round(255 * T / d));
+    const i = y * CW + x, d = sd[i];
+    if (d >= 0) continue;
+    const gx = at(x + 1, y) - at(x - 1, y), gy = at(x, y + 1) - at(x, y - 1), gl = Math.hypot(gx, gy) || 1;
+    const sx = Math.sign(SUNX + CW * Math.round((x - SUNX) / CW) - x); // toward the nearest copy of the sun
+    const lit = (gx * sx * 0.37 - gy * 0.93) / gl;                     // the outward normal against the light
+    const f = shadeCloud(-d, lit, y, cb[i], ct[i]);
+    L.idx[i] = ci(dith(f, x, y));
+    L.vis[i] = Math.min(254, Math.round(255 * 3 / (3 - d)));
   }
+}
+// depth is the distance inside the silhouette, lit the contour's facing toward the light (1 straight
+// at it); vy is 0 at the base and 1 at the top; low pales the clouds near the horizon. A thick bright
+// band along the lit upper contour, a softer band under it, a mid body and a flat dark base.
+function shadeCloud(depth, lit, y, base, top) {
+  const vy = clamp((base - y) / Math.max(1, base - top), 0, 1), low = 0.5 * y / HY;
+  const hw = 2 + 2.5 * lit;
+  if (lit > 0.1 && depth < hw) return 11;
+  if (y > base - 3) return 7 + low;
+  if (lit < -0.3 && depth < 2.5) return 7.5 + low;
+  if (lit > 0 && depth < hw + 2.5) return 10.2;
+  return 8.4 + 1.1 * vy + low;
 }
 // Per-layer offsets for this frame: the drift, and a slow breathing of a pixel or two.
 function cloudTick() {
@@ -2615,6 +2621,7 @@ if (IS_BROWSER) {
     setH(h) { H = h; alloc(); },
     get H() { return H; }, W, HY,
     spawnShadows, SHAD, spawnBirds, BIRDS, RUN, ENDING_COUNT,
+    setCloudT(v) { cloudT = v; },
   };
 }
 })();
