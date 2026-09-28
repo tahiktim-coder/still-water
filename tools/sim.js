@@ -2,7 +2,8 @@
 // order at every choice menu. Menus in order: scene 1 (Let it go / Keep it), wish 1 (company /
 // fish / home / Nothing), the ocean window after the fish wish (no menu: a press casts, { wait } does not), Who? (company only, one option), wish 2 (forever / hear / gold /
 // Nothing), the companion's question (company only: Yes / Say nothing), wish 3 (home / dark /
-// cut / Nothing if refused twice).
+// cut / Stay with them if answered / Nothing if refused twice). { tap: true } taps the companion once
+// per act during play, so his lines show up in the captions.
 const g = require('../src/game.js');
 g.init();
 const out = new Uint32Array(g.W * g.H);
@@ -13,7 +14,7 @@ function play(plan, label, opts) {
   g.resetAll();
   const UI = g.UI;
   UI.log.length = 0;
-  let t = 0, ci = 0, lastAct = 0, holding = false, frames = 0, lastLine = null, stalled = '';
+  let t = 0, ci = 0, lastAct = 0, holding = false, frames = 0, lastLine = null, stalled = '', tapped = -1;
   const dt = 1 / 30;
   const trace = [], lines = [];
   while (t < 900) {
@@ -21,7 +22,8 @@ function play(plan, label, opts) {
     const cur = g.DLG.cur;
     if (cur && cur !== lastLine) { lastLine = cur; lines.push((cur.who ? cur.who + ': ' : '') + cur.text); }
     if (t - lastAct > 0.25) {
-      if (p === 'title' || p === 'ready' || p === 'card') { g.press(); g.release(); lastAct = t; }
+      if (p === 'ready' && opts.tap && g.WS.companion > 0.5 && tapped < g.STORY.act) { g.companionTap(); tapped = g.STORY.act; lastAct = t; }
+      else if (p === 'title' || p === 'ready' || p === 'card') { g.press(); g.release(); lastAct = t; }
       else if (p === 'ocean') { if (!opts.wait) { g.press(); g.release(); } lastAct = t; } // the ocean window: cast into the big one unless the plan waits
       else if (p === 'bite') { g.press(); holding = true; lastAct = t; }
       else if (p === 'dialog') {
@@ -68,6 +70,7 @@ const plans = [
   // A third element is a sentence the ending card must end with; a fourth is options ({ wait } holds the
   // bot's hand through the ocean window, so the big one leaves).
   [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'You asked once for nothing. It kept count.'],
+  [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'after a while you stop minding.', { tap: true }],
 ];
 let ok = true;
 const seen = {};
@@ -77,7 +80,7 @@ for (const [plan, label, cardEnd, opts] of plans) {
   if (cardEnd && !r.text.endsWith(cardEnd)) { ok = false; console.log('   card should end with: ' + cardEnd); }
   if (r.id) seen[r.id] = true;
 }
-const need = ['home', 'dark', 'cut', 'cut:silent', 'swallowed'];
+const need = ['home', 'dark', 'cut', 'cut:silent', 'swallowed', 'stay'];
 const missing = need.filter(id => !seen[id]);
 if (missing.length) { ok = false; console.log('missing endings: ' + missing.join(', ')); }
 console.log(ok ? 'ALL ENDINGS REACHED' : 'SOMETHING STALLED');

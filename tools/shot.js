@@ -53,4 +53,8 @@ const ocean = ws => { ws.far = 1; ws.troubled = 0.15; g.setPhase('ocean'); g.big
 if (which === 'all' || which === 'ocean') shot('out_ocean.png', (ws) => { ocean(ws); }, 6);
 if (which === 'all' || which === 'ocean_mid') shot('out_ocean_mid.png', (ws) => { ws.far = 0.6; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.x = 20 + k * 26; s.y = g.HY + 30 + ((k * 37) % 90); } }, 6);
 if (which === 'all' || which === 'swallow') shot('out_swallow.png', (ws, G) => { ocean(ws); ws.swallow = 60; G.bob = { x: g.W / 2 + 16, y: g.bigRestY() - 4, fly: false }; g.setPhase('cine'); }, 6.5);
+// Phase 4, Stay: mid drift toward the left shore (company excludes a cabin), the companion facing the fisherman,
+// the lantern glow warmed, the line still taut to the red sun.
+const redSky = ws => { ws.mood = 2; ws.sunKind = 1; ws.sunR = 16; ws.sunY = 178; ws.sunGlow = 1.25; ws.horizGlow = 1.3; ws.pupil = 1; ws.stalk = 1; ws.ash = 1; ws.lantern = 1; ws.troubled = 0.55; };
+if (which === 'all' || which === 'stay') shot('out_stay.png', (ws, G) => { redSky(ws); ws.companion = 1; ws.companionTurn = 1; ws.companionFace = 1; ws.boatX = -40; ws.lanternWarm = 0.7; G.bob = { x: 101, y: g.HY + 5, taut: true }; g.setPhase('cine'); }, 7);
 if (which === 'all' || which === 'shore') shot('out_shore.png', (ws) => { ws.shoreShift = 10; ws.fishShadows = 1; g.spawnShadows(); ws.troubled = 0.22; ws.sunY = 172 + 16; }, 3.3);

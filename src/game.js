@@ -375,6 +375,20 @@ const COMP_TURN = sprite([
   '000000000',
   '.0000000.',
 ]);
+// Facing the fisherman, who sits to his left: the lit side of the face and lantern-coloured eyes (Stay only).
+const COMP_FACE = sprite([
+  '...000...',
+  '..00000..',
+  '.1110000.',
+  '.L1L0000.',
+  '.1110000.',
+  '..00000..',
+  '.0000000.',
+  '.00000000',
+  '000000000',
+  '000000000',
+  '.0000000.',
+]);
 const BIRD = [sprite(['1...1', '.1.1.', '..1..']), sprite(['.....', '11.11', '..1..'])];
 const EXCL = sprite(['.1.', '1b1', '1b1', '1b1', '.1.', '1b1', '.1.']);
 const ICON = sprite(['.bbb.b', 'bbbbbb', '.bbb.b']);
@@ -392,6 +406,7 @@ const CABIN = sprite([
 const GOLDPILE = sprite(['...y.w..', '..yygyy.', '.gyygyyg', 'dgggdggd']);
 const FARBOAT = sprite(['....0', '00000']); // the far boat on the title, at the horizon: a hull and a curled prow
 const FAR_X = 206; // the horizon is only open in the centre, so it sits on the lit foot of the right mountain, clear of the prow curl and of the screen edge
+const HB_GAP = 1.7;               // seconds between heartbeats in the red; Stay stretches it until it stops
 const COMP_DX = 50, COMP_DY = -17; // the companion's seat, from the boat's corner and the waterline
 const KNIFE_X = 12;               // hull column of the knife, beside the lantern pole
 
@@ -564,12 +579,13 @@ const VOICE = {
   home: 'I wished for a home too. This is it.',
   nothing: 'I wanted nothing too. It waited.',
 };
-const ENDING_COUNT = 4; // raised as later phases add Stay and Deep
+const ENDING_COUNT = 5; // raised again when phase 6 adds Deep
 const ENDINGS = {
   home: { title: 'Home', text: 'The lake is quiet again. The fish are hungry. Somewhere, a new sun is rising for the next fisherman.' },
   dark: { title: 'Dark', text: 'You sit with the lantern until it gutters out. Sometimes something takes the bait. You never reel it in.' },
   cut: { title: 'Still water', text: 'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.' },
   swallowed: { title: 'Swallowed', text: 'You asked to be taken where the fish are. Somewhere far above, the sun is still shining on a lake with no boat on it.' },
+  stay: { title: 'Stay', text: 'You stay. He never says who he is and you never ask. The light on the shore is warm. The sun does not come up, and after a while you stop minding.' },
 };
 const SILENT_TEXT = 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.';
 // One variant sentence per ending card (bible, section 4 Ending cards): kept, else (Still water only) the
@@ -615,6 +631,7 @@ const END_VARIANTS = {
       hear: 'You can still hear them from the shore. You stop listening.',
     },
   },
+  stay: { order: ['home'], lines: { home: 'It was your cabin all along.' } },
 };
 // The wish button labels, read back on the ending card.
 const WISH_LABELS = {
@@ -640,12 +657,14 @@ function resetWS() {
     // Phase 3: the ocean. shoreShift is px the mountains sit closer to the horizon after the ocean;
     // swallow is the radius of the opening water; boatDrop the boat's fall into it.
     shoreShift: 0, swallow: 0, boatDrop: 0,
+    // Phase 4: companionFace swaps the turned sprite for the one facing the fisherman; lanternWarm widens the glow (Stay).
+    companionFace: 0, lanternWarm: 0,
   });
 }
 const G = {
   phase: 'title', t: 0, pt: 0, holding: false, bob: null, cast: null, wait: null, reel: null, land: null,
   rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 },
-  lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0,
+  lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0, hbGap: HB_GAP,
   capUntil: 0, saidUntil: 0, saidPending: [],
   arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0,
 };
@@ -655,6 +674,7 @@ const G = {
 const freshStory = () => ({
   act: 0, catches: 0, actCatches: 0, wishes: [], heard: false, goldenNext: false, lastSpecies: null,
   kept: false, firstAsk: null, refused: 0, answered: null, ocean: 'none', said: 0, usedRepl: [], casts: 0, shown1: [],
+  tap: 0, tapPool: '', // the companion's lines: how many of the current pool have shown, and which pool it was
 });
 const STORY = freshStory();
 const has = w => STORY.wishes.indexOf(w) >= 0;
@@ -1125,12 +1145,16 @@ function drawFarBoat(t, far) {
   stampR(s, x0, y0, WL);
   G.tip = { x: x0 + s.w / 2, y: y0 }; // a cast from out here leaves from the silhouette itself
 }
+// Facing the horizon, turned (the red), or facing the fisherman (Stay).
+function compSprite() { return WS.companionFace > 0.5 ? COMP_FACE : WS.companionTurn > 0.5 ? COMP_TURN : COMP; }
+// The boat's left corner on screen, the origin of every sprite in the boat group.
+function boatLeft() { return Math.round(boatCentreX(WS.far) - BOAT.w / 2); }
 function drawBoatGroup(t) {
   const far = WS.far;
   if (far > 0.5) { drawFarBoat(t, far); return; }
   const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2);
   const sink = Math.round(WS.boatSink);
-  const bx = Math.round(boatCentreX(far) - BOAT.w / 2);
+  const bx = boatLeft();
   const dy = sink + bob;
   stampR(BOAT, bx, WL - BOAT.wl + dy, WL);
   const lpx = bx + 9, ltop = WL - 27 + dy;
@@ -1144,7 +1168,7 @@ function drawBoatGroup(t) {
   }
   G.lanternPos = { x: lx + 1, y: ly + 1.5 };
   if (WS.gold > 0) stampR(GOLDPILE, bx + 32, WL - 10 + dy, WL, WS.gold);
-  if (WS.companion > 0) stampR(WS.companionTurn > 0.5 ? COMP_TURN : COMP, bx + COMP_DX, WL + COMP_DY + dy, WL, WS.companion);
+  if (WS.companion > 0) stampR(compSprite(), bx + COMP_DX, WL + COMP_DY + dy, WL, WS.companion);
   const fx = bx + 18, fy = WL - 24 + dy;
   stampR(FISHER, fx, fy, WL);
   G.hand = { x: fx, y: fy + 9 };
@@ -1328,8 +1352,9 @@ function applyGlows(t) {
   if (WS.lantern > 0.01 && WS.lanternFlicker > 0.05) {
     const fl = WS.lanternFlicker * WS.lantern * (0.88 + 0.12 * Math.sin(t * 13) * Math.sin(t * 7.3));
     const lx = G.lanternPos.x, ly = G.lanternPos.y;
-    glowTint(lx, ly - s, 18, 17, 0.8 * fl);
-    glowTint(lx, 2 * WL - 1 - ly - s, 12, 17, 0.45 * fl);
+    const warm = WS.lanternWarm;
+    glowTint(lx, ly - s, 18 + 12 * warm, 17, (0.8 + 0.25 * warm) * fl);
+    glowTint(lx, 2 * WL - 1 - ly - s, 12 + 8 * warm, 17, (0.45 + 0.15 * warm) * fl);
   }
   const cab = WS.cabin * (1 - WS.far);
   if (cab > 0.4) {
@@ -1607,6 +1632,20 @@ const CINE_DARK = {
     if (WS.eyes) WS.lanternFlicker = 0.1;
     at('out', 8, () => SFX.hiss(0.6));
     at('fade', 8.3, () => UI.fade(1, 1));
+  },
+};
+// Stay (bible, section 8): he turns to face the fisherman, the boat drifts toward the cabin light (the left
+// shore if there is none), the red sun stays, the lantern warms, the heartbeat slows and stops, then black.
+const STAY_DRIFT_CABIN = -56, STAY_DRIFT_SHORE = -76;
+const CINE_STAY = {
+  dur: 14,
+  init(s) { s.x0 = WS.boatX; s.to = WS.cabin > 0 ? STAY_DRIFT_CABIN : STAY_DRIFT_SHORE; },
+  update(t, dt, at, s) {
+    at('face', 0.4, () => { WS.companionTurn = 1; WS.companionFace = 1; tween(WS, 'pupilDx', 0, 1.5); });
+    WS.boatX = lerp(s.x0, s.to, E.io(clamp((t - 0.6) / 8, 0, 1)));
+    WS.lanternWarm = clamp((t - 1) / 7, 0, 1);
+    G.hbGap = t < 9 ? HB_GAP + t * 0.45 : 1e9; // the heartbeat slows, then stops
+    at('fade', 11, () => UI.fade(1, 3));
   },
 };
 // The released sky fish drops below the horizon with a splash (the cut and silent endings).
@@ -1974,8 +2013,9 @@ function wish3Choices() {
     { label: 'Let me go home', pick: endHome },
     { label: 'Take the light away', pick: endDark },
     { label: 'Cut the line', pick: endCut },
-    // Stay with them (if answered) and Let me get my gold (if gold) are added by later phases, here.
   ];
+  if (STORY.answered === true) c.push({ label: 'Stay with them', pick: endStay });
+  // Let me get my gold (if gold) is added by phase 6, here.
   if (STORY.refused === 2) c.push({ label: 'Nothing', pick: endSilent });
   return c;
 }
@@ -2013,6 +2053,12 @@ function endCut() {
     red('No. Nobody cuts the'),
   ], () => playCine(cutCine(false), () => showEnding('cut')));
 }
+function endStay() {
+  dlgRun([
+    { who: 'Companion', text: 'Then stay.', style: 'whisper' },
+    red('Someone to sit with you. It’s what you asked for.'),
+  ], () => playCine(CINE_STAY, () => showEnding('stay')));
+}
 // Silent: nothing, asked a third time. Counts as Still water. Kept: the boat fish dims with no caption.
 function endSilent() {
   const L = [narr('You say nothing.'), { pause: 3 }, narr('It waits. Then it splashes its tail once and goes down.')];
@@ -2048,7 +2094,7 @@ function saveRun(id) {
 function endingVariant(id) {
   const v = END_VARIANTS[id];
   if (!v) return ''; // Swallowed has no variant sentence (bible, Ending cards)
-  if (STORY.kept) return v.kept;
+  if (STORY.kept && v.kept) return v.kept;
   if (v.refused1 && STORY.refused === 1) return v.refused1;
   for (const w of v.order) if (has(w)) return v.lines[w];
   if (v.refused2 && STORY.refused === 2) return v.refused2;
@@ -2101,7 +2147,11 @@ function saidBeat(text) {
   if (text) G.saidPending.push(text);
   if (!G.saidPending.length || G.t < G.capUntil) return;
   STORY.said++;
-  cap('“' + G.saidPending.shift() + '”', SAID_DUR, 'said');
+  showSaid(G.saidPending.shift());
+}
+// A quoted line in the said style, hiding the prompt while it is on screen.
+function showSaid(text) {
+  cap('“' + text + '”', SAID_DUR, 'said');
   G.saidUntil = G.capUntil;
   refreshPrompt();
 }
@@ -2323,6 +2373,42 @@ function fishUpdate(dt) {
   }
 }
 
+// ---------------------------------------------------------------- the companion (bible, section 6)
+// He only ever says the fisherman's words, bent a little. Pools are drawn in order, then the last repeats.
+const COMP_LINES = {
+  day: ['Look at that sun.', 'First time here.', 'We could watch that sun forever.', 'Still there.'],
+  night: ['Look at that sun.', 'It’s coming back.', 'Don’t you want it to?'],
+};
+const COMP_LATER = 'First time here. You said that last time.';
+function compPool() {
+  if (WS.companionTurn > 0.5) return { key: 'red', lines: [STORY.answered === true ? 'You said.' : 'Cut the line.'] };
+  return STORY.act === 2 ? { key: 'night', lines: COMP_LINES.night } : { key: 'day', lines: COMP_LINES.day };
+}
+function companionLine() {
+  const pool = compPool();
+  if (STORY.tapPool !== pool.key) { STORY.tapPool = pool.key; STORY.tap = 0; }
+  const first = STORY.tap === 0 && STORY.tapPool === 'day' && isLaterRun();
+  const text = first ? COMP_LATER : pool.lines[Math.min(STORY.tap, pool.lines.length - 1)];
+  STORY.tap++;
+  return text;
+}
+// One said-style caption instead of a cast. He never turns for it.
+function companionTap() {
+  SFX.init(); SFX.resume();
+  if (WS.companion <= 0.5) return;
+  showSaid(companionLine());
+}
+// His sprite box padded by 3 px, only while he is there and the stage is his to answer: during play, or in
+// the red once he has turned and the last choices are showing.
+const COMP_PAD = 3;
+function companionHit(x, y) {
+  if (WS.companion <= 0.5 || WS.far > 0.5) return false;
+  const open = G.phase === 'ready' || (G.phase === 'dialog' && !!UI.choices && WS.companionTurn > 0.5);
+  if (!open) return false;
+  const x0 = boatLeft() + COMP_DX - COMP_PAD, y0 = WL + COMP_DY - COMP_PAD;
+  return x >= x0 && x < x0 + COMP.w + 2 * COMP_PAD && y >= y0 && y < y0 + COMP.h + 2 * COMP_PAD;
+}
+
 // ---------------------------------------------------------------- input and flow
 function press() {
   SFX.init(); SFX.resume();
@@ -2393,7 +2479,7 @@ function resetAll() {
   resetWS();
   Object.assign(STORY, freshStory());
   loadRun();
-  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, saidUntil: 0, saidPending: [], arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0 });
+  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, saidUntil: 0, saidPending: [], arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0, hbGap: HB_GAP });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
   OCEAN.shad.length = 0; OCEAN.big = null; OCEAN.tr0 = 0;
   cloudT = 0; genEyes();
@@ -2412,7 +2498,7 @@ function restart() {
 function ambientUpdate(dt) {
   if (WS.mood > 1.6 && G.phase !== 'end' && WS.dim < 5) {
     G.hb -= dt;
-    if (G.hb <= 0) { G.hb = 1.7; SFX.heartbeat(); }
+    if (G.hb <= 0) { G.hb = G.hbGap; SFX.heartbeat(); }
   }
 }
 function update(dt) {
@@ -2554,7 +2640,9 @@ function boot() {
   stage.addEventListener('pointerdown', e => {
     if (e.target.closest && e.target.closest('button')) return;
     e.preventDefault();
-    press();
+    const r = stage.getBoundingClientRect(); // the stage is scaled uniformly, so internal pixels map by ratio
+    const ix = (e.clientX - r.left) / Math.max(1, r.width) * W, iy = (e.clientY - r.top) / Math.max(1, r.height) * H;
+    if (companionHit(ix, iy)) companionTap(); else press();
   });
   window.addEventListener('pointerup', release);
   const unlockAudio = () => { SFX.init(); SFX.resume(); };
@@ -2615,7 +2703,7 @@ if (IS_BROWSER) {
 } else if (typeof module !== 'undefined') {
   UI = stubUI();
   module.exports = {
-    init, render, update, press, release, resetAll, setPhase, setTestMode, testCatch,
+    init, render, update, press, release, resetAll, setPhase, setTestMode, testCatch, companionTap, companionHit,
     WS, G, STORY, DLG, SPECIES, makeFish, FPAL, GPAL,
     get UI() { return UI; },
     get phase() { return G.phase; },
