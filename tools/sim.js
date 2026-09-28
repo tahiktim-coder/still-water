@@ -71,6 +71,11 @@ const plans = [
   // bot's hand through the ocean window, so the big one leaves).
   [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'You asked once for nothing. It kept count.'],
   [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'after a while you stop minding.', { tap: true }],
+  // Phase 5, the kept fish: act 1 is a normal hook (one more catch), the fish speaks from the boat, and
+  // the ending card carries the kept sentence.
+  [[1, 2, 0, 2], 'keep, home, forever -> cut (still water, the fish over the side)', 'You lifted it over the side. It let you.'],
+  [[1, 2, 1, 0], 'keep, home, hear -> home', 'The golden fish slips out of the boat as you go in.'],
+  [[1, 3, 3, 3], 'keep, nothing, nothing, nothing -> silent', 'Some evenings, the sunset looks back.'],
 ];
 let ok = true;
 const seen = {};

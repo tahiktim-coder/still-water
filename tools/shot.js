@@ -58,3 +58,8 @@ if (which === 'all' || which === 'swallow') shot('out_swallow.png', (ws, G) => {
 const redSky = ws => { ws.mood = 2; ws.sunKind = 1; ws.sunR = 16; ws.sunY = 178; ws.sunGlow = 1.25; ws.horizGlow = 1.3; ws.pupil = 1; ws.stalk = 1; ws.ash = 1; ws.lantern = 1; ws.troubled = 0.55; };
 if (which === 'all' || which === 'stay') shot('out_stay.png', (ws, G) => { redSky(ws); ws.companion = 1; ws.companionTurn = 1; ws.companionFace = 1; ws.boatX = -40; ws.lanternWarm = 0.7; G.bob = { x: 101, y: g.HY + 5, taut: true }; g.setPhase('cine'); }, 7);
 if (which === 'all' || which === 'shore') shot('out_shore.png', (ws) => { ws.shoreShift = 10; ws.fishShadows = 1; g.spawnShadows(); ws.troubled = 0.22; ws.sunY = 172 + 16; }, 3.3);
+// Phase 5, the kept fish: in the boat by day at full alpha; at night on the 0.45 rung; in the red with no sky
+// fish, the boat fish glowing back to 1 while the line is dragged to the horizon.
+if (which === 'all' || which === 'kept') shot('out_kept.png', (ws) => { ws.goldKept = 1; }, 3.3);
+if (which === 'all' || which === 'kept_night') shot('out_kept_night.png', (ws) => { night(ws); ws.companion = 0; ws.goldKept = 0.45; }, 5);
+if (which === 'all' || which === 'kept_red') shot('out_kept_red.png', (ws, G, S) => { redSky(ws); S.kept = true; ws.goldKept = 1; G.bob = { x: 101, y: g.HY + 5, taut: true }; g.setPhase('dialog'); }, 7);

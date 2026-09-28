@@ -404,6 +404,12 @@ const CABIN = sprite([
   '.00000000.',
 ]);
 const GOLDPILE = sprite(['...y.w..', '..yygyy.', '.gyygyyg', 'dgggdggd']);
+// The kept golden fish (bible, section 8): about 10 by 4 in the gold indices 13 to 16, lying in the boat
+// bottom beside the gold-pile slot, head to the left. KEPT_OPEN is the open-mouth variant used while it talks.
+const KEPT = sprite(['..wyyw..d.', 'dywwwwygdd', '.gyyyyygd.', '..dgg...d.']);
+const KEPT_OPEN = sprite(['..wyyw..d.', '.ywwwwygdd', 'dgyyyyygd.', '..dgg...d.']);
+const KEPT_DX = 40, KEPT_DY = -10;   // from the boat's corner and the waterline
+const KEPT_LADDER = [1, 0.7, 0.45];  // its alpha per act (bible, 8c); 0.05 after the silent ending
 const FARBOAT = sprite(['....0', '00000']); // the far boat on the title, at the horizon: a hull and a curled prow
 const FAR_X = 206; // the horizon is only open in the centre, so it sits on the lit foot of the right mountain, clear of the prow curl and of the screen edge
 const HB_GAP = 1.7;               // seconds between heartbeats in the red; Stay stretches it until it stops
@@ -674,6 +680,7 @@ const G = {
 const freshStory = () => ({
   act: 0, catches: 0, actCatches: 0, wishes: [], heard: false, goldenNext: false, lastSpecies: null,
   kept: false, firstAsk: null, refused: 0, answered: null, ocean: 'none', said: 0, usedRepl: [], casts: 0, shown1: [],
+  keptNext: false, // kept, act 1: the next normal card closes into golden scene 2 from the boat
   tap: 0, tapPool: '', // the companion's lines: how many of the current pool have shown, and which pool it was
 });
 const STORY = freshStory();
@@ -1168,6 +1175,7 @@ function drawBoatGroup(t) {
   }
   G.lanternPos = { x: lx + 1, y: ly + 1.5 };
   if (WS.gold > 0) stampR(GOLDPILE, bx + 32, WL - 10 + dy, WL, WS.gold);
+  drawKeptFish(t, bx, dy);
   if (WS.companion > 0) stampR(compSprite(), bx + COMP_DX, WL + COMP_DY + dy, WL, WS.companion);
   const fx = bx + 18, fy = WL - 24 + dy;
   stampR(FISHER, fx, fy, WL);
@@ -1216,12 +1224,27 @@ function drawLine() {
     linePix(x, y);
   }
 }
+// The talking test shared by the sky fish and the boat fish: a Golden fish line is still typing.
+function fishSpeaking() {
+  const L = DLG.cur;
+  return !!(L && L.text && DLG.n < L.text.length && /fish/i.test(L.who || ''));
+}
+const mouthOpen = t => ((t * 10) | 0) & 1;
+// The kept fish in the boat bottom. Its alpha follows the ladder and returns to 1 whenever it speaks,
+// with a soft sparkle (bible, section 8). Not shown out on the ocean, when the boat is a speck.
+function drawKeptFish(t, bx, dy) {
+  const speaking = fishSpeaking();
+  const a = speaking ? 1 : WS.goldKept;
+  if (a <= 0.01) return;
+  const x0 = bx + KEPT_DX, y0 = WL + KEPT_DY + dy;
+  stampR(speaking && mouthOpen(t) ? KEPT_OPEN : KEPT, x0, y0, WL, a);
+  if (speaking && Math.random() < 0.12) sparkle(x0 + Math.random() * KEPT.w, y0 + Math.random() * KEPT.h);
+}
 function drawGoldFish(t) {
   const g = WS.goldFish;
   const a = g ? g.a * clamp(1 - (WS.far - 0.3) / 0.3, 0, 1) : 0; // out on the ocean it is out of sight too
   if (!g || a <= 0.01) return;
-  const L = DLG.cur;
-  const talking = L && L.text && DLG.n < L.text.length && /fish/i.test(L.who || '') && ((t * 10) | 0) & 1;
+  const talking = fishSpeaking() && mouthOpen(t);
   const s = talking ? GOLD_OPEN : GOLD;
   const x0 = Math.round(g.x), y0 = Math.round(g.y + Math.sin(t * 2.1) * 1.5);
   stampR(s, x0, y0, g.surf, a);
@@ -1685,6 +1708,7 @@ const cutCine = silent => ({
       WS.sunKind = 0; WS.sunR = 8; WS.stalk = 0; WS.stalkCut = 0; WS.companionTurn = 0; WS.frozen = 0;
       if (silent) G.bob = null;
       if (WS.cabin > 0) tween(WS, 'cabin', 0, 1.5);
+      keptOver(!silent); // kept: the fish goes over the side; the silent ending says nothing about it
     });
     if (t >= 6) {
       const kd = clamp((t - 6) / 6.5, 0, 1);
@@ -1716,12 +1740,35 @@ function goldenScene() {
   SFX.chime();
   if (STORY.act === 0) wish1(); else wish2();
 }
+// Kept, act 1: the fish speaks from the boat with no surfacing splash (bible, Act 1).
+function keptScene() {
+  G.bob = null;
+  tween(WS, 'goldKept', 1, 0.8);
+  wish2();
+}
 function goldenDive() {
   const g = WS.goldFish;
   if (!g) return;
   splash(g.x + 12, g.surf, 8); ring(g.x + 12, g.surf + 1);
   SFX.splash();
   tween(g, 'a', 0, 0.5, E.io, () => { if (WS.goldFish === g) WS.goldFish = null; });
+}
+// The kept fish dims one rung of the ladder as the scene ends (0.7 after wish 1, 0.45 after wish 2).
+function keptDim(act) { if (STORY.kept) tween(WS, 'goldKept', KEPT_LADDER[act], 1.5); }
+// Keep it: the sky fish is lifted into the boat, where it stays for the rest of the run.
+function keptLift() {
+  const g = WS.goldFish;
+  if (g) tween(g, 'a', 0, 0.4, E.lin, () => { if (WS.goldFish === g) WS.goldFish = null; });
+  tween(WS, 'goldKept', 1, 1);
+  splash(42, 262, 5); SFX.splash();
+}
+// The kept fish goes over the side (the still-water dawn; silently after the silent ending).
+function keptOver(withCaption) {
+  if (!STORY.kept || WS.goldKept <= 0) return;
+  const x = boatLeft() + KEPT_DX + 8;
+  splash(x, WL, 8); ring(x, WL + 1); SFX.splash();
+  tween(WS, 'goldKept', 0, 0.3, E.lin);
+  if (withCaption) cap('You lift the golden fish over the side.', 3);
 }
 function startAct(act) { STORY.act = act; STORY.actCatches = 0; }
 
@@ -1741,10 +1788,11 @@ function wish1() {
     ] },
   ]);
 }
-// Keep it is text and state only for now: the boat fish sprite and the kept flow are a later phase.
+// Keep it lifts the fish into the boat (keptLift); it dims each act and speaks from there (drawKeptFish).
 function wish1b(kept) {
   STORY.kept = kept;
   const L = kept ? [
+    { act: keptLift },
     narr('You lift it into the boat. It is heavier than a fish.'),
     fish('Cold hands. He had cold hands too.'),
     fish('Keep me, then. The wish comes anyway.'),
@@ -1777,7 +1825,7 @@ const costLines = () => [
   { act: sunDrop },
   fish('A wish costs a little daylight. You said you could watch that sun forever.'),
   fish('You’ll get to.'),
-  { act: goldenDive },
+  { act: () => { goldenDive(); keptDim(1); } },
   { pause: 0.8 },
 ];
 function afterGrant1() { startAct(1); setPhase('ready'); }
@@ -1945,7 +1993,7 @@ function grant2(w) {
   dlgRun(GRANT2[w]().concat([
     fish((STORY.refused === 1 ? 'That was my first, too.' : 'That was my second, too.') + ' This one costs the rest of the day.'),
     fish('You’ll miss the sun. I’ll bring you another.'),
-    { act: goldenDive },
+    { act: () => { goldenDive(); keptDim(2); } },
     { pause: 0.6 },
   ]), () => playCine(sunsetCine(false), afterSunset));
 }
@@ -1957,7 +2005,7 @@ function refuse2() {
   ] : [fish('Full already? It’s a little late for that.')];
   dlgRun(L.concat([
     fish('Then the sun keeps its own hours. You’ll miss it. I’ll bring you another.'),
-    { act: goldenDive },
+    { act: () => { goldenDive(); keptDim(2); } },
     { pause: 0.6 },
   ]), () => playCine(sunsetCine(true), afterSunset));
 }
@@ -1997,8 +2045,12 @@ function redSequence() {
   dlgRun([
     { pause: 1.4 },
     narr('The line goes taut. You did not feel a bite.'),
-    // The fish appears above the horizon where the sun set. (Kept: it should speak from the boat, a later phase.)
-    { act: () => { WS.goldFish = { x: SUNX - 14, y: HY - 24, a: 0, surf: HY + 1 }; tween(WS.goldFish, 'a', 1, 0.9); SFX.chime(); } },
+    // Released: the fish appears above the horizon where the sun set. Kept: nothing appears in the sky;
+    // the boat fish glows back to 1 and speaks from there (bible, Red sequence).
+    { act: () => {
+      if (STORY.kept) { tween(WS, 'goldKept', 1, 0.9); return; }
+      WS.goldFish = { x: SUNX - 14, y: HY - 24, a: 0, surf: HY + 1 }; tween(WS.goldFish, 'a', 1, 0.9); SFX.chime();
+    } },
     { pause: 2 }, // two seconds of silence, no caption
   ].concat(redLines()), () => playCine(CINE_RED, wish3));
 }
@@ -2305,12 +2357,15 @@ function stillCaption() {
   if (STORY.act === 1) return STORY.kept ? 'The water goes very still. The fish in the boat does not.' : 'The water goes very still again.';
   return STORY.kept ? 'The water goes very still. The flame leans toward your feet.' : 'The water goes very still. The lantern flame leans toward it.';
 }
+// Kept, act 1: the cast after the second catch is a normal hook with a normal card, and when that card
+// closes the fish speaks from the boat (STORY.keptNext marks the wait; bible, Act 1).
 function afterCatch() {
   STORY.catches++; STORY.actCatches++; G.tutorial++;
   UI.count(STORY.catches);
+  if (STORY.keptNext) { STORY.keptNext = false; keptScene(); return; }
   const need = [3, 2, 1][STORY.act];
   if (STORY.actCatches >= need && !STORY.goldenNext) {
-    STORY.goldenNext = true;
+    if (STORY.kept && STORY.act === 1) STORY.keptNext = true; else STORY.goldenNext = true;
     cap(stillCaption(), 3.2);
   } else saidBeat(STORY.act === 0 ? OPENING_CAPS[STORY.catches] : null);
   setPhase('ready');
@@ -2346,14 +2401,15 @@ function fishUpdate(dt) {
     const w = G.wait;
     if (G.t >= G.saidUntil) w.t += dt; // no nibble or bite while a said caption is on screen
     if (w.nib.length && w.t >= w.nib[0]) { w.nib.shift(); G.bobDip = 0.16; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
-    if (STORY.goldenNext && Math.random() < dt * 6) sparkle(G.bob.x + (Math.random() - 0.5) * 10, G.bob.y - Math.random() * 4);
+    const glitter = STORY.goldenNext && !STORY.kept; // kept: no sparkles and no chime; the fish is in the boat
+    if (glitter && Math.random() < dt * 6) sparkle(G.bob.x + (Math.random() - 0.5) * 10, G.bob.y - Math.random() * 4);
     if (w.t >= w.bite) {
       G.biteWin = STORY.goldenNext ? 3.2 : 0.95;
       setPhase('bite');
       G.bobDip = 999;
       ring(G.bob.x, G.bob.y + 1); ring(G.bob.x, G.bob.y + 1, true); splash(G.bob.x, G.bob.y, 3);
       SFX.bite();
-      if (STORY.goldenNext) SFX.chime();
+      if (glitter) SFX.chime();
       G.ringT = 0;
     }
   } else if (ph === 'bite') {

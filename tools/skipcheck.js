@@ -47,7 +47,7 @@ while (g.phase !== 'end' && t < 400) {
 if (g.phase !== 'end') fail('never reached an ending, phase=' + g.phase + ' act=' + g.STORY.act);
 const ending = g.UI.log.filter(l => l[0] === 'ending').map(l => l[1].title);
 console.log(`ending=${ending.join(',')} catches=${g.STORY.catches} wishes=${g.STORY.wishes.join(',')} simulated=${t.toFixed(0)}s real=${Date.now() - t0}ms`);
-if (g.STORY.catches !== 6) fail('expected 6 catches over the run, got ' + g.STORY.catches);
+if (g.STORY.catches !== 7) fail('expected 7 catches over the run (kept: act 1 ends on a normal hook), got ' + g.STORY.catches);
 
 // 3b. During the ocean window a skip acts as a cast into the big one, so the choice is never bypassed.
 g.resetAll(); g.press(); g.release(); tick(3);
