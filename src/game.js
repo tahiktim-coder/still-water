@@ -647,58 +647,131 @@ const VOICE = {
 };
 const ENDING_COUNT = 6;
 const ENDINGS = {
-  home: { title: 'Home', text: 'The lake is quiet again. The fish are hungry. Somewhere, a new sun is rising for the next fisherman.' },
-  dark: { title: 'Dark', text: 'You sit with the lantern until it gutters out. Sometimes something takes the bait. You never reel it in.' },
-  cut: { title: 'Still water', text: 'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.' },
-  swallowed: { title: 'Swallowed', text: 'You asked to be taken where the fish are. Somewhere far above, the sun is still shining on a lake with no boat on it.' },
-  stay: { title: 'Stay', text: 'You stay. He took the sun down with him and did not come back up. The seat behind you is empty again. It does not get light, and after a while you stop minding.' },
-  deep: { title: 'Deep', text: 'The gold is where you left it. So is everything else. The water is warmer than you thought, and full of light, and there is no bottom.' },
+  home: { title: 'Home' }, dark: { title: 'Dark' }, cut: { title: 'Still water' },
+  swallowed: { title: 'Swallowed' }, stay: { title: 'Stay' }, deep: { title: 'Deep' },
 };
-const SILENT_TEXT = 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.';
-// One variant sentence per ending card (bible, section 4 Ending cards): kept, else (Still water only) the
-// one-refusal line, else the most relevant wish in the order given per ending, else refused twice.
-const END_VARIANTS = {
+// The ending card's BASE (bible, section 4 Ending cards: twenty situations), keyed by ending (the silent
+// variant as 'silent'), then by lake or sea (WS.sea past 0.5), then by boat or sunk (WS.boatSunk at 1); Still
+// water at sea splits once more on whether he heard the fish. The number after each line is the bible's.
+const NEXT_SUN = ' Somewhere, a new sun is rising for the next fisherman.';
+const NO_BOTTOM = 'The water is warmer than you thought, and full of light, and ';
+const STAY_END = 'He took the sun down with him and did not come back up. ';
+const STAY_DARK = 'It does not get light, and after a while you stop minding.';
+const KNOW_WAY = 'You cut it. The fish you can hear know the way. They ';
+const NEW_SHORE = ' you to a shore nobody from home has seen, and you start again there.';
+const GUTTER = 'You never reel it in.';
+const END_BASES = {
   home: {
-    kept: 'The golden fish slips out of the boat as you go in.',
-    refused2: 'You asked for nothing, and then for home. Home was the only thing it had.',
-    order: ['home', 'company', 'gold', 'fish', 'hear', 'forever'],
-    lines: {
-      home: 'The light on the shore goes out. Nobody was inside.',
-      company: 'The seat behind you is empty now. It was your turn.',
-      gold: 'The gold goes down first. It has done this before.',
-      fish: 'The lake is full. It was always full.',
-      hear: 'You know the words already. You will say them.',
-      forever: 'The day does not end. You aren\u2019t in it.',
+    lake: {
+      boat: 'The lake is quiet again. The fish are hungry.' + NEXT_SUN, // 1
+      sunk: 'The lake is quiet again. The boat is on the bottom and so is the gold.' + NEXT_SUN, // 2
+    },
+    sea: {
+      boat: 'The sea is quiet again. Nobody will come this far to look.' + NEXT_SUN, // 3
+      sunk: 'The sea is quiet again. The gold is on the bottom, and it is a long way down.' + NEXT_SUN, // 4
     },
   },
   dark: {
-    kept: 'The golden fish dries in the bottom of the boat. It stops asking before you do.',
-    refused2: 'You asked for nothing twice. This is what it looks like.',
-    order: ['hear', 'fish', 'forever', 'company', 'gold', 'home'],
-    lines: {
-      hear: 'The lake keeps talking. You stop answering.',
-      fish: 'Something is always biting. You let them.',
-      forever: 'The day never ends. It never begins either.',
-      company: 'Someone breathes behind you all night. You do not turn around.',
-      gold: 'The boat rides low. You do not bail.',
-      home: 'The light on the shore stays on. Nobody comes down.',
+    lake: {
+      boat: 'You sit with the lantern until it gutters out. Sometimes something takes the bait. ' + GUTTER, // 5
+      sunk: 'You hang in the water beside the lantern until it gutters out. Sometimes something takes the bait. ' + GUTTER, // 6
+    },
+    sea: {
+      boat: 'You sit with the lantern until it gutters out. There is no shore to see it from. Sometimes something takes the bait. ' + GUTTER, // 7
+      sunk: 'You hang in the water beside the lantern until it gutters out. The big ones pass under you all night. You never reel anything in.', // 8
     },
   },
   cut: {
-    kept: 'You lifted it over the side. It let you.',
-    refused2: 'Twice you said nothing. The knife said it a third time.',
-    refused1: 'You asked once for nothing. It kept count.',
-    order: ['company', 'home', 'fish', 'gold', 'forever', 'hear'],
-    lines: {
-      company: 'There is someone in the stern. You do not ask. You row.',
-      home: 'The cabin is dark. You do not check whether anyone left.',
-      fish: 'The fish behind you all face one way. You do not look.',
-      gold: 'The gold is on the bottom. Your hands stayed on the oars.',
-      forever: 'Dawn comes anyway. You had forgotten it could.',
-      hear: 'You can still hear them from the shore. You stop listening.',
+    lake: {
+      boat: 'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.', // 9
+      sunk: 'You swim for the shore and reach it. Every morning you wake in the water again, above the gold. You can always come back for it, it said.', // 10, no pocket line
+    },
+    sea: {
+      boat: {
+        quiet: 'You cut it. The sun goes down for good, for everyone. There is no shore in any direction. You row anyway, for a while.', // 11
+        heard: KNOW_WAY + 'bring' + NEW_SHORE, // 12
+      },
+      sunk: {
+        quiet: 'You cut it. The sun goes down for everyone. You swim for a while.', // 13
+        heard: KNOW_WAY + 'carry' + NEW_SHORE, // 14 (hear and gold share wish 2, so this cell waits for a path)
+      },
     },
   },
-  deep: { kept: 'The golden fish goes down with you. It knows the way.', order: [], lines: {} },
+  stay: { // lake only: the companion is a first wish
+    lake: {
+      boat: 'You stay. ' + STAY_END + 'The seat behind you is empty again. ' + STAY_DARK, // 15
+      sunk: 'You stay, in the water. ' + STAY_END + STAY_DARK, // 16
+    },
+  },
+  deep: { // sunk only: Deep needs the gold
+    lake: { sunk: 'The gold is where you left it. So is everything else. ' + NO_BOTTOM + 'there is no bottom.' }, // 17
+    sea: { sunk: 'The gold is somewhere below. ' + NO_BOTTOM + 'the big ones let you pass. There is no bottom.' }, // 18
+  },
+  silent: { // lake, boat: Silent needs two refusals, so no gold and no sea
+    lake: { boat: 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.' }, // 19
+  },
+  swallowed: { // act 0, the sea
+    sea: { boat: 'You asked to be taken where the fish are. Somewhere far above, the sun is still shining on a lake with no boat on it.' }, // 20
+  },
+};
+// ONE extra sentence after the base: the first true state in each ending's priority order. A line is a
+// string, or an alternate keyed by boat/sunk or lake/sea; an alternate with no entry for the situation is
+// skipped (Still water's heard line is lake only).
+const END_EXTRA = {
+  home: {
+    order: ['kept', 'company', 'cabin', 'heard', 'forever', 'refused2'],
+    lines: {
+      kept: { boat: 'The golden fish slips out of the boat as you go in.', sunk: 'The golden fish follows you in.' },
+      company: 'The seat behind you is empty now. It was your turn.',
+      cabin: 'The light on the shore goes out. Nobody was inside.',
+      heard: 'You know the words already. You will say them.',
+      forever: 'The day does not end. You aren’t in it.',
+      refused2: 'You asked for nothing, and then for home. Home was the only thing it had.',
+    },
+  },
+  dark: {
+    order: ['kept', 'heard', 'company', 'forever', 'cabin', 'refused2'],
+    lines: {
+      kept: { boat: 'The golden fish dries in the bottom of the boat. It stops asking before you do.', sunk: 'The golden fish circles you all night, glowing less each time.' },
+      heard: { lake: 'The lake keeps talking. You stop answering.', sea: 'The sea keeps talking. You stop answering.' },
+      company: 'Someone breathes behind you all night. You do not turn around.',
+      forever: 'The day never ends. It never begins either.',
+      cabin: 'The light on the shore stays on. Nobody comes down.',
+      refused2: 'You asked for nothing twice. This is what it looks like.',
+    },
+  },
+  cut: {
+    order: ['company', 'cabin', 'kept', 'forever', 'heard', 'refused1', 'refused2'],
+    lines: {
+      company: 'There is someone in the stern. You do not ask. You row.',
+      cabin: 'The cabin is dark. You do not check whether anyone left.',
+      kept: 'You lifted it over the side. It let you.',
+      forever: { lake: 'Dawn comes anyway. You had forgotten it could.', sea: 'Dawn comes anyway, over nothing.' },
+      heard: { lake: 'You can still hear them from the shore. You stop listening.' },
+      refused1: 'You asked once for nothing. It kept count.',
+      refused2: 'Twice you said nothing. The knife said it a third time.',
+    },
+  },
+  stay: {
+    order: ['kept', 'heard', 'forever', 'cabin'],
+    lines: {
+      kept: 'The golden fish stays with you. It is the only light.',
+      heard: 'The lake keeps talking about him.',
+      forever: 'The day did not end. Now it will not begin.',
+      cabin: 'The light on the shore stays on for two.',
+    },
+  },
+  deep: {
+    order: ['kept', 'heard', 'company', 'forever'],
+    lines: {
+      kept: 'The golden fish goes down with you. It knows the way.',
+      heard: 'You can hear them all the way down. They are pleased.',
+      company: 'Someone comes down after you. You do not look back.',
+      forever: 'It is bright down here. It is always bright.',
+    },
+  },
+  silent: { order: ['kept'], lines: { kept: 'You lifted it over the side. It let you.' } },
+  swallowed: { order: ['kept'], lines: { kept: 'The golden fish went in with you. It did not seem surprised.' } },
 };
 // The wish button labels, read back on the ending card.
 const WISH_LABELS = {
@@ -1690,7 +1763,7 @@ const WEIGHT_VOL = 0.22, WEIGHT_OUT = 2;
 // A line is {who, text, style, choices, mark, bubble}, {act: fn} or {pause: seconds}. mark asks the UI for
 // the wrong question mark (the companion's question). A choice whose pick() does not start a new dlgRun
 // lets the current list continue, so a choice can sit in the middle of a scene. A bubble line (the
-// companion's, or the fisherman's `Take me back.`) shows complete in the thought bubble instead of the panel
+// companion's) shows complete in the thought bubble instead of the panel
 // and stays until a tap, never on a timer (bible, 4b), with the panel's ▾ marker; with choices it waits for
 // one under the bubble. A tapped choice is already the fisherman's line and is never echoed in his bubble
 // (bible, 4b): the tap closes the panel and runs its pick at once.
@@ -1821,7 +1894,7 @@ const CINE_RED = {
     WS.troubled = lerp(s.tr0, 0.55, clamp(t / 9, 0, 1));
     WS.ash = clamp((t - 6) / 4, 0, 1);
     WS.stalk = clamp((t - 9.2) / 2.3, 0, 1);
-    at('lake', 9.2, () => { if (STORY.heard) lakeWhisper('i could watch that sun forever. i could watch that sun forever.'); });
+    at('lake', 9.2, () => { if (STORY.heard) lakeWhisper('i could stay out here forever. i could stay out here forever.'); });
     at('lakeOff', 12.4, () => { if (STORY.heard) UI.dlgHide(); });
     WS.pupil = clamp((t - 12) / 1.3, 0, 1);
     WS.pupilDx = s.asked ? clamp((t - 13.6) / 1.0, 0, 1) * 4 : 0;
@@ -1967,8 +2040,6 @@ const red = text => ({ who: FISHN, text, style: 'red' });
 const whisperFish = text => ({ who: FISHN, text, style: 'whisper' });
 // The companion's lines go in his thought bubble (bible, 4b), never the panel.
 const comp = (text, extra) => Object.assign({ who: 'Companion', text, bubble: true }, extra);
-// The fisherman's own line inside a scene (`Take me back.` on the sea): his bubble, with his label.
-const think = text => ({ who: 'Fisherman', text, bubble: true, side: 'fisherman' });
 // The lake's one line (bible, section 4): a labelled whisper in the dialogue panel, shown from inside the red
 // cinematic. DLG is inactive there, so the text appears whole and the cinematic hides the panel itself.
 function lakeWhisper(text) { UI.dlgShow('The lake', 'whisper'); UI.dlgText(text); }
@@ -2063,7 +2134,7 @@ const GRANT1 = {
 // The cost: the sun starts dropping as the first cost line begins. No caption; the drop is the sentence.
 const costLines = () => [
   { act: sunDrop },
-  fish('A wish costs a little daylight. You said you could watch that sun forever.'),
+  fish('A wish costs a little daylight. You said you could stay out here forever.'),
   fish('You’ll get to.'),
   { act: () => { goldenDive(); keptDim(1); } },
   { pause: 0.8 },
@@ -2180,11 +2251,10 @@ const CINE_SWALLOW = {
   },
 };
 // Waited out: the camera comes back, the shore does not. The rest of the run is played on the open sea.
+// No plea from him (phase 16): the fish only notes the shoal, then the cost.
 function oceanLeave() {
   STORY.ocean = 'waited';
   playCine(CINE_OCEAN_BACK, () => dlgRun([
-    think('Take me back.'),
-    fish('You said where the fish are. This is where they are.'),
     fish('Look how they all go the same way.'),
   ].concat(costLines()), afterGrant1));
 }
@@ -2338,9 +2408,9 @@ function companionQuestion(done) {
 // -- the red sequence and wish 3
 // Refused twice replaces the whole set on either path (bible, Red sequence).
 function redLines() {
-  const L = STORY.refused === 2 ? ['One wish left. You said you could watch that sun forever, then asked for nothing twice.', 'It wants to see why.']
-    : STORY.kept ? ['I’m right here, fisherman.', 'One wish left. But first, the sun I promised you.', 'You said you could watch it forever. I passed that on.']
-      : ['One wish left. But first, the sun I promised you.', has('forever') ? 'You said forever, then you wished for it. I listened twice.' : 'You said you could watch it forever. I listened.'];
+  const L = STORY.refused === 2 ? ['One wish left. You said forever, then asked for nothing twice.', 'It wants to see why.']
+    : STORY.kept ? ['I’m right here, fisherman.', 'One wish left. But first, the sun I promised you.', 'You said forever. I passed that on.']
+      : ['One wish left. But first, the sun I promised you.', has('forever') ? 'You said forever, then you wished for it. I listened twice.' : 'You said forever. I listened.'];
   return L.map(fish);
 }
 function redSequence() {
@@ -2361,10 +2431,10 @@ function redSequence() {
   ].concat(redLines()), () => playCine(CINE_RED, wish3));
 }
 const sentence = s => s.charAt(0).toUpperCase() + s.slice(1) + '.';
-// One line, up to 125 characters: the granted wishes in order, then always the sun.
+// One line, up to 125 characters: the granted wishes in order, then always forever (bible, section 1).
 function recountLine() {
   const parts = STORY.wishes.map(w => RECOUNT[w]);
-  return 'Everything you asked for. ' + parts.map(sentence).join(' ') + ' And the sun you wanted. Your words, not mine.';
+  return 'Everything you asked for. ' + parts.map(sentence).join(' ') + ' And forever. Your words, not mine.';
 }
 function wish3Choices() {
   const c = [
@@ -2381,7 +2451,7 @@ function wish3Choices() {
 function wish3() {
   const nothing = STORY.wishes.length === 0;
   const L = [
-    red('There it is. You can watch it forever now.'),
+    red('There it is. Forever, like you said.'),
     red('That bait was never for fish. I should have said.'),
     red(nothing ? 'Nobody rows this far to want nothing. So why are you here.' : recountLine()),
   ];
@@ -2476,16 +2546,30 @@ function saveRun(id) {
   saveJSON('stillwater-runs', Math.max(sessionRuns, +loadJSON('stillwater-runs', 0) || 0));
   saveJSON('stillwater-last', id);
 }
-// The ending card: the base text, one variant sentence, and what was asked for.
-// Priority: kept > one refusal (Still water only: a run with one refusal always has one granted wish, so this
-// line has to outrank the wish sentence to ever show) > the most relevant wish (order per ending) > refused twice.
-function endingVariant(id) {
-  const v = END_VARIANTS[id];
-  if (!v) return ''; // Swallowed has no variant sentence (bible, Ending cards)
-  if (STORY.kept && v.kept) return v.kept;
-  if (v.refused1 && STORY.refused === 1) return v.refused1;
-  for (const w of v.order) if (has(w)) return v.lines[w];
-  if (v.refused2 && STORY.refused === 2) return v.refused2;
+// The ending card (bible, Ending cards): the base for the situation, one extra sentence, the pocket line on
+// every Still water card but the lake-sunk one (situation 10: the lake keeps him), then what was asked for.
+const END_STATES = {
+  kept: () => STORY.kept, company: () => has('company'), cabin: () => has('home'), heard: () => STORY.heard,
+  forever: () => has('forever'), refused1: () => STORY.refused === 1, refused2: () => STORY.refused === 2,
+};
+const endingPlace = () => WS.sea > 0.5 ? 'sea' : 'lake';
+const endingBoat = () => WS.boatSunk >= 1 ? 'sunk' : 'boat';
+// A line that is a string holds everywhere; an object is read by boat/sunk first, then by lake/sea.
+const altLine = (v, place, boat) => typeof v === 'string' ? v : (v[boat] || v[place] || '');
+// The table holds only the reachable cells; a missing place or boat falls back to the one the ending has.
+function endingBase(key, place, boat) {
+  const t = END_BASES[key];
+  const byPlace = t[place] || t.lake || t.sea;
+  const cell = byPlace[boat] || byPlace.boat || byPlace.sunk;
+  return typeof cell === 'string' ? cell : cell[STORY.heard ? 'heard' : 'quiet'];
+}
+function endingExtra(key, place, boat) {
+  const x = END_EXTRA[key];
+  for (const st of x.order) {
+    if (!END_STATES[st]()) continue;
+    const line = altLine(x.lines[st], place, boat);
+    if (line) return line;
+  }
   return '';
 }
 function askedLine() {
@@ -2494,17 +2578,15 @@ function askedLine() {
   const head = STORY.refused === 1 ? 'You asked for nothing, once. And for: ' : 'You asked for: ';
   return head + labels.join('. ') + '.';
 }
-// On a sunk run (gold wished) the base card swaps one verb: he swims, or hangs in the water (bible, Gold sink).
-const SWIM_VERBS = [['You row until', 'You swim until'], ['You sit with the lantern until', 'You hang in the water beside the lantern until']];
-function swimText(text) { return has('gold') ? SWIM_VERBS.reduce((s, v) => s.replace(v[0], v[1]), text) : text; }
 // Every Still water card (the silent variant too) ends with the bait still in his pocket: he will be the
-// stranger for the next one (bible, Ending cards). No other ending gets it.
+// stranger for the next one. The exception is situation 10, the lake with the boat sunk. No other ending gets it.
 const BAIT_END = 'The bait is still in your pocket.';
+const hasPocket = (id, place, boat) => id === 'cut' && !(place === 'lake' && boat === 'sunk');
 function composeEnding(id, variant) {
-  const e = ENDINGS[id];
-  const body = variant === 'silent' ? swimText(SILENT_TEXT) : (swimText(e.text) + ' ' + endingVariant(id)).trim();
-  const text = id === 'cut' ? body + ' ' + BAIT_END : body;
-  return { id, variant: variant || '', title: e.title, text, asked: askedLine() };
+  const place = endingPlace(), boat = endingBoat(), key = variant === 'silent' ? 'silent' : id;
+  const parts = [endingBase(key, place, boat), endingExtra(key, place, boat)];
+  if (hasPocket(id, place, boat)) parts.push(BAIT_END);
+  return { id, variant: variant || '', title: ENDINGS[id].title, text: parts.filter(Boolean).join(' '), asked: askedLine() };
 }
 let sessionEndings = [];
 function showEnding(id, variant) {
@@ -2705,7 +2787,7 @@ function closeCard() { UI.cardHide(); afterCatch(); }
 // The fisherman's four act 0 lines (bible, Opening): the bait once the boat has arrived (BAIT_LINE), the
 // throwaway wish when the first cast lands (0), then one after each of the first two cards close (1, 2).
 const BAIT_LINE = 'The stranger’s bait. Cursed or blessed, he said. It has an eye.';
-const OPENING_CAPS = { 0: 'Something interesting, for once.', 1: 'Look at that sun.', 2: 'I could watch that sun forever.' };
+const OPENING_CAPS = { 0: 'Something interesting, for once.', 1: 'Look at that sun.', 2: 'I could stay out here forever.' };
 function stillCaption() {
   if (STORY.act === 0) return 'The water goes very still.';
   if (STORY.act === 1) return STORY.kept ? 'The water goes very still. The fish in the boat does not.' : 'The water goes very still again.';
@@ -2786,7 +2868,7 @@ function fishUpdate(dt) {
 // ---------------------------------------------------------------- the companion (bible, section 6)
 // He only ever says the fisherman's words, bent a little. Pools are drawn in order, then the last repeats.
 const COMP_LINES = {
-  day: ['Look at that sun.', 'First time here.', 'We could watch that sun forever.', 'Still there.'],
+  day: ['Look at that sun.', 'First time here.', 'We could stay out here forever.', 'Still there.'],
   night: ['Look at that sun.', 'It’s coming back.', 'Don’t you want it to?'],
 };
 const COMP_LATER = 'First time here. You said that last time.';
