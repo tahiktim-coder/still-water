@@ -545,11 +545,20 @@ function boatSilhouette() {
   for (let y = BOAT.wl - 25; y < BOAT.wl - 21; y++) for (let x = 6; x < 9; x++) data[y * w + x] = 0;
   return { w, h, data, wl: BOAT.wl };
 }
+// The boat seen from beneath (the Deep ending): the flattened silhouette turned over, its waterline row
+// at the top, the hull and the people hanging down from the surface.
+let BOAT_BENEATH;
+function vflip(s) {
+  const data = new Uint8Array(s.w * s.h);
+  for (let y = 0; y < s.h; y++) data.set(s.data.subarray((s.h - 1 - y) * s.w, (s.h - y) * s.w), y * s.w);
+  return { w: s.w, h: s.h, data, wl: s.h - 1 - s.wl };
+}
 function buildFarBoats() {
   const full = boatSilhouette();
   BOAT_FAR2 = shrink(full, 2);
   BOAT_FAR4 = shrink(full, 4);
   BOAT_SPECK = sprite(['.000.', '00000']); BOAT_SPECK.wl = 2;
+  BOAT_BENEATH = vflip(full);
 }
 function buildSprites() {
   BOAT = makeBoat();
@@ -585,13 +594,14 @@ const VOICE = {
   home: 'I wished for a home too. This is it.',
   nothing: 'I wanted nothing too. It waited.',
 };
-const ENDING_COUNT = 5; // raised again when phase 6 adds Deep
+const ENDING_COUNT = 6;
 const ENDINGS = {
   home: { title: 'Home', text: 'The lake is quiet again. The fish are hungry. Somewhere, a new sun is rising for the next fisherman.' },
   dark: { title: 'Dark', text: 'You sit with the lantern until it gutters out. Sometimes something takes the bait. You never reel it in.' },
   cut: { title: 'Still water', text: 'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.' },
   swallowed: { title: 'Swallowed', text: 'You asked to be taken where the fish are. Somewhere far above, the sun is still shining on a lake with no boat on it.' },
   stay: { title: 'Stay', text: 'You stay. He never says who he is and you never ask. The light on the shore is warm. The sun does not come up, and after a while you stop minding.' },
+  deep: { title: 'Deep', text: 'The gold is where you left it. So is everything else. The water is warmer than you thought, and full of light, and there is no bottom.' },
 };
 const SILENT_TEXT = 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.';
 // One variant sentence per ending card (bible, section 4 Ending cards): kept, else (Still water only) the
@@ -638,6 +648,7 @@ const END_VARIANTS = {
     },
   },
   stay: { order: ['home'], lines: { home: 'It was your cabin all along.' } },
+  deep: { kept: 'The golden fish goes down with you. It knows the way.', order: [], lines: {} },
 };
 // The wish button labels, read back on the ending card.
 const WISH_LABELS = {
@@ -665,6 +676,9 @@ function resetWS() {
     shoreShift: 0, swallow: 0, boatDrop: 0,
     // Phase 4: companionFace swaps the turned sprite for the one facing the fisherman; lanternWarm widens the glow (Stay).
     companionFace: 0, lanternWarm: 0,
+    // Phase 6: dive is the Deep descent (the horizon rises past the top and the mirror fills the frame);
+    // glint is the gold pile's two-frame sparkle seen from beneath.
+    dive: 0, glint: 0,
   });
 }
 const G = {
@@ -741,6 +755,8 @@ function updParts(dt) {
   }
 }
 function ring(x, y, big) { RINGS.push({ x, y, r: 1, v: big ? 26 : 12, life: 0, max: big ? 2.6 : 1.6 }); }
+// A bubble: a small round ring that grows a little and pops (the gold sink).
+function bubble(x, y) { RINGS.push({ x, y, r: 1, v: 3, life: 0, max: 0.5 + Math.random() * 0.4, round: true }); }
 function updRings(dt) {
   if (WS.frozen) return; // frozen, a ring in flight holds, like the birds (bible, 8b)
   for (let k = RINGS.length - 1; k >= 0; k--) {
@@ -944,16 +960,21 @@ function sunRing(y, row, src, ixr, dyS, darkF, haze) {
     FRAME[row + x] = ci(dith(v - darkF + haze, x, y));
   }
 }
+// The Deep descent (bible, section 8): the horizon row rises past the top of the screen with WS.dive, and
+// the mirror's source rows are spread so the whole sky fills the growing water region. At dive 0 the
+// horizon is HY and every source row maps one to one, as before.
+function waterTop() { return WS.dive > 0 ? Math.max(0, Math.round(HY - (HY + 6) * WS.dive)) : HY; }
 function computeWater(t) {
   FRAME.set(TOP, 0);
-  const tr = WS.troubled, span = H - HY;
+  const tr = WS.troubled, hy = waterTop(), span = H - hy;
+  const srcK = lerp(H - HY, HY, WS.dive) / span; // sky rows per water row: 1 at rest, the whole sky over the whole frame at dive 1
   const sy = WS.sunY, sr = WS.sunR, lidH = sr * (1 - WS.lid);
-  for (let y = HY; y < H; y++) {
-    const k = (y - HY) / span;
+  for (let y = hy; y < H; y++) {
+    const k = (y - hy) / span;
     const amp = 0.35 + k * 1.5 + tr * (0.5 + k * 2.4);
     RIPX[y] = Math.round(Math.sin(y * 0.55 + t * 1.6 + Math.sin(y * 0.11 + t * 0.7) * 2.2) * amp);
     const oy = Math.round(Math.sin(y * 0.9 + t * 2.1) * (0.3 + tr * 0.9));
-    let src = 2 * HY - 1 - y + oy;
+    let src = Math.round(HY - 1 - (y - hy) * srcK) + oy;
     if (src < 0) src = 0; else if (src > HY - 1) src = HY - 1;
     const darkF = 0.75 + k * 1.1 + tr * 0.4;
     const haze = 1.1 * Math.pow(1 - k, 8);
@@ -968,11 +989,11 @@ function computeWater(t) {
     const dyS = src - sy;
     if (sr > 0 && Math.abs(dyS) <= lidH + 1) sunRing(y, row, src, ixr, dyS, darkF, haze);
   }
-  const hr = HY * W;
+  const hr = hy * W;
   for (let x = 0; x < W; x++) { const v = FRAME[hr + x]; if (v < 12) FRAME[hr + x] = ci(v + 2); }
   const gl = WS.sunGlow;
-  for (let y = HY + 1; y < H; y++) {
-    const k = (y - HY) / span;
+  for (let y = hy + 1; y < H; y++) {
+    const k = (y - hy) / span;
     const wdt = WS.sunR + 3 + k * 26;
     const row = y * W;
     for (let x = 0; x < W; x++) {
@@ -986,7 +1007,7 @@ function drawRings() {
   for (const r of RINGS) {
     const fade = 1 - r.life / r.max;
     const add = fade > 0.5 ? 2 : 1;
-    const rx = r.r, ry = r.r * 0.32;
+    const rx = r.r, ry = r.round ? r.r : r.r * 0.32;
     const n = Math.max(12, Math.ceil(rx * 5));
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2;
@@ -1156,28 +1177,58 @@ function drawFarBoat(t, far) {
 function compSprite() { return WS.companionFace > 0.5 ? COMP_FACE : WS.companionTurn > 0.5 ? COMP_TURN : COMP; }
 // The boat's left corner on screen, the origin of every sprite in the boat group.
 function boatLeft() { return Math.round(boatCentreX(WS.far) - BOAT.w / 2); }
-function drawBoatGroup(t) {
-  const far = WS.far;
-  if (far > 0.5) { drawFarBoat(t, far); return; }
-  const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2);
-  const sink = Math.round(WS.boatSink);
-  const bx = boatLeft();
-  const dy = sink + bob;
-  stampR(BOAT, bx, WL - BOAT.wl + dy, WL);
+// The gold sink (bible, section 8): at boatSunk 1 the hull rides SINK_PX lower, so the waterline sits at the
+// gunwale and the rows under it are the water (the reflecting stamp masks them); the people stand another
+// LEG_PX lower in the flooded hull, legs under. boatSink is the red sequence's two extra pixels on top.
+const SINK_PX = 5, LEG_PX = 2;
+function boatSinkPx() { return Math.round(WS.boatSunk * SINK_PX + WS.boatSink); }
+// The lantern hangs from its pole, or floats beside the stern at water level once the boat has settled.
+function drawLantern(t, bx, dy) {
+  const sunk = WS.boatSunk;
   const lpx = bx + 9, ltop = WL - 27 + dy;
   for (let y = ltop; y < WL - 8 + dy; y++) plotR(lpx, y, 0, WL);
   plotR(lpx - 1, ltop, 0, WL); plotR(lpx - 2, ltop, 0, WL); plotR(lpx - 2, ltop + 1, 0, WL);
-  const lx = lpx - 3, ly = ltop + 2;
+  const bobF = sunk > 0.5 && Math.sin(t * 1.9) > 0.4 ? 1 : 0;
+  const lx = Math.round(lerp(lpx - 3, bx - 4, sunk)), ly = Math.round(lerp(ltop + 2, WL - 4, sunk)) + bobF;
   const lit = WS.lantern > 0.3 && WS.lanternFlicker > 0.5;
   for (let j = 0; j < 4; j++) for (let i = 0; i < 3; i++) {
     const edge = i === 0 || i === 2 || j === 0 || j === 3;
     plotR(lx + i, ly + j, edge ? 0 : lit ? 17 : 2, WL);
   }
   G.lanternPos = { x: lx + 1, y: ly + 1.5 };
+}
+// Deep: the boat as a dark shape hanging from the surface near the top of the screen, seen from beneath,
+// with the gold pile's one glint. Rows above the water top are the sky and are not drawn.
+function drawBoatBeneath() {
+  const hy = waterTop(), bx = boatLeft(), s = BOAT_BENEATH;
+  const y0 = Math.max(hy, 4) - 1 - boatSinkPx();
+  const solid = (i, j) => i >= 0 && j >= 0 && i < s.w && j < s.h && s.data[j * s.w + i] !== 255;
+  for (let j = 0; j < s.h; j++) {
+    const y = y0 + j;
+    if (y < hy) continue;
+    for (let i = 0; i < s.w; i++) {
+      if (solid(i, j)) plot(bx + i, y, 0);
+      else if (solid(i - 1, j) || solid(i + 1, j) || solid(i, j - 1) || solid(i, j + 1)) plot(bx + i, y, 9); // light through the water around the hull
+    }
+  }
+  if (WS.companion > 0) for (let j = 0; j < COMP.h; j++) for (let i = 0; i < COMP.w; i++) {
+    if (COMP.data[(COMP.h - 1 - j) * COMP.w + i] !== 255) plot(bx + COMP_DX + i, y0 + s.wl + 1 - COMP_DY - COMP.h + j, 0);
+  }
+  if (WS.glint > 0) { const gx = bx + 35, gy = y0 + s.wl + 8; plot(gx, gy, 16); plot(gx + 2, gy + 1, 15); plot(gx + 1, gy + 2, 16); }
+}
+function drawBoatGroup(t) {
+  const far = WS.far;
+  if (far > 0.5) { drawFarBoat(t, far); return; }
+  if (WS.dive > 0) { drawBoatBeneath(); return; }
+  const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2);
+  const bx = boatLeft();
+  const dy = boatSinkPx() + bob, legs = Math.round(WS.boatSunk * LEG_PX);
+  stampR(BOAT, bx, WL - BOAT.wl + dy, WL);
+  drawLantern(t, bx, dy);
   if (WS.gold > 0) stampR(GOLDPILE, bx + 32, WL - 10 + dy, WL, WS.gold);
   drawKeptFish(t, bx, dy);
   if (WS.companion > 0) stampR(compSprite(), bx + COMP_DX, WL + COMP_DY + dy, WL, WS.companion);
-  const fx = bx + 18, fy = WL - 24 + dy;
+  const fx = bx + 18, fy = WL - 24 + dy + legs;
   stampR(FISHER, fx, fy, WL);
   G.hand = { x: fx, y: fy + 9 };
   drawRod(G.hand.x, G.hand.y, WL);
@@ -1379,7 +1430,7 @@ function applyGlows(t) {
     glowTint(lx, ly - s, 18 + 12 * warm, 17, (0.8 + 0.25 * warm) * fl);
     glowTint(lx, 2 * WL - 1 - ly - s, 12 + 8 * warm, 17, (0.45 + 0.15 * warm) * fl);
   }
-  const cab = WS.cabin * (1 - WS.far);
+  const cab = WS.cabin * (1 - WS.far) * (1 - WS.dive); // the window's glow is fixed to the shore, which the dive leaves
   if (cab > 0.4) {
     const wx = CABIN_X + 2.5, wy = cabinY() + 7;
     glowTint(wx, wy - s, 7, 17, 0.55 * cab);
@@ -1978,25 +2029,47 @@ const GRANT2 = {
     { act: () => { STORY.heard = true; SFX.chime(); } },
     fish('Listen, then. They all say the same thing.'),
   ],
-  gold: () => [
-    fish('Gold. A boat full of it.'),
-    { act: () => { tween(WS, 'gold', 1, 1.5); tween(WS, 'boatSink', 2, 3); SFX.chime(); } }, // the sink cutscene is a later phase
-    { pause: 1.6 },
-    fish('Sorry. Gold is heavy. You can always come back for it.'),
-  ],
 };
 // Forever: the clouds stop, the birds hang, the fish stop jumping and the sun holds until the sunset
 // cinematic, which drives it directly (bible, 8b). Nothing says so.
 function freezeDay() { WS.frozen = 1; G.frozeT = G.t; untween(WS, 'sunY'); SFX.chime(); }
-function grant2(w) {
-  STORY.wishes.push(w);
-  dlgRun(GRANT2[w]().concat([
+// The lines that close a granted wish 2, then the sunset.
+function wish2Cost() {
+  return [
     fish((STORY.refused === 1 ? 'That was my first, too.' : 'That was my second, too.') + ' This one costs the rest of the day.'),
     fish('You’ll miss the sun. I’ll bring you another.'),
     { act: () => { goldenDive(); keptDim(2); } },
     { pause: 0.6 },
-  ]), () => playCine(sunsetCine(false), afterSunset));
+  ];
 }
+const wish2Sunset = () => playCine(sunsetCine(false), afterSunset);
+function grant2(w) {
+  STORY.wishes.push(w);
+  if (w === 'gold') { grantGold(); return; }
+  dlgRun(GRANT2[w]().concat(wish2Cost()), wish2Sunset);
+}
+// Gold (bible, Wish 2 grants and section 8): the pile appears, the boat settles to the gunwales in the sink
+// cutscene, then the apology and the usual cost lines.
+function grantGold() {
+  dlgRun([
+    fish('Gold. A boat full of it.'),
+    { act: () => { tween(WS, 'gold', 1, 1.5); SFX.chime(); } },
+    { pause: 1.2 },
+  ], () => playCine(CINE_SINK, () => dlgRun([fish('Sorry. Gold is heavy. You can always come back for it.')].concat(wish2Cost()), wish2Sunset)));
+}
+// The gold sink (5 s): boatSunk 0 to 1 over 3 s, bubbles along the hull for two seconds. The sunk state
+// persists for the rest of the run; the rod and the float still work from it.
+const CINE_SINK = {
+  dur: 5,
+  init() { tween(WS, 'boatSunk', 1, 3, E.io); SFX.hiss(2.4); },
+  update(t, dt, at) {
+    if (t < 2.2 && Math.random() < dt * 14) {
+      const bx = boatLeft();
+      bubble(bx + 4 + Math.random() * (BOAT.w - 10), WL + Math.random() * 3);
+    }
+    at('settle', 3, () => { SFX.plop(); ring(boatLeft() + BOAT.w / 2, WL + 2, true); });
+  },
+};
 function refuse2() {
   STORY.refused++;
   const L = STORY.refused === 2 ? [
@@ -2067,7 +2140,7 @@ function wish3Choices() {
     { label: 'Cut the line', pick: endCut },
   ];
   if (STORY.answered === true) c.push({ label: 'Stay with them', pick: endStay });
-  // Let me get my gold (if gold) is added by phase 6, here.
+  if (has('gold')) c.push({ label: 'Let me get my gold', pick: endDeep });
   if (STORY.refused === 2) c.push({ label: 'Nothing', pick: endSilent });
   return c;
 }
@@ -2111,6 +2184,35 @@ function endStay() {
     red('Someone to sit with you. It’s what you asked for.'),
   ], () => playCine(CINE_STAY, () => showEnding('stay')));
 }
+// Deep (bible, sections 4 and 8): down for the gold. The horizon rises past the top of the screen and the
+// mirror fills the frame, the palette dims, stars show below, the boat hangs from the surface as a dark
+// shape seen from beneath, the gold glints once, then black. There is no bottom.
+function endDeep() {
+  dlgRun([red('It’s still down there. All of it. Mind the waterline.')], () => playCine(CINE_DEEP, () => showEnding('deep')));
+}
+const CINE_DEEP = {
+  dur: 14,
+  init(s) {
+    s.g0 = WS.sunGlow; s.h0 = WS.horizGlow; s.tr0 = WS.troubled;
+    G.bob = null; G.tip = null; G.hbGap = 1e9;
+    tween(WS, 'lantern', 0, 2.5); tween(WS, 'ash', 0, 3);
+    if (WS.goldFish) tween(WS.goldFish, 'a', 0, 1.5); // the sky fish stays above; under the surface it is out of sight
+    SFX.splash(); SFX.swell();
+  },
+  update(t, dt, at, s) {
+    const k = E.io(clamp((t - 0.4) / 6, 0, 1));
+    WS.dive = k;
+    WS.dim = 6 * clamp((t - 1) / 7, 0, 1);
+    WS.sunGlow = lerp(s.g0, 0, clamp(t / 4, 0, 1));
+    WS.horizGlow = lerp(s.h0, 0, clamp(t / 4, 0, 1));
+    WS.troubled = lerp(s.tr0, 0.15, clamp(t / 5, 0, 1));
+    WS.starA = clamp((t - 3) / 4, 0, 1);
+    at('drone', 2, () => SFX.drone(false));
+    at('glint', 8, () => { WS.glint = 1; SFX.tick(); });
+    at('glintOff', 8.08, () => { WS.glint = 0; });
+    at('fade', 12, () => UI.fade(1, 2));
+  },
+};
 // Silent: nothing, asked a third time. Counts as Still water. Kept: the boat fish dims with no caption.
 function endSilent() {
   const L = [narr('You say nothing.'), { pause: 3 }, narr('It waits. Then it splashes its tail once and goes down.')];
@@ -2767,7 +2869,7 @@ if (IS_BROWSER) {
     setH(h) { H = h; alloc(); },
     get H() { return H; }, W, HY,
     spawnShadows, SHAD, spawnBirds, BIRDS, RUN, ENDING_COUNT,
-    OCEAN, spawnOceanShadow, bigRise, bigRestY, untween,
+    OCEAN, spawnOceanShadow, bigRise, bigRestY, untween, bubble, boatLeft, WL,
     setCloudT(v) { cloudT = v; },
   };
 }

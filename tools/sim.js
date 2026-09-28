@@ -2,7 +2,7 @@
 // order at every choice menu. Menus in order: scene 1 (Let it go / Keep it), wish 1 (company /
 // fish / home / Nothing), the ocean window after the fish wish (no menu: a press casts, { wait } does not), Who? (company only, one option), wish 2 (forever / hear / gold /
 // Nothing), the companion's question (company only: Yes / Say nothing), wish 3 (home / dark /
-// cut / Stay with them if answered / Nothing if refused twice). { tap: true } taps the companion once
+// cut / Stay with them if answered / Let me get my gold if gold / Nothing if refused twice). { tap: true } taps the companion once
 // per act during play, so his lines show up in the captions.
 const g = require('../src/game.js');
 g.init();
@@ -76,6 +76,10 @@ const plans = [
   [[1, 2, 0, 2], 'keep, home, forever -> cut (still water, the fish over the side)', 'You lifted it over the side. It let you.'],
   [[1, 2, 1, 0], 'keep, home, hear -> home', 'The golden fish slips out of the boat as you go in.'],
   [[1, 3, 3, 3], 'keep, nothing, nothing, nothing -> silent', 'Some evenings, the sunset looks back.'],
+  // Phase 6, the gold sink and Deep: gold at wish 2 sinks the boat to the gunwales; 'Let me get my gold' sits
+  // after Cut the line (no Stay) or after Stay with them.
+  [[0, 2, 2, 3], 'let go, home, gold -> deep', 'and there is no bottom.'],
+  [[1, 0, 0, 2, 0, 4], 'keep, company (someone), gold, yes -> deep (kept)', 'The golden fish goes down with you. It knows the way.'],
 ];
 let ok = true;
 const seen = {};
@@ -85,7 +89,7 @@ for (const [plan, label, cardEnd, opts] of plans) {
   if (cardEnd && !r.text.endsWith(cardEnd)) { ok = false; console.log('   card should end with: ' + cardEnd); }
   if (r.id) seen[r.id] = true;
 }
-const need = ['home', 'dark', 'cut', 'cut:silent', 'swallowed', 'stay'];
+const need = ['home', 'dark', 'cut', 'cut:silent', 'swallowed', 'stay', 'deep'];
 const missing = need.filter(id => !seen[id]);
 if (missing.length) { ok = false; console.log('missing endings: ' + missing.join(', ')); }
 console.log(ok ? 'ALL ENDINGS REACHED' : 'SOMETHING STALLED');

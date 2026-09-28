@@ -35,9 +35,9 @@ function shot(name, setup, t) {
 const which = process.argv[2] || 'all';
 if (which === 'all' || which === 'day') shot('out_day.png', null, 3.3);
 if (which === 'all' || which === 'night') shot('out_night.png', (ws) => { ws.mood = 1; ws.sunY = g.HY + 14; ws.sunGlow = 0.12; ws.horizGlow = 0.3; ws.starA = 1; ws.lantern = 1; ws.companion = 1; ws.troubled = 0.35; }, 5);
-if (which === 'all' || which === 'red') shot('out_red.png', (ws) => { ws.mood = 2; ws.sunKind = 1; ws.sunR = 16; ws.sunY = 178; ws.sunGlow = 1.25; ws.horizGlow = 1.3; ws.pupil = 1; ws.pupilDx = 4; ws.stalk = 1; ws.ash = 1; ws.lantern = 1; ws.companion = 1; ws.companionTurn = 1; ws.cabin = 1; ws.gold = 1; ws.troubled = 0.7; }, 7);
+if (which === 'all' || which === 'red') shot('out_red.png', (ws) => { ws.mood = 2; ws.sunKind = 1; ws.sunR = 16; ws.sunY = 178; ws.sunGlow = 1.25; ws.horizGlow = 1.3; ws.pupil = 1; ws.pupilDx = 4; ws.stalk = 1; ws.ash = 1; ws.lantern = 1; ws.companion = 1; ws.companionTurn = 1; ws.cabin = 1; ws.gold = 1; ws.boatSunk = 1; ws.boatSink = 2; ws.troubled = 0.7; }, 7); // gold wished: sunk, and two pixels more from the red
 if (which === 'all' || which === 'low') shot('out_low.png', (ws) => { ws.sunY = 172 + 16; ws.troubled = 0.22; }, 3.3); // after wish 1: the sun two steps lower
-if (which === 'all' || which === 'wish') shot('out_wish.png', (ws) => { ws.companion = 1; ws.cabin = 1; ws.gold = 1; ws.boatSink = 2; ws.fishShadows = 1; g.spawnShadows(); ws.goldFish = { x: 44, y: 238, a: 1, surf: 262 }; ws.sunY = 182; ws.troubled = 0.22; }, 4);
+if (which === 'all' || which === 'wish') shot('out_wish.png', (ws) => { ws.companion = 1; ws.cabin = 1; ws.gold = 1; ws.boatSunk = 1; ws.fishShadows = 1; g.spawnShadows(); ws.goldFish = { x: 44, y: 238, a: 1, surf: 262 }; ws.sunY = 182; ws.troubled = 0.22; }, 4);
 
 // Phase 2 scenes. night() is the act 2 night as out_night.png sets it up.
 const night = ws => { ws.mood = 1; ws.sunY = g.HY + 14; ws.sunGlow = 0.12; ws.horizGlow = 0.3; ws.starA = 1; ws.lantern = 1; ws.companion = 1; ws.troubled = 0.35; };
@@ -63,3 +63,8 @@ if (which === 'all' || which === 'shore') shot('out_shore.png', (ws) => { ws.sho
 if (which === 'all' || which === 'kept') shot('out_kept.png', (ws) => { ws.goldKept = 1; }, 3.3);
 if (which === 'all' || which === 'kept_night') shot('out_kept_night.png', (ws) => { night(ws); ws.companion = 0; ws.goldKept = 0.45; }, 5);
 if (which === 'all' || which === 'kept_red') shot('out_kept_red.png', (ws, G, S) => { redSky(ws); S.kept = true; ws.goldKept = 1; G.bob = { x: 101, y: g.HY + 5, taut: true }; g.setPhase('dialog'); }, 7);
+// Phase 6, the gold sink and Deep: the boat settled to the gunwales with the lantern afloat beside it (bubbles
+// still rising); then mid descent, the horizon well up the screen, the sky mirrored below, the boat hanging
+// from the surface as a shape seen from beneath.
+if (which === 'all' || which === 'sink') shot('out_sink.png', (ws, G) => { ws.gold = 1; ws.boatSunk = 1; ws.sunY = 172 + 16; ws.troubled = 0.22; ws.companion = 1; g.setPhase('cine'); for (let k = 0; k < 9; k++) g.bubble(g.boatLeft() + 6 + k * 8, g.WL + (k % 3)); }, 4);
+if (which === 'all' || which === 'deep') shot('out_deep.png', (ws, G) => { redSky(ws); ws.lantern = 0; ws.ash = 0; ws.sunGlow = 0; ws.horizGlow = 0; ws.gold = 1; ws.boatSunk = 1; ws.boatSink = 2; ws.companion = 1; ws.companionTurn = 1; ws.dive = 0.6; ws.dim = 3; ws.starA = 0.7; ws.troubled = 0.2; g.setPhase('cine'); }, 7);

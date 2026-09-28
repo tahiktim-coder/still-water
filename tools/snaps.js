@@ -48,4 +48,5 @@ play([0, 0, 0, 0, 0, 0], 'e_', [[6, 'redrise', 'red'], [3.5, 'jaw']]);
 play([0, 1, 1, 1], 'e_', [[5, 'dark']]);
 play([0, 2, 2, 2], 'e_', [[2.2, 'cutfall'], [18, 'cutdawn']]);
 play([0, 3, 3, 3], 'e_', [[2.2, 'silentfall'], [18, 'silentdawn']]);
+play([0, 2, 2, 3], 'e_', [[5, 'deepmid'], [11, 'deep']]); // the descent: the horizon half way up, then the mirror filling the frame after the glint
 console.log('wrote tools/out/e_*.png');
