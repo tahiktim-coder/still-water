@@ -1336,14 +1336,16 @@ function drawBobber() {
   const x = Math.round(b.x), y = Math.round(b.y);
   const gold = STORY.goldenNext && (G.phase === 'waiting' || G.phase === 'bite' || G.phase === 'casting');
   const col = gold ? 15 : 12;
-  const bait = STORY.act === 0; // the stranger's bait: one gold pixel on the hook for all of act 0 (bible, Opening)
-  if (b.fly) { plot(x, y - 1, 11); plot(x, y, col); plot(x + 1, y, col); if (bait) plot(x + 1, y + 1, BAIT_IDX); return; }
+  const bait = STORY.act === 0; // the stranger's bait on the hook for all of act 0 (bible, Opening)
+  if (b.fly) { plot(x, y - 1, 11); plot(x, y, col); plot(x + 1, y, col); if (bait) drawBait(x + 1, y + 1); return; }
   if (G.phase === 'bite' || b.taut) return;
   const yy = y + (G.bobDip > 0 ? 1 : 0), wl = yy + 1;
   plotR(x, yy - 2, 11, wl); plotR(x, yy - 1, col, wl); plotR(x + 1, yy - 1, col, wl); plotR(x, yy, col, wl); plotR(x + 1, yy, col, wl);
-  if (bait) plot(x + 1, yy + 1, BAIT_IDX); // under the float, in the water, not reflected
+  if (bait) drawBait(x + 1, yy + 1); // under the float, in the water, not reflected
 }
-const BAIT_IDX = 16; // the bright end of the gold ramp: 13 is dark and reads as a sinker at 3x
+const BAIT_IDX = 16, BAIT_EYE_IDX = 19; // the bright end of the gold ramp (13 is dark and reads as a sinker at 3x), and black
+// The lure: one gold pixel with one dark pixel beside it, the eye (bible, Opening). It moves with the float.
+function drawBait(x, y) { plot(x, y, BAIT_IDX); plot(x + 1, y, BAIT_EYE_IDX); }
 function linePix(x, y) {
   x = Math.round(x); y = Math.round(y);
   if (x < 0 || x >= W || y < 0 || y >= H) return;
@@ -1868,7 +1870,7 @@ function stayPushOff() {
   const x = boatLeft() + COMP_DX + 4;
   ring(x, WL + 1); ring(x + 3, WL + 2); SFX.plop();
 }
-function stayImpact() { WS.sunGlow = 2.4; WS.pupil = 0; SFX.crunch(); }
+function stayImpact() { WS.sunGlow = 2.4; WS.pupil = 0; SFX.crunch(); goldFishFade(STAY_DROP); } // the sky fish goes under with the sun
 function stayDiscHitsWater() { SFX.hiss(2.2); ring(SUNX, HY + 3, true); ring(SUNX, HY + 3); splash(SUNX, HY + 2, 10); SFX.drone(false); }
 function stayGoneUnder() { WS.companion = 0; WS.leap = 0; }
 const CINE_STAY = {
@@ -1899,6 +1901,11 @@ const CINE_STAY = {
     at('fade', STAY_FADE_AT, () => UI.fade(1, 3));
   },
 };
+// The released sky fish at the horizon fades out over dur and is cleared (Stay: with the dropping disc).
+function goldFishFade(dur) {
+  const g = WS.goldFish;
+  if (g) tween(g, 'a', 0, dur, E.lin, () => { if (WS.goldFish === g) WS.goldFish = null; });
+}
 // The released sky fish drops below the horizon with a splash (the cut and silent endings).
 function goldFishDrop() {
   const g = WS.goldFish;
@@ -1990,8 +1997,7 @@ function goldenDive() {
 function keptDim(act) { if (STORY.kept) tween(WS, 'goldKept', KEPT_LADDER[act], 1.5); }
 // Keep it: the sky fish is lifted into the boat, where it stays for the rest of the run.
 function keptLift() {
-  const g = WS.goldFish;
-  if (g) tween(g, 'a', 0, 0.4, E.lin, () => { if (WS.goldFish === g) WS.goldFish = null; });
+  goldFishFade(0.4);
   tween(WS, 'goldKept', 1, 1);
   splash(42, 262, 5); SFX.splash();
 }
@@ -2491,9 +2497,13 @@ function askedLine() {
 // On a sunk run (gold wished) the base card swaps one verb: he swims, or hangs in the water (bible, Gold sink).
 const SWIM_VERBS = [['You row until', 'You swim until'], ['You sit with the lantern until', 'You hang in the water beside the lantern until']];
 function swimText(text) { return has('gold') ? SWIM_VERBS.reduce((s, v) => s.replace(v[0], v[1]), text) : text; }
+// Every Still water card (the silent variant too) ends with the bait still in his pocket: he will be the
+// stranger for the next one (bible, Ending cards). No other ending gets it.
+const BAIT_END = 'The bait is still in your pocket.';
 function composeEnding(id, variant) {
   const e = ENDINGS[id];
-  const text = variant === 'silent' ? swimText(SILENT_TEXT) : (swimText(e.text) + ' ' + endingVariant(id)).trim();
+  const body = variant === 'silent' ? swimText(SILENT_TEXT) : (swimText(e.text) + ' ' + endingVariant(id)).trim();
+  const text = id === 'cut' ? body + ' ' + BAIT_END : body;
   return { id, variant: variant || '', title: e.title, text, asked: askedLine() };
 }
 let sessionEndings = [];
@@ -2694,7 +2704,7 @@ function showCard(f) { thinkHide(); setPhase('card'); UI.card(f); SFX.caught(); 
 function closeCard() { UI.cardHide(); afterCatch(); }
 // The fisherman's four act 0 lines (bible, Opening): the bait once the boat has arrived (BAIT_LINE), the
 // throwaway wish when the first cast lands (0), then one after each of the first two cards close (1, 2).
-const BAIT_LINE = 'The stranger’s bait. Cursed or blessed, he said, and laughed.';
+const BAIT_LINE = 'The stranger’s bait. Cursed or blessed, he said. It has an eye.';
 const OPENING_CAPS = { 0: 'Something interesting, for once.', 1: 'Look at that sun.', 2: 'I could watch that sun forever.' };
 function stillCaption() {
   if (STORY.act === 0) return 'The water goes very still.';

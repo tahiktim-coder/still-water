@@ -53,8 +53,10 @@ const ocean = ws => { ws.far = 1; ws.sea = 1; ws.troubled = 0.15; g.setPhase('oc
 if (which === 'all' || which === 'ocean') shot('out_ocean.png', (ws) => { ocean(ws); }, 6);
 // Phase 10: the big one mid-crossing, deep, at the left third, the smaller shapes ahead of it not yet scattered.
 if (which === 'all' || which === 'ocean_enter') shot('out_ocean_enter.png', (ws) => { ws.far = 1; ws.sea = 1; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.x = 60 + k * 20; s.y = g.HY + 30 + ((k * 37) % 90); } g.bigEnter(); const b = g.OCEAN.big; g.untween(b, 'x'); g.untween(b, 'y'); g.untween(b, 'deep'); b.x = g.W / 3; b.y = g.bigRestY() + 10; b.deep = 0.8; }, 6);
-// Phase 10: act 0, the float in the water with the stranger's bait, one gold pixel on the hook.
+// Phase 10, reworked in phase 15: act 0, the float in the water with the stranger's bait on the hook, one gold
+// pixel with a dark eye beside it; and the same lure in flight, mid-cast.
 if (which === 'all' || which === 'bait') shot('out_bait.png', (ws, G) => { g.setPhase('waiting'); G.wait = { t: 0, nib: [], bite: 99 }; G.bob = { x: 70, y: 280, fly: false }; }, 3.3);
+if (which === 'all' || which === 'bait_fly') shot('out_bait_fly.png', (ws, G) => { g.setPhase('casting'); G.cast = { t: 0.55, tx: 70, ty: 280, from: null }; }, 3.3);
 if (which === 'all' || which === 'ocean_mid') shot('out_ocean_mid.png', (ws) => { ws.far = 0.6; ws.sea = 0.6; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.x = 20 + k * 26; s.y = g.HY + 30 + ((k * 37) % 90); } }, 6);
 if (which === 'all' || which === 'swallow') shot('out_swallow.png', (ws, G) => { ocean(ws); ws.swallow = 60; G.bob = { x: g.W / 2 + 16, y: g.bigRestY() - 4, fly: false }; g.setPhase('cine'); }, 6.5);
 // Phase 14, Stay: the companion standing at his seat under the red sun, the eye snapped toward him, the line

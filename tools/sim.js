@@ -9,6 +9,11 @@ g.init();
 const out = new Uint32Array(g.W * g.H);
 g.setOut(out);
 
+// Still water and Silent end with the bait sentence, right before the asked-for line; nobody else has it.
+function baitOk(r) {
+  const still = r.id.startsWith('cut');
+  return still ? r.text.endsWith(BAIT_END) && r.asked.startsWith('You asked') : r.text.indexOf(BAIT_END) < 0;
+}
 function play(plan, label, opts) {
   opts = opts || {};
   g.resetAll();
@@ -70,8 +75,11 @@ function play(plan, label, opts) {
   // equal a label from any menu this run offered.
   const echoed = UI.log.filter(l => l[0] === 'think' && labels.has(l[1])).map(l => l[1]);
   if (echoed.length) { ok = false; console.log('   a choice label was echoed in the bubble: ' + echoed.join(' / ')); }
-  return { ok, id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '' };
+  return { ok, id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '', asked: card ? card.asked : '' };
 }
+// Phase 15: every Still water card (the silent variant too) ends with the bait sentence, before the asked-for
+// line, and no other ending's card carries it.
+const BAIT_END = 'The bait is still in your pocket.';
 const plans = [
   [[0, 0, 0, 0, 0, 0], 'let go, company (someone), forever, yes -> home'],
   [[1, 1, 1, 1], 'keep, fish (wait), hear -> dark', null, { wait: true }],
@@ -85,13 +93,13 @@ const plans = [
   [[1, 1, 2, 1], 'keep, fish (wait), gold -> dark', null, { wait: true }],
   // A third element is a sentence the ending card must end with; a fourth is options ({ wait } holds the
   // bot's hand through the ocean window, so the big one leaves; { has } is a sentence the card must contain).
-  [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'You asked once for nothing. It kept count.'],
+  [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'You asked once for nothing. It kept count. ' + BAIT_END],
   [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'after a while you stop minding.', { tap: true }],
   // Phase 5, the kept fish: act 1 is a normal hook (one more catch), the fish speaks from the boat, and
   // the ending card carries the kept sentence.
-  [[1, 2, 0, 2], 'keep, home, forever -> cut (still water, the fish over the side)', 'You lifted it over the side. It let you.'],
+  [[1, 2, 0, 2], 'keep, home, forever -> cut (still water, the fish over the side)', 'You lifted it over the side. It let you. ' + BAIT_END],
   [[1, 2, 1, 0], 'keep, home, hear -> home', 'The golden fish slips out of the boat as you go in.'],
-  [[1, 3, 3, 3], 'keep, nothing, nothing, nothing -> silent', 'Some evenings, the sunset looks back.'],
+  [[1, 3, 3, 3], 'keep, nothing, nothing, nothing -> silent', 'Some evenings, the sunset looks back. ' + BAIT_END],
   // Phase 6, the gold sink and Deep: gold at wish 2 sinks the boat to the gunwales; 'Let me get my gold' sits
   // after Cut the line (no Stay) or after Stay with them.
   [[0, 2, 2, 3], 'let go, home, gold -> deep', 'and there is no bottom.'],
@@ -99,7 +107,7 @@ const plans = [
   // Phase 9: the fish wish waited out continues on the open sea (no shore) to Home, Dark and Still water; the
   // gold sink leaves the fisherman in the water, and the Still water and Dark cards swap their verb.
   [[0, 1, 0, 0], 'let go, fish (wait), forever -> home (sea)', 'The lake is full. It was always full.', { wait: true }],
-  [[0, 1, 1, 2], 'let go, fish (wait), hear -> cut (sea)', 'The fish behind you all face one way. You do not look.', { wait: true }],
+  [[0, 1, 1, 2], 'let go, fish (wait), hear -> cut (sea)', 'The fish behind you all face one way. You do not look. ' + BAIT_END, { wait: true }],
   [[0, 2, 2, 2], 'let go, home, gold -> cut (swimming)', null, { has: 'You swim until the water is only water.' }],
   [[0, 1, 2, 1], 'let go, fish (wait), gold -> dark (swimming, sea)', null, { wait: true, has: 'You hang in the water beside the lantern until it gutters out.' }],
 ];
@@ -111,6 +119,7 @@ for (const [plan, label, cardEnd, opts] of plans) {
   if (cardEnd && !r.text.endsWith(cardEnd)) { ok = false; console.log('   card should end with: ' + cardEnd); }
   if (opts && opts.has && r.text.indexOf(opts.has) < 0) { ok = false; console.log('   card should contain: ' + opts.has); }
   if (r.id) seen[r.id] = true;
+  if (r.id && !baitOk(r)) { ok = false; console.log('   the bait sentence is ' + (r.id.startsWith('cut') ? 'missing from' : 'on') + ' the ' + r.id + ' card'); }
 }
 // One line per ending id (six, plus the silent variant of cut), then the verdict: every plan must end and
 // all six ids must have been seen.
