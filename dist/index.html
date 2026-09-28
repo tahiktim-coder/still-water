@@ -262,6 +262,7 @@ const E = {
   lin: t => t,
   io: t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
   out: t => 1 - Math.pow(1 - t, 3),
+  out2: t => 1 - (1 - t) * (1 - t), // a gentler ease-out, for the big one's long glide
   in: t => t * t * t,
 };
 function mulberry32(a) {
@@ -1230,15 +1231,16 @@ function bigShape(u, v) {
   return av < p && av > notch ? 0.3 + 0.3 * (1 - av / p) : 0;
 }
 function drawBigShadow(b) {
-  const hw = b.w * 0.5, hh = b.h * 0.5;
+  const hw = b.w * 0.5, hh = b.h * 0.5, deep = b.deep > 0.5 ? 1 : 0; // deeper reads a shade darker
   const y0 = Math.max(HY, Math.floor(b.y - hh * 1.5)), y1 = Math.min(H - 1, Math.ceil(b.y + hh * 1.5));
+  const x0 = Math.max(0, Math.floor(b.x - hw - 2)), x1 = Math.min(W - 1, Math.ceil(b.x + hw + 2));
   for (let y = y0; y <= y1; y++) {
     const v = (y - b.y) / hh, rip = RIPX[y], row = y * W;
-    for (let x = 0; x < W; x++) {
+    for (let x = x0; x <= x1; x++) {
       const d = bigShape(-(x + rip - b.x) / hw, v);
       if (d <= 0) continue;
       const i = row + x, f = FRAME[i];
-      if (f < 12) FRAME[i] = Math.max(0, f - (d > 0.7 ? 4 : d > 0.4 ? 3 : 2));
+      if (f < 12) FRAME[i] = Math.max(0, f - deep - (d > 0.7 ? 4 : d > 0.4 ? 3 : 2));
     }
   }
 }
@@ -1409,11 +1411,14 @@ function drawBobber() {
   const x = Math.round(b.x), y = Math.round(b.y);
   const gold = STORY.goldenNext && (G.phase === 'waiting' || G.phase === 'bite' || G.phase === 'casting');
   const col = gold ? 15 : 12;
-  if (b.fly) { plot(x, y - 1, 11); plot(x, y, col); plot(x + 1, y, col); return; }
+  const bait = STORY.act === 0; // the stranger's bait: one gold pixel on the hook for all of act 0 (bible, Opening)
+  if (b.fly) { plot(x, y - 1, 11); plot(x, y, col); plot(x + 1, y, col); if (bait) plot(x + 1, y + 1, BAIT_IDX); return; }
   if (G.phase === 'bite' || b.taut) return;
   const yy = y + (G.bobDip > 0 ? 1 : 0), wl = yy + 1;
   plotR(x, yy - 2, 11, wl); plotR(x, yy - 1, col, wl); plotR(x + 1, yy - 1, col, wl); plotR(x, yy, col, wl); plotR(x + 1, yy, col, wl);
+  if (bait) plot(x + 1, yy + 1, BAIT_IDX); // under the float, in the water, not reflected
 }
+const BAIT_IDX = 16; // the bright end of the gold ramp: 13 is dark and reads as a sinker at 3x
 function linePix(x, y) {
   x = Math.round(x); y = Math.round(y);
   if (x < 0 || x >= W || y < 0 || y >= H) return;
@@ -1720,7 +1725,30 @@ const SFX = {
       setTimeout(() => d.os.forEach(o => { try { o.stop(); } catch (e) { /* already stopped */ } }), 4000);
     }
   },
+  wgt: null,
+  weight(on) {
+    const c = this.ctx; if (!c) return;
+    const now = c.currentTime;
+    if (on && !this.wgt) {
+      const g = c.createGain(); g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(WEIGHT_VOL, now + OCEAN_CROSS);
+      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 90; f.Q.value = 1.2;
+      const os = [[44, 'sine'], [52.5, 'triangle']].map(([fr, ty]) => { const o = c.createOscillator(); o.type = ty; o.frequency.value = fr; o.connect(f); o.start(); return o; });
+      const n = c.createBufferSource(); n.buffer = this.buf; n.loop = true;
+      const nf = c.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = 140; nf.Q.value = 0.7;
+      const ng = c.createGain(); ng.gain.value = 0.35;
+      n.connect(nf); nf.connect(ng); ng.connect(g); n.start();
+      f.connect(g); g.connect(this.out);
+      this.wgt = { g, os: os.concat([n]) };
+    } else if (!on && this.wgt) {
+      const w = this.wgt; this.wgt = null;
+      w.g.gain.cancelScheduledValues(now); w.g.gain.setValueAtTime(w.g.gain.value, now);
+      w.g.gain.linearRampToValueAtTime(0.0001, now + WEIGHT_OUT);
+      setTimeout(() => w.os.forEach(o => { try { o.stop(); } catch (e) { /* already stopped */ } }), (WEIGHT_OUT + 0.5) * 1000);
+    }
+  },
 };
+const WEIGHT_VOL = 0.22, WEIGHT_OUT = 2;
 
 const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0, echo: null, hold: 0 };
 const ECHO_DUR = 1.2, BUBBLE_HOLD = 3;
@@ -2001,6 +2029,7 @@ function wish1() {
   dlgRun([
     { pause: 3 },
     fish(greeting1()),
+    fish('Something interesting, you said. Here I am.'),
     { who: FISHN, text: 'Put me back and I’ll grant you a wish. Three, if you’re patient.', choices: [
       { label: 'Let it go', pick: () => wish1b(false) },
       { label: 'Keep it', pick: () => wish1b(true) },
@@ -2052,7 +2081,7 @@ function grant1(w) {
   dlgRun(GRANT1[w]().concat(costLines()), afterGrant1);
 }
 
-const OCEAN_FAR_DUR = 6, OCEAN_BIG_T = 10, OCEAN_WINDOW = 10, OCEAN_RETURN = 4, SWALLOW_R = 130;
+const OCEAN_FAR_DUR = 6, OCEAN_SPAWN_T = 1.4, OCEAN_SPAWN_GAP = 0.35, OCEAN_BIG_T = 5.5, OCEAN_CROSS = 8, OCEAN_WINDOW = 10, OCEAN_RETURN = 4, SWALLOW_R = 130;
 function spawnOceanShadow(size) {
   const fromLeft = Math.random() < 0.5;
   const s = { x: fromLeft ? -20 - Math.random() * 30 : W + 20 + Math.random() * 30, y: HY + 30 + Math.random() * (H - HY - 50), size, a: 1, fade: 0 };
@@ -2070,14 +2099,25 @@ function spawnSeaShoal() {
   for (let k = 0; k < SEA_SHOAL; k++) OCEAN.shad.push(seaShadow({}, HY + 30 + Math.random() * (H - HY - 50)));
 }
 const bigRestY = () => HY + 16 + (H - HY) / 6; // its back just under the surface, the fins clear of the horizon
-function bigRise() {
-  const h = (H - HY) / 3;
-  OCEAN.big = { x: W / 2, y: H + h, w: W, h };
-  tween(OCEAN.big, 'y', bigRestY(), 2.6, E.out);
+const BIG_DEEP_PX = 12; // how many rows lower it swims while crossing, before it rises to rest
+function bigEnter() {
+  const h = (H - HY) / 3, restY = bigRestY();
+  OCEAN.big = { x: -W * 0.55, y: restY + BIG_DEEP_PX, w: W, h, deep: 1, crossing: true };
+  tween(OCEAN.big, 'x', W / 2, OCEAN_CROSS, E.out2, () => { if (OCEAN.big) OCEAN.big.crossing = false; });
+  tween(OCEAN.big, 'y', restY, OCEAN_CROSS, E.in);
+  tween(OCEAN.big, 'deep', 0, OCEAN_CROSS, E.in);
 }
-function scatterOcean() {
+function bigRise() {
+  bigEnter();
+  const b = OCEAN.big;
+  untween(b, 'x'); untween(b, 'y'); untween(b, 'deep');
+  Object.assign(b, { x: W / 2, y: bigRestY(), deep: 0, crossing: false });
+}
+const SCATTER_REACH = 0.55;
+function scatterFrom(b) {
   for (const s of OCEAN.shad) {
-    const dx = s.x - W / 2, dy = s.y - bigRestY(), n = Math.hypot(dx, dy) || 1;
+    if (s.fade > 0 || Math.abs(s.x - b.x) > b.w * SCATTER_REACH) continue;
+    const dx = s.x - b.x, dy = s.y - b.y, n = Math.hypot(dx, dy) || 1;
     s.vx = (dx / n) * 70; s.vy = (dy / n) * 25 - 6; s.fade = 2; s.dir = s.vx >= 0 ? 1 : -1;
   }
 }
@@ -2093,6 +2133,7 @@ function updOcean(dt) {
     }
     if (s.x < -60 || s.x > W + 60) s.vx = -s.vx, s.dir = -s.dir;
   }
+  if (OCEAN.big && OCEAN.big.crossing) scatterFrom(OCEAN.big);
   if (G.phase === 'ocean' && G.pt >= OCEAN_WINDOW) oceanLeave();
 }
 const CINE_OCEAN = {
@@ -2100,17 +2141,18 @@ const CINE_OCEAN = {
   init(s) {
     OCEAN.tr0 = WS.troubled; OCEAN.shad.length = 0; OCEAN.big = null;
     tween(WS, 'far', 1, OCEAN_FAR_DUR, E.io); tween(WS, 'sea', 1, OCEAN_FAR_DUR, E.io); tween(WS, 'troubled', 0.15, 2);
-    s.next = 2.5; s.n = 0;
+    s.next = OCEAN_SPAWN_T; s.n = 0;
   },
   update(t, dt, at, s) {
     at('snd', 0, () => SFX.swell());
-    if (s.n < 12 && t >= s.next) { s.next += 0.55; s.n++; spawnOceanShadow(2 + Math.round((s.n / 12) * 4)); }
-    at('big', OCEAN_BIG_T, () => { bigRise(); scatterOcean(); SFX.rumble(); });
+    if (s.n < 12 && t >= s.next) { s.next += OCEAN_SPAWN_GAP; s.n++; spawnOceanShadow(2 + Math.round((s.n / 12) * 4)); } // a dozen, all in before the big one
+    at('big', OCEAN_BIG_T, () => { bigEnter(); SFX.weight(true); }); // no stinger: the swell rises with the crossing
   },
 };
 function oceanTold() { dlgRun([fish('Told you. I’d let that one pass.')], () => setPhase('ocean')); }
 function oceanCast() {
   STORY.ocean = 'swallowed';
+  SFX.weight(false);
   playCine(CINE_SWALLOW, () => showEnding('swallowed'));
 }
 const CINE_SWALLOW = {
@@ -2143,6 +2185,7 @@ const CINE_OCEAN_BACK = {
   dur: OCEAN_RETURN * 2 + 0.6,
   init() {
     const b = OCEAN.big;
+    SFX.weight(false);
     if (b) tween(b, 'x', -b.w * 0.65, OCEAN_RETURN, E.in, () => { if (OCEAN.big === b) OCEAN.big = null; });
   },
   update(t, dt, at) {
@@ -2597,7 +2640,8 @@ function land() {
 }
 function showCard(f) { thinkHide(); setPhase('card'); UI.card(f); SFX.caught(); }
 function closeCard() { UI.cardHide(); afterCatch(); }
-const OPENING_CAPS = { 1: 'Look at that sun.', 2: 'I could watch that sun forever.' };
+const BAIT_LINE = 'The stranger’s bait. Cursed or blessed, he said, and laughed.';
+const OPENING_CAPS = { 0: 'Something interesting, for once.', 1: 'Look at that sun.', 2: 'I could watch that sun forever.' };
 function stillCaption() {
   if (STORY.act === 0) return 'The water goes very still.';
   if (STORY.act === 1) return STORY.kept ? 'The water goes very still. The fish in the boat does not.' : 'The water goes very still again.';
@@ -2636,7 +2680,7 @@ function fishUpdate(dt) {
         G.bob = { x: c.tx, y: c.ty, fly: false };
         ring(c.tx, c.ty + 1); splash(c.tx, c.ty, 4);
         SFX.plop();
-        thinkBeat(STORY.casts === 1 ? 'First time here.' : null);
+        thinkBeat(STORY.casts === 1 ? OPENING_CAPS[0] : null);
         startWaiting();
       }
     }
@@ -2755,7 +2799,7 @@ function openingUpdate(dt) {
     o.stage = 1;
     WS.boatX = ROW_FROM;
     tween(WS, 'boatX', ROW_FROM * 0.25, ROW_DUR / 2, E.out, () =>
-      tween(WS, 'boatX', 0, ROW_DUR / 2, E.out, () => { G.arrived = true; refreshPrompt(); }));
+      tween(WS, 'boatX', 0, ROW_DUR / 2, E.out, () => { G.arrived = true; refreshPrompt(); thinkBeat(BAIT_LINE); }));
     UI.fade(0, 1.2);
     SFX.row();
     cap('Nothing on the lake is moving except you.', 3.5);
@@ -2773,7 +2817,7 @@ function resetAll() {
   WS.farBoat = RUN.count > 0 || loadEndings().length > 0 || sessionEndings.length > 0 ? 1 : 0; // bible, Title
   CINE = null;
   DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0; DLG.echo = null; DLG.hold = 0;
-  SFX.drone(false);
+  SFX.drone(false); SFX.weight(false);
   UI.count(0); UI.dlgHide(); UI.thinkHide(); UI.cardHide(); UI.endingHide();
   setPhase('title');
   UI.title(true, Math.max(loadEndings().length, sessionEndings.length));
@@ -3045,7 +3089,7 @@ if (IS_BROWSER) {
     setH(h) { H = h; alloc(); },
     get H() { return H; }, W, HY,
     spawnShadows, SHAD, spawnBirds, BIRDS, RUN, ENDING_COUNT,
-    OCEAN, spawnOceanShadow, spawnSeaShoal, bigRise, bigRestY, untween, bubble, boatLeft, WL,
+    OCEAN, spawnOceanShadow, spawnSeaShoal, bigRise, bigEnter, bigRestY, untween, bubble, boatLeft, WL,
     setCloudT(v) { cloudT = v; },
   };
 }

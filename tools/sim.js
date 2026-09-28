@@ -14,13 +14,14 @@ function play(plan, label, opts) {
   g.resetAll();
   const UI = g.UI;
   UI.log.length = 0;
-  let t = 0, ci = 0, lastAct = 0, holding = false, frames = 0, lastLine = null, stalled = '', tapped = -1;
+  let t = 0, ci = 0, lastAct = 0, holding = false, frames = 0, lastLine = null, stalled = '', tapped = -1, keptMax = 0;
   const dt = 1 / 30;
   const trace = [], lines = [];
   while (t < 900) {
     const p = g.phase;
     const cur = g.DLG.cur;
     if (cur && cur !== lastLine) { lastLine = cur; lines.push((cur.who ? cur.who + ': ' : '') + cur.text); }
+    if (p === 'dialog') keptMax = Math.max(keptMax, g.WS.goldKept); // the released path never stamps a kept fish
     if (t - lastAct > 0.25) {
       if (p === 'ready' && opts.tap && g.WS.companion > 0.5 && tapped < g.STORY.act) { g.companionTap(); tapped = g.STORY.act; lastAct = t; }
       else if (p === 'title' || p === 'ready' || p === 'card') { g.press(); g.release(); lastAct = t; }
@@ -55,7 +56,11 @@ function play(plan, label, opts) {
   console.log('   captions: ' + caps.join(' / '));
   console.log('   cards: ' + cards.join(' / '));
   if (card) console.log('   card: ' + card.text + ' | ' + card.asked);
-  return { ok: g.phase === 'end', id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '' };
+  // Let go: STORY.kept stays false and WS.goldKept stays 0 while the fish speaks, so drawKeptFish's guard
+  // (!STORY.kept || goldKept <= 0.01) skips the stamp on every frame of the dialogue.
+  let ok = g.phase === 'end';
+  if (!S.kept && keptMax > 0) { ok = false; console.log('   a kept fish was drawn on a released path (goldKept ' + keptMax + ')'); }
+  return { ok, id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '' };
 }
 const plans = [
   [[0, 0, 0, 0, 0, 0], 'let go, company (someone), forever, yes -> home'],
