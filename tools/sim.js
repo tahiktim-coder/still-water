@@ -50,7 +50,7 @@ function play(plan, label) {
   console.log('   captions: ' + caps.join(' / '));
   console.log('   cards: ' + cards.join(' / '));
   if (card) console.log('   card: ' + card.text + ' | ' + card.asked);
-  return { ok: g.phase === 'end', id: card ? card.id + (card.variant ? ':' + card.variant : '') : null };
+  return { ok: g.phase === 'end', id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '' };
 }
 const plans = [
   [[0, 0, 0, 0, 0, 0], 'let go, company (someone), forever, yes -> home'],
@@ -62,12 +62,15 @@ const plans = [
   [[1, 2, 3, 2], 'keep, home, nothing -> cut'],
   [[0, 3, 3, 0], 'let go, nothing, nothing -> home'],
   [[1, 1, 2, 1], 'keep, fish, gold -> dark'],
+  // A third element is a sentence the ending card must end with.
+  [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'You asked once for nothing. It kept count.'],
 ];
 let ok = true;
 const seen = {};
-for (const [plan, label] of plans) {
+for (const [plan, label, cardEnd] of plans) {
   const r = play(plan, label);
   ok = ok && r.ok;
+  if (cardEnd && !r.text.endsWith(cardEnd)) { ok = false; console.log('   card should end with: ' + cardEnd); }
   if (r.id) seen[r.id] = true;
 }
 const need = ['home', 'dark', 'cut', 'cut:silent'];

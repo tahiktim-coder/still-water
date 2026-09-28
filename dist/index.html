@@ -749,8 +749,8 @@ const ENDINGS = {
   cut: { title: 'Still water', text: 'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.' },
 };
 const SILENT_TEXT = 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.';
-// One variant sentence per ending card (bible, section 4 Ending cards): kept, else the most relevant
-// wish in the order given per ending, else refused twice, else (Still water only) the one-refusal line.
+// One variant sentence per ending card (bible, section 4 Ending cards): kept, else (Still water only) the
+// one-refusal line, else the most relevant wish in the order given per ending, else refused twice.
 const END_VARIANTS = {
   home: {
     kept: 'The golden fish slips out of the boat as you go in.',
@@ -767,7 +767,7 @@ const END_VARIANTS = {
   },
   dark: {
     kept: 'The golden fish dries in the bottom of the boat. It stops asking before you do.',
-    refused2: 'Nothing was what you wanted, and nothing is what there is to see.',
+    refused2: 'You asked for nothing twice. This is what it looks like.',
     order: ['hear', 'fish', 'forever', 'company', 'gold', 'home'],
     lines: {
       hear: 'The lake keeps talking. You stop answering.',
@@ -1654,9 +1654,9 @@ const CINE_RED = {
     WS.troubled = lerp(s.tr0, 0.55, clamp(t / 9, 0, 1));
     WS.ash = clamp((t - 6) / 4, 0, 1);
     WS.stalk = clamp((t - 9.2) / 2.3, 0, 1);
-    at('lake', 9.2, () => { if (STORY.heard) cap('i could watch that sun forever. i could watch that sun forever.', 3.2, 'whisper'); });
+    at('lake', 9.2, () => { if (STORY.heard) lakeWhisper('i could watch that sun forever. i could watch that sun forever.'); });
+    at('lakeOff', 12.4, () => { if (STORY.heard) UI.dlgHide(); });
     WS.pupil = clamp((t - 12) / 1.3, 0, 1);
-    at('c3', 12.2, () => cap('It is not a sun.', 2.8));
     WS.pupilDx = s.asked ? clamp((t - 13.6) / 1.0, 0, 1) * 4 : 0;
     at('turn', 13.6, () => { if (WS.companion > 0) tween(WS, 'companionTurn', 1, 0.4); });
     at('hb', 13.6, () => SFX.heartbeat());
@@ -1747,6 +1747,9 @@ const narr = text => ({ who: '', text, style: 'narr' });
 const fish = text => ({ who: FISHN, text });
 const red = text => ({ who: FISHN, text, style: 'red' });
 const whisperFish = text => ({ who: FISHN, text, style: 'whisper' });
+// The lake's one line (bible, section 4): a labelled whisper in the dialogue panel, shown from inside the red
+// cinematic. DLG is inactive there, so the text appears whole and the cinematic hides the panel itself.
+function lakeWhisper(text) { UI.dlgShow('The lake', 'whisper'); UI.dlgText(text); }
 function goldenScene() {
   G.bob = null;
   WS.goldFish = { x: 26, y: 240, a: 0, surf: 263 };
@@ -1953,15 +1956,13 @@ function redSequence() {
     narr('The line goes taut. You did not feel a bite.'),
     // The fish appears above the horizon where the sun set. (Kept: it should speak from the boat, a later phase.)
     { act: () => { WS.goldFish = { x: SUNX - 14, y: HY - 24, a: 0, surf: HY + 1 }; tween(WS.goldFish, 'a', 1, 0.9); SFX.chime(); } },
-    { act: () => cap('It is where the sun was.', 2.4) },
-    { pause: 2 },
+    { pause: 2 }, // two seconds of silence, no caption
   ].concat(redLines()), () => playCine(CINE_RED, wish3));
 }
 const sentence = s => s.charAt(0).toUpperCase() + s.slice(1) + '.';
-// One line, up to 120 characters: the granted wishes in order, the answered clause, and always the sun.
+// One line, up to 125 characters: the granted wishes in order, then always the sun.
 function recountLine() {
   const parts = STORY.wishes.map(w => RECOUNT[w]);
-  if (STORY.answered === true) parts.push('someone who will stay');
   return 'Everything you asked for. ' + parts.map(sentence).join(' ') + ' And the sun you wanted. Your words, not mine.';
 }
 function wish3Choices() {
@@ -2038,13 +2039,14 @@ function saveRun(id) {
   saveJSON('stillwater-last', id);
 }
 // The ending card: the base text, one variant sentence, and what was asked for.
-// Priority: kept > the most relevant wish (order per ending) > refused twice > one refusal (Still water only).
+// Priority: kept > one refusal (Still water only: a run with one refusal always has one granted wish, so this
+// line has to outrank the wish sentence to ever show) > the most relevant wish (order per ending) > refused twice.
 function endingVariant(id) {
   const v = END_VARIANTS[id];
   if (STORY.kept) return v.kept;
+  if (v.refused1 && STORY.refused === 1) return v.refused1;
   for (const w of v.order) if (has(w)) return v.lines[w];
   if (v.refused2 && STORY.refused === 2) return v.refused2;
-  if (v.refused1 && STORY.refused === 1) return v.refused1;
   return '';
 }
 function askedLine() {

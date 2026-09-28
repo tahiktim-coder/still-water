@@ -25,7 +25,7 @@ The recount at wish 3 always ends with `and the sun you wanted.`
 
 ## 2. Rules for copy
 
-- Sentence case. Short. Eerie. Dialogue under 90 characters (the wish 3 recount may run to 120), captions under 60, card lines under 60.
+- Sentence case. Short. Eerie. Dialogue under 90 characters (the wish 3 recount may run to 125), captions under 60, card lines under 60. This file writes apostrophes straight; the game renders every one as the typographic ’.
 - The fisherman speaks three lines in the whole game, all in act 0. Everything later quotes them. His lines and the companion's lines share one "said" caption style, in quotation marks, so the player cannot always tell whose words they are. Narrator captions have no quotes.
 - The golden fish is polite, patient and never lies. It gives exactly what was asked for and reads the player's own words back as consent. It never threatens. It is never rude, only accurate. Its rules begin with "Nobody".
 - Never say memory, remember, past, stuck, grief, nostalgia, lure, or "you are the fish". "Bait" appears once in dialogue, at wish 3. The Dark ending's base card keeps its own "bait" because it shipped that way.
@@ -206,7 +206,7 @@ Refused twice (either path, replaces the lines above):
 - Golden fish: `One wish left. You said you could watch that sun forever, then asked for nothing twice.`
 - Golden fish: `It wants to see why.`
 
-Then the red cinematic as coded, with four changes: the companion turns at the pupil beat (inside the cinematic, before anyone speaks); the pupil slides toward the boat only if the player ever asked for something; if `heard`, at the stalk beat The lake whispers `i could watch that sun forever. i could watch that sun forever.` (the fisherman's words back from every fish at once); if gold, the boat sinks two more pixels when the line goes taut.
+Then the red cinematic as coded, with four changes: the companion turns at the pupil beat (inside the cinematic, before anyone speaks); the pupil slides toward the boat only if the player ever asked for something; if `heard`, at the stalk beat The lake whispers `i could watch that sun forever. i could watch that sun forever.` (the fisherman's words back from every fish at once); if gold, the boat sinks two more pixels when the line goes taut. The cinematic's own narr caption at 0.6 s stays: `Something rises where the sun went down.` There is no caption at the pupil beat.
 
 #### Wish 3
 
@@ -214,7 +214,7 @@ Red style. One voice. The only insertions are the two optional lines marked belo
 
 1. Golden fish: `There it is. You can watch it forever now.`
 2. Golden fish: `Every sun is bait. I should have said. It didn't come up.`
-3. Golden fish, the recount: `Everything you asked for.` then the granted wishes in order as short clauses, then `and the sun you wanted.`, then `Your words, not mine.` All in one line, up to 120 characters. The clauses are the player's own labels, shifted to the second person: company `someone to sit with you`, fish `where the fish are`, home `a home on the shore`, forever `a day that lasts forever`, hear `to hear the fish`, gold `a boat full of gold`. Example: `Everything you asked for. Someone to sit with you. A boat full of gold. And the sun you wanted. Your words, not mine.` If nothing was granted: `Nobody rows this far to want nothing. So why are you here.`
+3. Golden fish, the recount: `Everything you asked for.` then the granted wishes in order as short clauses, then `and the sun you wanted.`, then `Your words, not mine.` All in one line, up to 125 characters. The clauses are the player's own labels, shifted to the second person: company `someone to sit with you`, fish `where the fish are`, home `a home on the shore`, forever `a day that lasts forever`, hear `to hear the fish`, gold `a boat full of gold`. Example: `Everything you asked for. Someone to sit with you. A boat full of gold. And the sun you wanted. Your words, not mine.` If nothing was granted: `Nobody rows this far to want nothing. So why are you here.`
 4. Optional, companion present and silent: Companion: `Don't answer it. Cut the line.` Companion present and answered: Companion: `You said you'd stay.`
 5. Optional, kept: Golden fish, whisper from the boat: `I'm sorry.`
 6. Golden fish: `I sat where you sit. I said what you said. Three times.`
@@ -241,7 +241,7 @@ Buttons are a flex column with smaller padding when there are more than three. K
 
 #### Ending cards
 
-Card = the base text (unchanged for the three original endings) + one variant sentence + the asked-for list. Variant priority: silent > kept > the most relevant wish (order given per ending) > refused twice. The list is `You asked for:` followed by the labels taken, in order, or `You asked for nothing.`; with exactly one refusal the header is `You asked for nothing, once. And for:`. Every ending card carries the list, Stay, Deep and Swallowed included.
+Card = the base text (unchanged for the three original endings) + one variant sentence + the asked-for list. Variant priority: silent > kept > one refusal (Still water only; a run with exactly one refusal always has one granted wish, so this line has to outrank the wish sentence to ever show) > the most relevant wish (order given per ending) > refused twice. The list is `You asked for:` followed by the wish 1 and wish 2 labels taken, in order (the wish 3 button is the ending, not a request), or `You asked for nothing.`; with exactly one refusal the header is `You asked for nothing, once. And for:`. Every ending card carries the list, Stay, Deep and Swallowed included.
 
 Home. Base: `The lake is quiet again. The fish are hungry. Somewhere, a new sun is rising for the next fisherman.`
 - kept: `The golden fish slips out of the boat as you go in.`
@@ -257,7 +257,7 @@ Still water. Base: `You row until the water is only water. You never fish here a
 - kept: `You lifted it over the side. It let you.`
 - company > home > fish > gold > forever > hear: `There is someone in the stern. You do not ask. You row.` / `The cabin is dark. You do not check whether anyone left.` / `The fish behind you all face one way. You do not look.` / `The gold is on the bottom. Your hands stayed on the oars.` / `Dawn comes anyway. You had forgotten it could.` / `You can still hear them from the shore. You stop listening.`
 - refused twice: `Twice you said nothing. The knife said it a third time.`
-- one refusal only: `You asked once for nothing. It kept count.`
+- one refusal (outranks the wish sentence): `You asked once for nothing. It kept count.`
 
 Silent. Card: `You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.`
 
