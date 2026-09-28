@@ -1,6 +1,6 @@
 // A headless bot that plays the story to every ending. Plans are index lists consumed in
 // order at every choice menu. Menus in order: scene 1 (Let it go / Keep it), wish 1 (company /
-// fish / home / Nothing), Who? (company only, one option), wish 2 (forever / hear / gold /
+// fish / home / Nothing), the ocean window after the fish wish (no menu: a press casts, { wait } does not), Who? (company only, one option), wish 2 (forever / hear / gold /
 // Nothing), the companion's question (company only: Yes / Say nothing), wish 3 (home / dark /
 // cut / Nothing if refused twice).
 const g = require('../src/game.js');
@@ -8,7 +8,8 @@ g.init();
 const out = new Uint32Array(g.W * g.H);
 g.setOut(out);
 
-function play(plan, label) {
+function play(plan, label, opts) {
+  opts = opts || {};
   g.resetAll();
   const UI = g.UI;
   UI.log.length = 0;
@@ -21,6 +22,7 @@ function play(plan, label) {
     if (cur && cur !== lastLine) { lastLine = cur; lines.push((cur.who ? cur.who + ': ' : '') + cur.text); }
     if (t - lastAct > 0.25) {
       if (p === 'title' || p === 'ready' || p === 'card') { g.press(); g.release(); lastAct = t; }
+      else if (p === 'ocean') { if (!opts.wait) { g.press(); g.release(); } lastAct = t; } // the ocean window: cast into the big one unless the plan waits
       else if (p === 'bite') { g.press(); holding = true; lastAct = t; }
       else if (p === 'dialog') {
         if (UI.choices) {
@@ -44,7 +46,7 @@ function play(plan, label) {
   const cards = UI.log.filter(l => l[0] === 'card').map(l => l[1].name + ': ' + l[1].desc + (l[1].voice ? ' ' + l[1].voice : ''));
   const card = (UI.log.filter(l => l[0] === 'ending').map(l => l[1]))[0];
   const S = g.STORY;
-  console.log(`[${label}] phase=${g.phase} t=${t.toFixed(1)}s catches=${S.catches} wishes=${S.wishes.join(',')} kept=${S.kept} firstAsk=${S.firstAsk} refused=${S.refused} answered=${S.answered} ending=${card ? card.title + (card.variant ? ' (' + card.variant + ')' : '') : stalled}`);
+  console.log(`[${label}] phase=${g.phase} t=${t.toFixed(1)}s catches=${S.catches} wishes=${S.wishes.join(',')} kept=${S.kept} firstAsk=${S.firstAsk} refused=${S.refused} answered=${S.answered} ocean=${S.ocean} ending=${card ? card.title + (card.variant ? ' (' + card.variant + ')' : '') : stalled}`);
   console.log('   ' + trace.join(' | '));
   console.log('   lines: ' + lines.join(' / '));
   console.log('   captions: ' + caps.join(' / '));
@@ -54,26 +56,28 @@ function play(plan, label) {
 }
 const plans = [
   [[0, 0, 0, 0, 0, 0], 'let go, company (someone), forever, yes -> home'],
-  [[1, 1, 1, 1], 'keep, fish, hear -> dark'],
+  [[1, 1, 1, 1], 'keep, fish (wait), hear -> dark', null, { wait: true }],
+  [[0, 1], 'let go, fish, cast into the big one -> swallowed'],
   [[0, 2, 2, 2], 'let go, home, gold -> cut'],
   [[1, 0, 0, 1, 1, 2], 'keep, company (someone), hear, say nothing -> cut'],
   [[0, 3, 3, 3], 'let go, nothing, nothing, nothing -> silent'],
   [[0, 3, 0, 0], 'let go, nothing, forever -> home'],
   [[1, 2, 3, 2], 'keep, home, nothing -> cut'],
   [[0, 3, 3, 0], 'let go, nothing, nothing -> home'],
-  [[1, 1, 2, 1], 'keep, fish, gold -> dark'],
-  // A third element is a sentence the ending card must end with.
+  [[1, 1, 2, 1], 'keep, fish (wait), gold -> dark', null, { wait: true }],
+  // A third element is a sentence the ending card must end with; a fourth is options ({ wait } holds the
+  // bot's hand through the ocean window, so the big one leaves).
   [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'You asked once for nothing. It kept count.'],
 ];
 let ok = true;
 const seen = {};
-for (const [plan, label, cardEnd] of plans) {
-  const r = play(plan, label);
+for (const [plan, label, cardEnd, opts] of plans) {
+  const r = play(plan, label, opts);
   ok = ok && r.ok;
   if (cardEnd && !r.text.endsWith(cardEnd)) { ok = false; console.log('   card should end with: ' + cardEnd); }
   if (r.id) seen[r.id] = true;
 }
-const need = ['home', 'dark', 'cut', 'cut:silent'];
+const need = ['home', 'dark', 'cut', 'cut:silent', 'swallowed'];
 const missing = need.filter(id => !seen[id]);
 if (missing.length) { ok = false; console.log('missing endings: ' + missing.join(', ')); }
 console.log(ok ? 'ALL ENDINGS REACHED' : 'SOMETHING STALLED');

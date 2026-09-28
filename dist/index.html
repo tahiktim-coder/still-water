@@ -715,8 +715,35 @@ function makeFish(o) {
 const FPAL = { o: 3, b: 6, m: 8, l: 10, s: 11, f: 5, e: 1 };
 const GPAL = { o: 13, b: 14, m: 15, l: 16, s: 16, f: 14, e: 18 };
 let BOAT, GOLD, GOLD_OPEN;
+// The far boat silhouettes for the ocean (bible, section 8): the hull with the fisherman and the lantern
+// pole flattened to index 0, then downscaled by 2 and 4 with nearest-neighbour cells (a cell is dark if any
+// source pixel in it is, so the thin hull lines and the prow curl survive), and a 5 by 2 speck. Each keeps a
+// waterline row wl for the reflecting stamp.
+let BOAT_FAR2, BOAT_FAR4, BOAT_SPECK;
+function shrink(s, k) {
+  const w = Math.ceil(s.w / k), h = Math.ceil(s.h / k);
+  const data = new Uint8Array(w * h).fill(255);
+  for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) if (s.data[y * s.w + x] !== 255) data[Math.floor(y / k) * w + Math.floor(x / k)] = 0;
+  return { w, h, data, wl: Math.round(s.wl / k) };
+}
+function boatSilhouette() {
+  const w = BOAT.w, h = BOAT.h, data = new Uint8Array(w * h).fill(255);
+  const put = (spr, x0, y0) => { for (let y = 0; y < spr.h; y++) for (let x = 0; x < spr.w; x++) if (spr.data[y * spr.w + x] !== 255) data[(y0 + y) * w + x0 + x] = 0; };
+  put(BOAT, 0, 0);
+  put(FISHER, 18, BOAT.wl - 24);
+  for (let y = BOAT.wl - 27; y < BOAT.wl - 8; y++) data[y * w + 9] = 0; // the lantern pole
+  for (let y = BOAT.wl - 25; y < BOAT.wl - 21; y++) for (let x = 6; x < 9; x++) data[y * w + x] = 0;
+  return { w, h, data, wl: BOAT.wl };
+}
+function buildFarBoats() {
+  const full = boatSilhouette();
+  BOAT_FAR2 = shrink(full, 2);
+  BOAT_FAR4 = shrink(full, 4);
+  BOAT_SPECK = sprite(['.000.', '00000']); BOAT_SPECK.wl = 2;
+}
 function buildSprites() {
   BOAT = makeBoat();
+  buildFarBoats();
   GOLD = makeFish({ len: 23, ht: 10, tail: 8, dorsalH: 4, crown: true, fork: true, barbel: true, pal: GPAL });
   GOLD_OPEN = { w: GOLD.w, h: GOLD.h, data: GOLD.data.slice(), cy: GOLD.cy, bar: GOLD.bar };
   const mi = GOLD.cy * GOLD.w + GOLD.bar;
@@ -748,11 +775,12 @@ const VOICE = {
   home: 'I wished for a home too. This is it.',
   nothing: 'I wanted nothing too. It waited.',
 };
-const ENDING_COUNT = 3; // raised as later phases add Stay, Deep and Swallowed
+const ENDING_COUNT = 4; // raised as later phases add Stay and Deep
 const ENDINGS = {
   home: { title: 'Home', text: 'The lake is quiet again. The fish are hungry. Somewhere, a new sun is rising for the next fisherman.' },
   dark: { title: 'Dark', text: 'You sit with the lantern until it gutters out. Sometimes something takes the bait. You never reel it in.' },
   cut: { title: 'Still water', text: 'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.' },
+  swallowed: { title: 'Swallowed', text: 'You asked to be taken where the fish are. Somewhere far above, the sun is still shining on a lake with no boat on it.' },
 };
 const SILENT_TEXT = 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.';
 // One variant sentence per ending card (bible, section 4 Ending cards): kept, else (Still water only) the
@@ -820,6 +848,9 @@ function resetWS() {
     lineCut: false, goldFish: null,
     // story bible, section 3. Only frozen is read in this phase; the rest are drawn by later phases.
     goldKept: 0, boatSunk: 0, frozen: 0, far: 0, eyes: 0, farBoat: 0,
+    // Phase 3: the ocean. shoreShift is px the mountains sit closer to the horizon after the ocean;
+    // swallow is the radius of the opening water; boatDrop the boat's fall into it.
+    shoreShift: 0, swallow: 0, boatDrop: 0,
   });
 }
 const G = {
@@ -973,8 +1004,22 @@ function updJumps(dt) {
 }
 
 // ---------------------------------------------------------------- rendering
+// The mountains sink toward the horizon (bible, Ocean): their height is scaled by 1 - far and, after the
+// ocean, they sit shoreShift px lower for the rest of the run. Output row y samples the source row that
+// high above the horizon; past far 0.98 nothing of them remains.
+function mountShift(x, y, inv, sh) {
+  const ys = HY - Math.round((HY - y + sh) * inv);
+  return ys < 0 ? 255 : MOUNT[ys * W + x];
+}
+function mountIdx(x, y) {
+  const far = WS.far, sh = WS.shoreShift;
+  if (far <= 0 && sh === 0) return MOUNT[y * W + x];
+  if (far > 0.98) return 255;
+  return mountShift(x, y, 1 / (1 - far), sh);
+}
 function renderTop(t) {
   cloudTick();
+  const far = WS.far, sh = WS.shoreShift, shifted = far > 0 || sh > 0, gone = far > 0.98, inv = 1 / Math.max(0.02, 1 - far);
   const sx = WS.sunX, sy = WS.sunY, sr = WS.sunR;
   const glow = WS.sunGlow, hg = WS.horizGlow;
   const red = WS.sunKind === 1;
@@ -994,22 +1039,23 @@ function renderTop(t) {
     const litY = SUN0Y - y; // a corridor edge this far above the sun is sun-lit where litY < 3.2 |dx|
     for (let x = 0; x < W; x++) {
       const i = row + x;
-      const m = MOUNT[i];
-      if (m !== 255) { TOP[i] = m; continue; }
+      const m = gone ? 255 : shifted ? mountShift(x, y, inv, sh) : MOUNT[i];
+      if (m !== 255 && far <= 0) { TOP[i] = m; continue; }
       const dx = x - sx, d2 = dx * dx + dy2;
       const g = glow * (2.1 * Math.exp(-d2 * i1) + 1.2 * Math.exp(-d2 * i2)) + hb * Math.exp(-(dx * dx) / 4500);
       let bx = x + off0; if (bx >= CW) bx -= CW;
       let cp = row0 + bx, c = idx0[cp], cv = vis0;
       if (c === 255) { bx = x + off1; if (bx >= CW) bx -= CW; cp = row1 + bx; c = idx1[cp]; cv = vis1; }
+      let v = -1;
       if (c !== 255) {
-        const k = KCOR[i], v = cv[cp];
-        if (k > v) { // in the corridor a cloud pixel shows only where enough of it is left, and the cut gets a rim
-          if (k < 255 && k < v * 1.2333) c = litY < 3.2 * Math.abs(x - SUNX) ? 11 : c > 0 ? c - 1 : 0;
-          TOP[i] = ci(dith(c + g * 0.55, x, y)); continue;
+        const k = KCOR[i], vv = cv[cp];
+        if (k > vv) { // in the corridor a cloud pixel shows only where enough of it is left, and the cut gets a rim
+          if (k < 255 && k < vv * 1.2333) c = litY < 3.2 * Math.abs(x - SUNX) ? 11 : c > 0 ? c - 1 : 0;
+          v = ci(dith(c + g * 0.55, x, y));
         }
       }
-      if (sr > 0 && d2 <= srr && Math.abs(dy) <= lidH) { TOP[i] = sunPix(dx, dy, d2); continue; }
-      TOP[i] = ci(dith(base + g, x, y));
+      if (v < 0) v = sr > 0 && d2 <= srr && Math.abs(dy) <= lidH ? sunPix(dx, dy, d2) : ci(dith(base + g, x, y));
+      TOP[i] = m === 255 ? v : ci(dith(m + (v - m) * far, x, y)); // a sinking mountain blends toward the sky behind it
     }
   }
 }
@@ -1043,6 +1089,8 @@ function stampTop(s, x0, y0, alpha) {
   }
 }
 const CABIN_X = 62, CABIN_Y = HY - 12;
+// After the ocean the shore sits lower, and the cabin keeps its feet on it (never below the horizon).
+function cabinY() { return Math.min(CABIN_Y + WS.shoreShift, HY - CABIN.h); }
 function topExtras(t) {
   if (WS.starA > 0.02) {
     for (const s of STARS) {
@@ -1051,22 +1099,23 @@ function topExtras(t) {
     }
   }
   const bt = WS.frozen ? G.frozeT : t; // frozen, the wings hold too
-  for (const b of BIRDS) stampTop(BIRD[((bt * 5 + b.ph) | 0) & 1], b.x | 0, b.y | 0);
-  if (WS.cabin > 0) stampTop(CABIN, CABIN_X, CABIN_Y, WS.cabin);
+  if (WS.far < 0.5) for (const b of BIRDS) stampTop(BIRD[((bt * 5 + b.ph) | 0) & 1], b.x | 0, b.y | 0);
+  if (WS.cabin > 0 && WS.far < 0.98) stampTop(CABIN, CABIN_X, cabinY(), WS.cabin * (1 - WS.far)); // it fades with the mountains
   if (WS.farBoat > 0 && G.phase === 'title') stampTop(FARBOAT, FAR_X, HY - FARBOAT.h); // it reflects for free
   if (WS.stalk > 0) {
     const yEnd = WS.sunY - WS.sunR * 0.9;
     const y1 = yEnd * WS.stalk * (1 - WS.stalkCut);
     for (let y = 0; y < Math.min(HY, y1); y++) {
       const x = Math.round(WS.sunX + Math.sin(y * 0.04 + t * 0.9) * 0.8 * (y / Math.max(1, yEnd)));
-      if (x >= 0 && x < W && MOUNT[y * W + x] === 255) TOP[y * W + x] = 1;
+      if (x >= 0 && x < W && mountIdx(x, y) === 255) TOP[y * W + x] = 1;
     }
   }
 }
 // The sun's reflection is one pixel larger than the disc (bible, 8c). The white sun is redrawn in the
 // water with the sunPix rule at radius sr + 1 (fill and rim both a pixel further out); the red sun,
 // whose pupil must stay as mirrored, only gets a rim in its edge colour outside the disc.
-function sunRing(y, row, srow, ixr, dyS, darkF, haze) {
+function sunRing(y, row, src, ixr, dyS, darkF, haze) {
+  const srow = src * W;
   const sx = WS.sunX, sr = WS.sunR, r0 = (sr + 0.4) * (sr + 0.4), r1 = (sr + 1.4) * (sr + 1.4);
   const white = WS.sunKind === 0, fill2 = sr * sr, dy2 = dyS * dyS;
   const x0 = Math.max(0, Math.floor(sx - sr - 2 - ixr)), x1 = Math.min(W - 1, Math.ceil(sx + sr + 2 - ixr));
@@ -1074,7 +1123,7 @@ function sunRing(y, row, srow, ixr, dyS, darkF, haze) {
     const sxp = clamp(x + ixr, 0, W - 1), dx = sxp - sx, d2 = dx * dx + dy2;
     if (d2 > r1 || (!white && d2 <= r0)) continue;
     const si = srow + sxp;
-    if (MOUNT[si] !== 255 || TOP[si] >= 12) continue;
+    if (mountIdx(sxp, src) !== 255 || TOP[si] >= 12) continue;
     const v = white ? (d2 > fill2 ? 10 : 11) : 8;
     FRAME[row + x] = ci(dith(v - darkF + haze, x, y));
   }
@@ -1101,7 +1150,7 @@ function computeWater(t) {
       FRAME[row + x] = v;
     }
     const dyS = src - sy;
-    if (sr > 0 && Math.abs(dyS) <= lidH + 1) sunRing(y, row, srow, ixr, dyS, darkF, haze);
+    if (sr > 0 && Math.abs(dyS) <= lidH + 1) sunRing(y, row, src, ixr, dyS, darkF, haze);
   }
   const hr = HY * W;
   for (let x = 0; x < W; x++) { const v = FRAME[hr + x]; if (v < 12) FRAME[hr + x] = ci(v + 2); }
@@ -1133,19 +1182,78 @@ function drawRings() {
     }
   }
 }
+// One fish shadow, size 1 being the shoal's. Larger ones (the ocean, 2x to 6x) get a flared tail. a dithers
+// it away as it fades. Head toward dir.
+function drawShadowShape(sx, sy, dir, size, a) {
+  for (let k = -5 * size; k <= 4 * size; k++) {
+    const kk = k / size, tail = kk * dir < -3;
+    const hgt = tail ? (size >= 2 ? Math.round(size * 0.4 * (Math.abs(kk) - 3)) : 0) : Math.round(1.3 * size * Math.sqrt(Math.max(0, 1 - (kk / 4.6) * (kk / 4.6))));
+    for (let j = -hgt; j <= hgt; j++) {
+      const x = Math.round(sx + k), y = Math.round(sy + j);
+      if (x < 0 || x >= W || y < HY || y >= H) continue;
+      if (a < 1 && hash2(x, y, 3) > a) continue;
+      const i = y * W + x, u = FRAME[i];
+      if (u < 12) FRAME[i] = Math.max(0, u - 2);
+    }
+  }
+}
 function drawShadows() {
   if (!WS.fishShadows) return;
-  for (const s of SHAD) {
-    const dir = s.dir;
-    for (let k = -5; k <= 4; k++) {
-      const tail = k * dir < -3;
-      const hgt = tail ? 0 : Math.round(1.3 * Math.sqrt(Math.max(0, 1 - (k / 4.6) * (k / 4.6))));
-      for (let j = -hgt; j <= hgt; j++) {
-        const x = Math.round(s.x + k), y = Math.round(s.y + j);
-        if (x < 0 || x >= W || y < HY || y >= H) continue;
-        const i = y * W + x, u = FRAME[i];
-        if (u < 12) FRAME[i] = Math.max(0, u - 2);
-      }
+  for (const s of SHAD) drawShadowShape(s.x, s.y, s.dir, 1, 1);
+}
+// The ocean (bible, section 8): a dozen large shadows drifting to the horizon, then the big one.
+const OCEAN = { shad: [], big: null, tr0: 0 };
+function drawOceanShadows() {
+  for (const s of OCEAN.shad) drawShadowShape(s.x, s.y, s.dir, s.size, s.a);
+  if (OCEAN.big) drawBigShadow(OCEAN.big);
+}
+// The big one's plan shape, u along the body (head at u = -1, tail tip at u = 1), v across it, both -1..1.
+// Returns the darkness 0..1 inside, 0 outside: an elliptical body with a ridge down the middle, a pair of
+// pectoral fins, and a forked tail that flares from the root.
+function bigShape(u, v) {
+  const av = Math.abs(v);
+  if (u < 0.44) { // body, an ellipse from -1 to 0.44
+    const ub = (u + 0.28) / 0.72, q = ub * ub + v * v;
+    if (q < 1) return 0.25 + 0.75 * (1 - q);
+    const fu = Math.abs(u + 0.15); // fins root by the head
+    if (fu < 0.2 && av < 1 + 0.42 * (1 - fu / 0.2) - Math.abs(u + 0.15) * 0.8) return 0.3;
+    return 0;
+  }
+  const tt = (u - 0.44) / 0.56; // tail: flaring, forked at the tip
+  const p = lerp(0.14, 0.72, tt), notch = 0.55 * tt * tt * tt;
+  return av < p && av > notch ? 0.3 + 0.3 * (1 - av / p) : 0;
+}
+function drawBigShadow(b) {
+  const hw = b.w * 0.5, hh = b.h * 0.5;
+  const y0 = Math.max(HY, Math.floor(b.y - hh * 1.5)), y1 = Math.min(H - 1, Math.ceil(b.y + hh * 1.5));
+  for (let y = y0; y <= y1; y++) {
+    const v = (y - b.y) / hh, rip = RIPX[y], row = y * W;
+    for (let x = 0; x < W; x++) {
+      const d = bigShape(-(x + rip - b.x) / hw, v);
+      if (d <= 0) continue;
+      const i = row + x, f = FRAME[i];
+      if (f < 12) FRAME[i] = Math.max(0, f - (d > 0.7 ? 4 : d > 0.4 ? 3 : 2));
+    }
+  }
+}
+// The Swallowed circle (bible, section 8): the water inside an ellipse around the boat goes to the darkest
+// index, with a rippling edge a shade lighter. In the water only, never reflected.
+const SWALLOW_CY = WL + 6;
+function drawSwallow(t) {
+  const r = WS.swallow;
+  if (r <= 0.5) return;
+  const cx = W / 2, cy = SWALLOW_CY, ry = r * 0.45;
+  const y0 = Math.max(HY, Math.floor(cy - ry - 4)), y1 = Math.min(H - 1, Math.ceil(cy + ry + 4));
+  for (let y = y0; y <= y1; y++) {
+    const dy = (y - cy) / 0.45, rip = RIPX[y], row = y * W;
+    const x0 = Math.max(0, Math.floor(cx - r - 4)), x1 = Math.min(W - 1, Math.ceil(cx + r + 4));
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + rip - cx, d = Math.sqrt(dx * dx + dy * dy);
+      if (d > r + 3) continue;
+      const edge = r + Math.sin(Math.atan2(dy, dx) * 9 + t * 6) * 1.6 + (hash2(x, y, (t * 8) | 0) - 0.5) * 1.5;
+      const i = row + x;
+      if (d < edge - 1.5) FRAME[i] = 0;
+      else if (d < edge && FRAME[i] < 12) FRAME[i] = Math.min(FRAME[i], 2);
     }
   }
 }
@@ -1218,10 +1326,22 @@ function drawRod(hx, hy, wl) {
   }
   G.tip = { x: tx, y: ty };
 }
+// While far > 0 the boat's centre slides toward the middle of the screen; past 0.5 it is a silhouette
+// (half, quarter, then a speck) with the rod, line, float and lantern hidden (bible, Ocean).
+const boatCentreX = far => lerp(BOAT_X + WS.boatX + BOAT.w / 2, W / 2, far);
+function farBoatSprite(far) { return far <= 0.75 ? BOAT_FAR2 : far <= 0.92 ? BOAT_FAR4 : BOAT_SPECK; }
+function drawFarBoat(t, far) {
+  const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2), dy = bob + Math.round(WS.boatDrop);
+  const s = farBoatSprite(far), x0 = Math.round(boatCentreX(far) - s.w / 2), y0 = WL - s.wl + dy;
+  stampR(s, x0, y0, WL);
+  G.tip = { x: x0 + s.w / 2, y: y0 }; // a cast from out here leaves from the silhouette itself
+}
 function drawBoatGroup(t) {
+  const far = WS.far;
+  if (far > 0.5) { drawFarBoat(t, far); return; }
   const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2);
   const sink = Math.round(WS.boatSink);
-  const bx = Math.round(BOAT_X + WS.boatX);
+  const bx = Math.round(boatCentreX(far) - BOAT.w / 2);
   const dy = sink + bob;
   stampR(BOAT, bx, WL - BOAT.wl + dy, WL);
   const lpx = bx + 9, ltop = WL - 27 + dy;
@@ -1285,13 +1405,14 @@ function drawLine() {
 }
 function drawGoldFish(t) {
   const g = WS.goldFish;
-  if (!g || g.a <= 0.01) return;
+  const a = g ? g.a * clamp(1 - (WS.far - 0.3) / 0.3, 0, 1) : 0; // out on the ocean it is out of sight too
+  if (!g || a <= 0.01) return;
   const L = DLG.cur;
   const talking = L && L.text && DLG.n < L.text.length && /fish/i.test(L.who || '') && ((t * 10) | 0) & 1;
   const s = talking ? GOLD_OPEN : GOLD;
   const x0 = Math.round(g.x), y0 = Math.round(g.y + Math.sin(t * 2.1) * 1.5);
-  stampR(s, x0, y0, g.surf, g.a);
-  if (g.a > 0.6 && Math.random() < 0.25) sparkle(x0 + Math.random() * s.w, y0 + Math.random() * s.h);
+  stampR(s, x0, y0, g.surf, a);
+  if (a > 0.6 && Math.random() < 0.25) sparkle(x0 + Math.random() * s.w, y0 + Math.random() * s.h);
 }
 function drawLanding() {
   if (G.phase !== 'landing' || !G.land) return;
@@ -1321,8 +1442,8 @@ function composite() {
     const msrc = 2 * HY - 1 - yb;
     for (let x = 0; x < W; x++) {
       let v = 19, tooth = false;
-      const ta = hasA && MOUNT[ya * W + x] !== 255;
-      const tb = hasB && msrc >= 0 && msrc < HY && MOUNT[msrc * W + x] !== 255;
+      const ta = hasA && mountIdx(x, ya) !== 255; // the jaws close from the shifted shore (bible, 8c)
+      const tb = hasB && msrc >= 0 && msrc < HY && mountIdx(x, msrc) !== 255;
       const sp = yb >= 0 && yb < H ? SPR[yb * W + x] : 255;
       if (ta) { v = FRAME[ya * W + x]; tooth = true; }
       else if (sp !== 255) v = sp;
@@ -1421,10 +1542,11 @@ function applyGlows(t) {
     glowTint(lx, ly - s, 18, 17, 0.8 * fl);
     glowTint(lx, 2 * WL - 1 - ly - s, 12, 17, 0.45 * fl);
   }
-  if (WS.cabin > 0.4) {
-    const wx = CABIN_X + 2.5, wy = CABIN_Y + 7;
-    glowTint(wx, wy - s, 7, 17, 0.55 * WS.cabin);
-    glowTint(wx, 2 * HY - 1 - wy - s, 5, 17, 0.35 * WS.cabin);
+  const cab = WS.cabin * (1 - WS.far);
+  if (cab > 0.4) {
+    const wx = CABIN_X + 2.5, wy = cabinY() + 7;
+    glowTint(wx, wy - s, 7, 17, 0.55 * cab);
+    glowTint(wx, 2 * HY - 1 - wy - s, 5, 17, 0.35 * cab);
   }
 }
 function render(t) {
@@ -1434,6 +1556,8 @@ function render(t) {
   computeWater(t);
   drawRings();
   drawShadows();
+  drawOceanShadows();
+  drawSwallow(t);
   drawEyes();
   SPR.fill(255);
   drawBoatGroup(t);
@@ -1441,7 +1565,7 @@ function render(t) {
   drawGoldFish(t);
   drawLanding();
   drawParts(t);
-  drawLine();
+  if (WS.far <= 0.5 || G.bob) drawLine(); // far out there is no rod; a float in the water still trails its line
   composite();
   drawFangs();
   drawUIPix(t);
@@ -1814,12 +1938,6 @@ const GRANT1 = {
     fish('Someone. Nobody asks who.'),
     fish('If they ask you anything, don’t answer.'),
   ],
-  fish: () => [
-    fish('Where the fish are. I know a spot. Hold on.'),
-    { act: () => { WS.fishShadows = 1; spawnShadows(); SFX.chime(); } }, // the ocean cutscene is a later phase
-    { pause: 1.2 },
-    fish('Look how they all go the same way.'),
-  ],
   home: () => [
     { act: () => { tween(WS, 'cabin', 1, 2.2); SFX.chime(); } },
     fish('A home on the shore. One has just come free.'),
@@ -1827,19 +1945,110 @@ const GRANT1 = {
   ],
 };
 // The cost: the sun starts dropping as the first cost line begins. No caption; the drop is the sentence.
+const costLines = () => [
+  { act: sunDrop },
+  fish('A wish costs a little daylight. You said you could watch that sun forever.'),
+  fish('You’ll get to.'),
+  { act: goldenDive },
+  { pause: 0.8 },
+];
+function afterGrant1() { startAct(1); setPhase('ready'); }
 function grant1(w) {
   STORY.wishes.push(w); STORY.firstAsk = w;
-  dlgRun(GRANT1[w]().concat([
-    { act: sunDrop },
-    fish('A wish costs a little daylight. You said you could watch that sun forever.'),
-    fish('You’ll get to.'),
-    { act: goldenDive },
-    { pause: 0.8 },
-  ]), () => {
-    startAct(1);
-    setPhase('ready');
-  });
+  if (w === 'fish') { dlgRun([fish('Where the fish are. I know a spot. Hold on.')], () => playCine(CINE_OCEAN, oceanTold)); return; }
+  dlgRun(GRANT1[w]().concat(costLines()), afterGrant1);
 }
+
+// -- the ocean (bible, sections 4 and 8). The shore sinks into haze, the boat shrinks to a speck on a vast
+// lit sea, huge shadows drift to the horizon, and one the width of the screen stops under the boat.
+const OCEAN_FAR_DUR = 6, OCEAN_BIG_T = 10, OCEAN_WINDOW = 12, OCEAN_RETURN = 4, SHORE_SHIFT = 10, SWALLOW_R = 130;
+function spawnOceanShadow(size) {
+  const fromLeft = Math.random() < 0.5;
+  const s = { x: fromLeft ? -20 - Math.random() * 30 : W + 20 + Math.random() * 30, y: HY + 30 + Math.random() * (H - HY - 50), size, a: 1, fade: 0 };
+  s.vx = (fromLeft ? 1 : -1) * (5 + Math.random() * 6); s.vy = -(1.5 + Math.random() * 2.5);
+  s.dir = s.vx >= 0 ? 1 : -1;
+  OCEAN.shad.push(s);
+}
+const bigRestY = () => HY + 16 + (H - HY) / 6; // its back just under the surface, the fins clear of the horizon
+function bigRise() {
+  const h = (H - HY) / 3;
+  OCEAN.big = { x: W / 2, y: H + h, w: W, h };
+  tween(OCEAN.big, 'y', bigRestY(), 2.6, E.out);
+}
+function scatterOcean() {
+  for (const s of OCEAN.shad) {
+    const dx = s.x - W / 2, dy = s.y - bigRestY(), n = Math.hypot(dx, dy) || 1;
+    s.vx = (dx / n) * 70; s.vy = (dy / n) * 25 - 6; s.fade = 2; s.dir = s.vx >= 0 ? 1 : -1;
+  }
+}
+function updOcean(dt) {
+  for (let k = OCEAN.shad.length - 1; k >= 0; k--) {
+    const s = OCEAN.shad[k];
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    if (s.fade > 0) { s.a -= dt / s.fade; if (s.a <= 0) { OCEAN.shad.splice(k, 1); continue; } }
+    if (s.y < HY + 4 + s.size * 2) { s.y = H - 10; s.x = Math.random() * W; }
+    if (s.x < -60 || s.x > W + 60) s.vx = -s.vx, s.dir = -s.dir;
+  }
+  if (G.phase === 'ocean' && G.pt >= OCEAN_WINDOW) oceanLeave();
+}
+const CINE_OCEAN = {
+  dur: 13.5,
+  init(s) {
+    OCEAN.tr0 = WS.troubled; OCEAN.shad.length = 0; OCEAN.big = null;
+    tween(WS, 'far', 1, OCEAN_FAR_DUR, E.io); tween(WS, 'troubled', 0.15, 2);
+    s.next = 2.5; s.n = 0;
+  },
+  update(t, dt, at, s) {
+    at('snd', 0, () => SFX.swell());
+    if (s.n < 12 && t >= s.next) { s.next += 0.55; s.n++; spawnOceanShadow(2 + Math.round((s.n / 12) * 4)); }
+    at('big', OCEAN_BIG_T, () => { bigRise(); scatterOcean(); SFX.rumble(); });
+  },
+};
+function oceanTold() { dlgRun([fish('Told you.')], () => setPhase('ocean')); }
+// The choice is made by input: a cast while the big one is under the boat is the Swallowed ending; waiting the
+// window out lets it leave. Skip fish counts as a cast here.
+function oceanCast() {
+  STORY.ocean = 'swallowed';
+  playCine(CINE_SWALLOW, () => showEnding('swallowed'));
+}
+const CINE_SWALLOW = {
+  dur: 7.6,
+  init(s) {
+    const b = OCEAN.big;
+    s.from = { x: W / 2, y: WL - 2 }; s.to = { x: W / 2 + 16, y: b ? b.y - b.h * 0.1 : HY + 30 };
+    G.bob = { x: s.from.x, y: s.from.y, fly: true };
+    SFX.whoosh();
+  },
+  update(t, dt, at, s) {
+    if (t < 0.7) { const k = t / 0.7; G.bob = { x: lerp(s.from.x, s.to.x, k), y: lerp(s.from.y, s.to.y, k) - Math.sin(k * Math.PI) * 14, fly: true }; }
+    at('land', 0.7, () => { G.bob = { x: s.to.x, y: s.to.y, fly: false }; ring(s.to.x, s.to.y + 1); SFX.plop(); });
+    at('cap', 1.1, () => cap('The float lands on something that is not water.', 3.2));
+    at('open', 1.6, () => { tween(WS, 'swallow', SWALLOW_R, 4, E.in); SFX.rumble(); });
+    at('float', 3.7, () => { G.bob = null; }); // the opening has reached the float
+    at('drop', 4.6, () => tween(WS, 'boatDrop', 24, 1.1, E.in));
+    at('black', 7.1, () => { SFX.crunch(); UI.fade(1, 0.25); });
+  },
+};
+function oceanLeave() {
+  STORY.ocean = 'waited';
+  playCine(CINE_OCEAN_BACK, () => dlgRun([fish('Look how they all go the same way.')].concat(costLines()), afterGrant1));
+}
+// The big one slides off left over 4 s, then the boat and the mountains come back over 4 s, the shore landing
+// SHORE_SHIFT px closer to the horizon for the rest of the run. The shoal stays. No caption about it.
+const CINE_OCEAN_BACK = {
+  dur: OCEAN_RETURN * 2 + 0.6,
+  init() {
+    const b = OCEAN.big;
+    if (b) tween(b, 'x', -b.w * 0.65, OCEAN_RETURN, E.in, () => { if (OCEAN.big === b) OCEAN.big = null; });
+  },
+  update(t, dt, at) {
+    at('back', OCEAN_RETURN, () => {
+      WS.shoreShift = SHORE_SHIFT; OCEAN.shad.length = 0;
+      tween(WS, 'far', 0, OCEAN_RETURN, E.io); tween(WS, 'troubled', OCEAN.tr0, OCEAN_RETURN);
+      WS.fishShadows = 1; spawnShadows();
+    });
+  },
+};
 // The sun drops in two visible steps, about 16 px over 5 s, and the water grows a little troubled.
 const SUN_STEP = 8;
 function sunDrop() {
@@ -2049,6 +2258,7 @@ function saveRun(id) {
 // line has to outrank the wish sentence to ever show) > the most relevant wish (order per ending) > refused twice.
 function endingVariant(id) {
   const v = END_VARIANTS[id];
+  if (!v) return ''; // Swallowed has no variant sentence (bible, Ending cards)
   if (STORY.kept) return v.kept;
   if (v.refused1 && STORY.refused === 1) return v.refused1;
   for (const w of v.order) if (has(w)) return v.lines[w];
@@ -2078,7 +2288,7 @@ function showEnding(id, variant) {
 
 // ---------------------------------------------------------------- fishing
 function promptFor(p) {
-  if (p === 'ready') return 'Tap to cast';
+  if (p === 'ready' || p === 'ocean') return 'Tap to cast';
   if (p === 'waiting' && G.tutorial < 2) return 'Wait for the float to dip';
   if (p === 'bite') return 'Tap now!';
   if (p === 'reeling') return G.tutorial < 3 ? 'Hold to reel. Let go when it pulls hard.' : 'Hold to reel';
@@ -2330,6 +2540,7 @@ function press() {
   const p = G.phase;
   if (p === 'title') startGame();
   else if (p === 'ready') { if (G.arrived) cast(); } // no cast until the boat has rowed in
+  else if (p === 'ocean') oceanCast();
   else if (p === 'waiting') lose(STORY.goldenNext ? 'Too early.' : 'Too early. Nothing was biting yet.');
   else if (p === 'bite') hook();
   else if (p === 'reeling') G.holding = true;
@@ -2354,6 +2565,7 @@ function testCatch() {
   const p = G.phase;
   if (p === 'title') { startGame(); return; }
   if (p === 'card') { closeCard(); return; }
+  if (p === 'ocean') { oceanCast(); return; } // a skip is a cast into the big one; it never bypasses the choice
   if (p === 'ready' && !G.arrived) return; // no skip before the boat has rowed in either
   if (p !== 'ready' && p !== 'casting' && p !== 'waiting' && p !== 'bite' && p !== 'reeling' && p !== 'lost') return;
   G.cast = null; G.wait = null; G.holding = false; G.bobDip = 0;
@@ -2394,6 +2606,7 @@ function resetAll() {
   loadRun();
   Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, saidUntil: 0, saidPending: [], arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0 });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
+  OCEAN.shad.length = 0; OCEAN.big = null; OCEAN.tr0 = 0;
   cloudT = 0; genEyes();
   WS.farBoat = RUN.count > 0 || loadEndings().length > 0 || sessionEndings.length > 0 ? 1 : 0; // bible, Title
   CINE = null;
@@ -2423,7 +2636,7 @@ function update(dt) {
   eyesUpdate();
   if (!WS.frozen) cloudT += dt;
   dlgUpdate(dt);
-  updParts(dt); updRings(dt); updAsh(dt); updShadows(dt); updBirds(dt); updJumps(dt);
+  updParts(dt); updRings(dt); updAsh(dt); updShadows(dt); updOcean(dt); updBirds(dt); updJumps(dt);
   ambientUpdate(dt);
 }
 function init() {
@@ -2621,6 +2834,7 @@ if (IS_BROWSER) {
     setH(h) { H = h; alloc(); },
     get H() { return H; }, W, HY,
     spawnShadows, SHAD, spawnBirds, BIRDS, RUN, ENDING_COUNT,
+    OCEAN, spawnOceanShadow, bigRise, bigRestY, untween,
     setCloudT(v) { cloudT = v; },
   };
 }

@@ -47,3 +47,10 @@ if (which === 'all' || which === 'eyes') shot('out_eyes.png', (ws) => { night(ws
 if (which === 'all' || which === 'clouds_night') shot('out_clouds_night.png', (ws) => { night(ws); ws.companion = 0; ws.lantern = 0; }, 20); // the cumulus at night, drifted
 if (which === 'all' || which === 'clouds_red') shot('out_clouds_red.png', (ws) => { ws.mood = 2; ws.sunKind = 1; ws.sunR = 16; ws.sunY = 178; ws.sunGlow = 1.25; ws.horizGlow = 1.3; ws.pupil = 1; ws.ash = 1; ws.troubled = 0.55; }, 20); // the cumulus in the red
 if (which === 'all' || which === 'title_far') shot('out_title_far.png', (ws) => { ws.farBoat = 1; }, 3.3);
+
+// Phase 3, the ocean. The big one at rest under the speck; the sea mid-swallow; the shore returned closer.
+const ocean = ws => { ws.far = 1; ws.troubled = 0.15; g.setPhase('ocean'); g.bigRise(); g.untween(g.OCEAN.big, 'y'); g.OCEAN.big.y = g.bigRestY(); };
+if (which === 'all' || which === 'ocean') shot('out_ocean.png', (ws) => { ocean(ws); }, 6);
+if (which === 'all' || which === 'ocean_mid') shot('out_ocean_mid.png', (ws) => { ws.far = 0.6; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.x = 20 + k * 26; s.y = g.HY + 30 + ((k * 37) % 90); } }, 6);
+if (which === 'all' || which === 'swallow') shot('out_swallow.png', (ws, G) => { ocean(ws); ws.swallow = 60; G.bob = { x: g.W / 2 + 16, y: g.bigRestY() - 4, fly: false }; g.setPhase('cine'); }, 6.5);
+if (which === 'all' || which === 'shore') shot('out_shore.png', (ws) => { ws.shoreShift = 10; ws.fishShadows = 1; g.spawnShadows(); ws.troubled = 0.22; ws.sunY = 172 + 16; }, 3.3);

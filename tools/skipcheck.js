@@ -49,6 +49,25 @@ const ending = g.UI.log.filter(l => l[0] === 'ending').map(l => l[1].title);
 console.log(`ending=${ending.join(',')} catches=${g.STORY.catches} wishes=${g.STORY.wishes.join(',')} simulated=${t.toFixed(0)}s real=${Date.now() - t0}ms`);
 if (g.STORY.catches !== 6) fail('expected 6 catches over the run, got ' + g.STORY.catches);
 
+// 3b. During the ocean window a skip acts as a cast into the big one, so the choice is never bypassed.
+g.resetAll(); g.press(); g.release(); tick(3);
+const oplan = [0, 1]; // let go, fish
+ci = 0; last = -1; t = 0;
+let sawOcean = false;
+while (g.phase !== 'end' && t < 200) {
+  const p = g.phase;
+  if (p === 'ocean') sawOcean = true;
+  if (t - last > 0.2) {
+    if (p === 'ready' || p === 'card' || p === 'lost' || p === 'ocean') g.testCatch();
+    else if (p === 'dialog') { if (g.UI.choices) g.UI.choices[oplan[ci++] || 0].cb(); else { g.press(); g.release(); } }
+    last = t;
+  }
+  tick(1); t += dt;
+}
+if (!sawOcean) fail('the fish wish never reached the ocean window');
+const oend = g.UI.log.filter(l => l[0] === 'ending').map(l => l[1].id);
+if (g.phase !== 'end' || oend[oend.length - 1] !== 'swallowed') fail('a skip in the ocean window should cast into the big one, got ' + g.phase + ' ' + oend.join(','));
+
 // 4. Turning test mode off again hides the skip and stops the shortcut.
 g.setTestMode(false);
 g.resetAll(); g.press(); g.release(); tick(3);
