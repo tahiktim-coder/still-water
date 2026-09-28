@@ -601,19 +601,40 @@ const COMP_TURN = sprite([
   '000000000',
   '.0000000.',
 ]);
-const COMP_FACE = sprite([
+const COMP_STAND = sprite([
   '...000...',
   '..00000..',
-  '.1110000.',
-  '.L1L0000.',
-  '.1110000.',
+  '.0011100.',
+  '.01X1X10.',
+  '.0011100.',
+  '..00000..',
+  '...000...',
   '..00000..',
   '.0000000.',
-  '.00000000',
-  '000000000',
-  '000000000',
   '.0000000.',
+  '00.000.00',
+  '00.000.00',
+  '...000...',
+  '...000...',
+  '...0.0...',
+  '...0.0...',
+  '..00.00..',
 ]);
+const COMP_LEAP = sprite([
+  '.....000....',
+  '....00000...',
+  '0...00000...',
+  '00...000....',
+  '.00.00000...',
+  '..000000000.',
+  '...00000.000',
+  '....0000..00',
+  '.....00....0',
+  '....00......',
+  '....0.......',
+  '...0........',
+]);
+const LEAP_ARC = 30; // how high the parabola rises above the straight line from the seat to the disc
 const BIRD = [sprite(['1...1', '.1.1.', '..1..']), sprite(['.....', '11.11', '..1..'])];
 const EXCL = sprite(['.1.', '1b1', '1b1', '1b1', '.1.', '1b1', '.1.']);
 const ICON = sprite(['.bbb.b', 'bbbbbb', '.bbb.b']);
@@ -830,7 +851,7 @@ const ENDINGS = {
   dark: { title: 'Dark', text: 'You sit with the lantern until it gutters out. Sometimes something takes the bait. You never reel it in.' },
   cut: { title: 'Still water', text: 'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.' },
   swallowed: { title: 'Swallowed', text: 'You asked to be taken where the fish are. Somewhere far above, the sun is still shining on a lake with no boat on it.' },
-  stay: { title: 'Stay', text: 'You stay. He never says who he is and you never ask. The light on the shore is warm. The sun does not come up, and after a while you stop minding.' },
+  stay: { title: 'Stay', text: 'You stay. He took the sun down with him and did not come back up. The seat behind you is empty again. It does not get light, and after a while you stop minding.' },
   deep: { title: 'Deep', text: 'The gold is where you left it. So is everything else. The water is warmer than you thought, and full of light, and there is no bottom.' },
 };
 const SILENT_TEXT = 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.';
@@ -875,7 +896,6 @@ const END_VARIANTS = {
       hear: 'You can still hear them from the shore. You stop listening.',
     },
   },
-  stay: { order: ['home'], lines: { home: 'It was your cabin all along.' } },
   deep: { kept: 'The golden fish goes down with you. It knows the way.', order: [], lines: {} },
 };
 const WISH_LABELS = {
@@ -896,7 +916,7 @@ function resetWS() {
     lineCut: false, goldFish: null,
     goldKept: 0, boatSunk: 0, frozen: 0, far: 0, sea: 0, eyes: 0, farBoat: 0,
     swallow: 0, boatDrop: 0,
-    companionFace: 0, lanternWarm: 0,
+    companionStand: 0, leap: 0, rock: 0, lanternWarm: 0,
     dive: 0, glint: 0,
     shoalOut: 0, // the still-water dawn: the shoal steers to the horizon at full weight and leaves as it arrives
   });
@@ -1367,7 +1387,7 @@ function drawFarBoat(t, far) {
   stampR(s, x0, y0, WL);
   G.tip = { x: x0 + s.w / 2, y: y0 }; // a cast from out here leaves from the silhouette itself
 }
-function compSprite() { return WS.companionFace > 0.5 ? COMP_FACE : WS.companionTurn > 0.5 ? COMP_TURN : COMP; }
+function compSprite() { return WS.companionStand > 0.5 ? COMP_STAND : WS.companionTurn > 0.5 ? COMP_TURN : COMP; }
 function boatLeft() { return Math.round(boatCentreX(WS.far) - BOAT.w / 2); }
 const SINK_PX = 28, SWIM_AT = 0.6, FISHER_FLOAT = 10, COMP_FLOAT = 7;
 const FISHER_DY = -24, LANTERN_DY = -25;
@@ -1425,14 +1445,24 @@ function drawBoatGroup(t) {
   const far = WS.far;
   if (far > 0.5) { drawFarBoat(t, far); return; }
   if (WS.dive > 0) { drawSwimmerBeneath(); return; }
-  const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2);
+  const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2) + rockPx(t);
   const bx = boatLeft(), dy = boatSinkPx() + bob;
   stampR(BOAT, bx, WL - BOAT.wl + dy, WL);
   drawLantern(t, bx, dy);
   if (WS.gold > 0) drawGoldPile(bx, dy);
   drawKeptFish(t, bx, dy);
-  if (WS.companion > 0) stampR(compSprite(), bx + COMP_DX, compY(dy) + swimBob(t, 2.6), WL, WS.companion);
+  if (WS.companion > 0) drawCompanion(t, bx, dy);
   drawFisherman(t, bx, dy);
+}
+const rockPx = t => Math.round(Math.sin(t * 15) * WS.rock * 1.6);
+const seatTop = (s, dy) => compY(dy) - (s.h - COMP.h);
+function drawCompanion(t, bx, dy) {
+  if (WS.leap <= 0) { stampR(compSprite(), bx + COMP_DX, seatTop(compSprite(), dy) + swimBob(t, 2.6), WL, WS.companion); return; }
+  const p = WS.leap, s = COMP_LEAP;
+  const x0 = bx + COMP_DX - 2, y0 = seatTop(s, dy);
+  const x1 = WS.sunX - s.w / 2, y1 = WS.sunY - s.h / 2 + 1;
+  const x = lerp(x0, x1, p), y = lerp(y0, y1, p) - LEAP_ARC * 4 * p * (1 - p);
+  stampR(s, Math.round(x), Math.round(y), Math.round(lerp(WL, HY, p)));
 }
 function drawBobber() {
   const b = G.bob;
@@ -1933,16 +1963,43 @@ const CINE_DARK = {
     at('fade', 8.3, () => UI.fade(1, 1));
   },
 };
-const STAY_DRIFT_CABIN = -56, STAY_DRIFT_SHORE = -76;
+const STAY_LOOK = 7;                    // pupilDx toward the stern, which is to the right of the disc
+const STAY_LEAP_AT = 2, STAY_LEAP_DUR = 1.6, STAY_HIT = STAY_LEAP_AT + STAY_LEAP_DUR;
+const STAY_DROP = 1.5, STAY_UNDER = STAY_HIT + STAY_DROP, STAY_NIGHT = 5, STAY_FADE_AT = 13;
+function stayPushOff() {
+  WS.companionStand = 0; WS.rock = 1; tween(WS, 'rock', 0, 1.2);
+  const x = boatLeft() + COMP_DX + 4;
+  ring(x, WL + 1); ring(x + 3, WL + 2); SFX.plop();
+}
+function stayImpact() { WS.sunGlow = 2.4; WS.pupil = 0; SFX.crunch(); }
+function stayDiscHitsWater() { SFX.hiss(2.2); ring(SUNX, HY + 3, true); ring(SUNX, HY + 3); splash(SUNX, HY + 2, 10); SFX.drone(false); }
+function stayGoneUnder() { WS.companion = 0; WS.leap = 0; }
 const CINE_STAY = {
-  dur: 14,
-  init(s) { s.x0 = WS.boatX; s.to = WS.cabin > 0 ? STAY_DRIFT_CABIN : STAY_DRIFT_SHORE; },
+  dur: 16,
+  init(s) {
+    s.y0 = WS.sunY;
+    WS.companionStand = 1;
+    tween(WS, 'pupilDx', STAY_LOOK, 0.4);
+    G.hbGap = HB_GAP * 0.45; G.hb = Math.min(G.hb, 0.4); // the heartbeat quickens
+  },
   update(t, dt, at, s) {
-    at('face', 0.4, () => { WS.companionTurn = 1; WS.companionFace = 1; tween(WS, 'pupilDx', 0, 1.5); });
-    WS.boatX = lerp(s.x0, s.to, E.io(clamp((t - 0.6) / 8, 0, 1)));
-    WS.lanternWarm = clamp((t - 1) / 7, 0, 1);
-    G.hbGap = t < 9 ? HB_GAP + t * 0.45 : 1e9; // the heartbeat slows, then stops
-    at('fade', 11, () => UI.fade(1, 3));
+    at('leap', STAY_LEAP_AT, stayPushOff);
+    if (t >= STAY_LEAP_AT && WS.companion > 0) WS.leap = clamp((t - STAY_LEAP_AT) / STAY_LEAP_DUR, 0, 1);
+    at('hit', STAY_HIT, stayImpact);
+    at('unspike', STAY_HIT + 0.07, () => { WS.sunGlow = 1.25; }); // the spike lasts two frames
+    if (t >= STAY_HIT) {
+      WS.sunY = lerp(s.y0, HY + 28, E.in(clamp((t - STAY_HIT) / STAY_DROP, 0, 1)));
+      WS.stalkCut = clamp((t - STAY_HIT) / 0.7, 0, 1);
+    }
+    at('hiss', STAY_HIT + 1.3, stayDiscHitsWater);
+    at('under', STAY_UNDER, stayGoneUnder);
+    if (t > STAY_HIT + 0.1) WS.sunGlow = lerp(1.25, 0.12, clamp((t - STAY_HIT - 0.1) / 2.5, 0, 1));
+    const k = clamp((t - STAY_UNDER) / STAY_NIGHT, 0, 1);
+    if (k > 0) {
+      WS.mood = lerp(2, 1, k); WS.starA = k; WS.ash = 1 - k;
+      WS.horizGlow = lerp(1.3, 0.3, k); WS.lanternWarm = 0.6 * k;
+    }
+    at('fade', STAY_FADE_AT, () => UI.fade(1, 3));
   },
 };
 function goldFishDrop() {
@@ -2402,8 +2459,9 @@ function endCut() {
 }
 function endStay() {
   dlgRun([
-    comp('Then stay.'),
-    red('Someone to sit with you. It’s what you asked for.'),
+    red('Stay with them. Two wishes, one seat.'),
+    comp('He said he’d stay with me.'),
+    red('He said a lot of things.'),
   ], () => playCine(CINE_STAY, () => showEnding('stay')));
 }
 function endDeep() {

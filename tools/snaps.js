@@ -21,12 +21,13 @@ function play(plan, prefix, offsets, opts) {
   opts = opts || {};
   g.resetAll();
   const UI = g.UI;
-  let t = 0, ci = 0, lastAct = 0, holding = false, tFinal = -1, redT = -1;
+  let t = 0, ci = 0, lastAct = 0, holding = false, tFinal = -1, redT = -1, cineT = -1;
   const dt = 1 / 30, shots = offsets.slice();
   while (t < 900 && g.phase !== 'end') {
     const p = g.phase;
     if (t - lastAct > 0.25) {
-      if (p === 'title' || p === 'ready' || p === 'card') { g.press(); g.release(); lastAct = t; }
+      if (g.G.t < g.G.thinkUntil) { g.press(); g.release(); lastAct = t; } // a waiting bubble over play is dismissed first (bible, 4b), as in the sim
+      else if (p === 'title' || p === 'ready' || p === 'card') { g.press(); g.release(); lastAct = t; }
       else if (p === 'ocean') { if (!opts.wait) { g.press(); g.release(); } lastAct = t; }
       else if (p === 'bite') { g.press(); holding = true; lastAct = t; }
       else if (p === 'dialog') {
@@ -39,9 +40,11 @@ function play(plan, prefix, offsets, opts) {
       else if (!holding && g.G.reel.T < 0.3) { g.press(); holding = true; }
     }
     if (redT < 0 && g.WS.sunKind === 1) redT = t;
+    if (cineT < 0 && tFinal >= 0 && p === 'cine') cineT = t; // the ending cinematic itself, after the last lines
     g.update(dt);
     t += dt;
-    const ref = shots.length && shots[0][2] === 'red' ? redT : tFinal;
+    const kind = shots.length ? shots[0][2] : '';
+    const ref = kind === 'red' ? redT : kind === 'cine' ? cineT : tFinal; // timed from the red rise, the ending cinematic's start, or the wish 3 choice
     if (shots.length && ref >= 0 && t - ref >= shots[0][0]) { g.render(t); write(prefix + shots[0][1] + '.png'); shots.shift(); }
   }
 }
@@ -55,4 +58,7 @@ play([0, 2, 2, 3], 'e_', [[5, 'deepmid'], [11, 'deep']]); // the descent: the ho
 // dawn on a sunk run (the swimmer, swimming out).
 play([0, 1, 0, 0], 'e_', [[3.5, 'jaw_sea']], { wait: true });
 play([0, 2, 2, 2], 'e_', [[13.5, 'cutswim'], [18, 'cutdawn_swim']]);
+// Phase 14, Stay, timed from the cinematic's start: mid-leap, the impact frame (the glow spike, the eye closed),
+// mid-drop with him riding the disc down, and the night boat alone with the lantern once the disc and the companion are gone.
+play([0, 0, 0, 0, 0, 3], 'e_', [[2.8, 'stay_leap', 'cine'], [3.6, 'stay_hit', 'cine'], [4.7, 'stay_fall', 'cine'], [12, 'stay_after', 'cine']]);
 console.log('wrote tools/out/e_*.png');

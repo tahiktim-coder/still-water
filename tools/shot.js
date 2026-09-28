@@ -57,10 +57,10 @@ if (which === 'all' || which === 'ocean_enter') shot('out_ocean_enter.png', (ws)
 if (which === 'all' || which === 'bait') shot('out_bait.png', (ws, G) => { g.setPhase('waiting'); G.wait = { t: 0, nib: [], bite: 99 }; G.bob = { x: 70, y: 280, fly: false }; }, 3.3);
 if (which === 'all' || which === 'ocean_mid') shot('out_ocean_mid.png', (ws) => { ws.far = 0.6; ws.sea = 0.6; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.x = 20 + k * 26; s.y = g.HY + 30 + ((k * 37) % 90); } }, 6);
 if (which === 'all' || which === 'swallow') shot('out_swallow.png', (ws, G) => { ocean(ws); ws.swallow = 60; G.bob = { x: g.W / 2 + 16, y: g.bigRestY() - 4, fly: false }; g.setPhase('cine'); }, 6.5);
-// Phase 4, Stay: mid drift toward the left shore (company excludes a cabin), the companion facing the fisherman,
-// the lantern glow warmed, the line still taut to the red sun.
+// Phase 14, Stay: the companion standing at his seat under the red sun, the eye snapped toward him, the line
+// still taut, before the leap.
 const redSky = ws => { ws.mood = 2; ws.sunKind = 1; ws.sunR = 16; ws.sunY = 178; ws.sunGlow = 1.25; ws.horizGlow = 1.3; ws.pupil = 1; ws.stalk = 1; ws.ash = 1; ws.lantern = 1; ws.troubled = 0.55; };
-if (which === 'all' || which === 'stay') shot('out_stay.png', (ws, G) => { redSky(ws); ws.companion = 1; ws.companionTurn = 1; ws.companionFace = 1; ws.boatX = -40; ws.lanternWarm = 0.7; G.bob = { x: 101, y: g.HY + 5, taut: true }; g.setPhase('cine'); }, 7);
+if (which === 'all' || which === 'stay') shot('out_stay.png', (ws, G) => { redSky(ws); ws.companion = 1; ws.companionTurn = 1; ws.companionStand = 1; ws.pupilDx = 7; G.bob = { x: 101, y: g.HY + 5, taut: true }; g.setPhase('cine'); }, 7);
 // Phase 9, the open sea: sea 1 for the rest of a fish-wish run, the boat back at full size on an empty horizon,
 // the giant shapes still passing beneath, by day (after the cost drop), at night and in the red.
 const sea = ws => { ws.sea = 1; ws.fishShadows = 1; g.spawnShadows(); g.spawnSeaShoal(); g.OCEAN.shad.forEach((s, k) => { s.x = 30 + k * 40; s.y = g.HY + 24 + ((k * 53) % 110); }); };

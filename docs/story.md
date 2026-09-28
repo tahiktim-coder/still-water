@@ -17,7 +17,7 @@ Each wish quietly borrows a figure from Slavic water lore, never named: Pushkin'
 
 The player must see this chain, so it is said three times in plain words. It starts with the bait:
 
-0. The fisherman was given a bait by a stranger who called it cursed or blessed and laughed. He casts it with a throwaway thought, `Something interesting, for once.` The bait takes wishes literally: the golden fish surfaces and its second line is `Something interesting, you said. Here I am.` From then on everything he thinks near that bait is an order.
+0. The fisherman was given a bait by a stranger who called it cursed or blessed. It has an eye, as lures do. He casts it with a throwaway thought, `Something interesting, for once.` The bait takes wishes literally: the golden fish surfaces and its second line is `Something interesting, you said. Here I am.` From then on everything he thinks near that bait is an order.
 1. The fisherman, act 0: `I could watch that sun forever.`
 2. The fish quotes it after wish 1 (`You said you could watch that sun forever. You'll get to.`) and promises after wish 2 (`You'll miss the sun. I'll bring you another.`), on every path including refusals.
 3. The fish delivers it: `But first, the sun I promised you.` / `You said you could watch it forever. I listened.` and opens wish 3 with `There it is. You can watch it forever now.`
@@ -65,7 +65,7 @@ Unchanged text. Two silent additions: three bone pixels of a knife on the gunwal
 The boat rows in from the left at dawn while the title fades (a short dip to black, then `boatX` from -208, off screen, to 0 over 4 s). Casting is not possible until it arrives. Captions, one per beat, in pace with play:
 
 - When the boat has arrived, narr, in the dialogue panel, waiting for a tap: `Nothing on the lake is moving except you.` (not a timed caption: the player must be able to read it).
-- Then, before the first cast, Fisherman (bubble): `The stranger's bait. Cursed or blessed, he said, and laughed.` The float carries one gold pixel (index 16, the bright end of the gold ramp; 13 is too dark to read as gold at 3x) on the hook for all of act 0.
+- Then, before the first cast, Fisherman (bubble): `The stranger's bait. Cursed or blessed, he said. It has an eye.` The bait on the hook is drawn for all of act 0 as two pixels: gold (index 16, the bright end of the gold ramp) with one dark pixel beside it, the eye. Real lures have painted eyes, so it is fair; and when the red sun opens its eye on a line at the end, it is this bait, enlarged. Nobody says so.
 - When the first cast lands, Fisherman (bubble): `Something interesting, for once.`
 - After the first card closes, Fisherman (bubble): `Look at that sun.`
 - After the second card closes, Fisherman (bubble): `I could watch that sun forever.`
@@ -250,7 +250,7 @@ Buttons are a flex column with smaller padding when there are more than three. K
 
 **Still water.** narr: `You reach for the knife on the gunwale.` Golden fish: `No. Nobody cuts the` The cut cinematic as coded, plus: the gold pile goes over with the line, the cabin window goes dark at the dawn beat, the shadows steer to the horizon at full weight and are removed as they arrive, the companion stays in the stern. No caption at 3.4 s on any path: the interrupted word, the snap and the splash say it (released: the sky fish drops below the horizon with a splash). Kept adds a splash beside the boat at the dawn beat with `goldKept` to 0 and the caption `You lift the golden fish over the side.`
 
-**Stay.** Companion: `Then stay.` Golden fish: `Someone to sit with you. It's what you asked for.` The stay cinematic (section 8).
+**Stay.** Two claims collide over him. Golden fish, red: `Stay with them. Two wishes, one seat.` Companion (bubble), the first thing he ever says that is not the fisherman's own words: `He said he'd stay with me.` Golden fish: `He said a lot of things.` Then the stay cinematic (section 8): the companion stands, the eye snaps to him, he leaps at the red sun and takes it down into the sea with him. He does not come up.
 
 **Deep.** Golden fish: `It's still down there. All of it. Mind the waterline.` The deep cinematic (section 8).
 
@@ -272,16 +272,15 @@ Dark. Base: `You sit with the lantern until it gutters out. Sometimes something 
 - hear > fish > forever > company > gold > home: `The lake keeps talking. You stop answering.` / `Something is always biting. You let them.` / `The day never ends. It never begins either.` / `Someone breathes behind you all night. You do not turn around.` / `The boat rides low. You do not bail.` / `The light on the shore stays on. Nobody comes down.`
 - refused twice: `You asked for nothing twice. This is what it looks like.`
 
-Still water. Base: `You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.`
+Still water. Base: `You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.` Every Still water card ends, after the variant sentence and before the asked-for list, with: `The bait is still in your pocket.` (he will be the stranger for the next one).
 - kept: `You lifted it over the side. It let you.`
 - company > home > fish > gold > forever > hear: `There is someone in the stern. You do not ask. You row.` / `The cabin is dark. You do not check whether anyone left.` / `The fish behind you all face one way. You do not look.` / `The gold is on the bottom. Your hands stayed on the oars.` / `Dawn comes anyway. You had forgotten it could.` / `You can still hear them from the shore. You stop listening.`
 - refused twice: `Twice you said nothing. The knife said it a third time.`
 - one refusal (outranks the wish sentence): `You asked once for nothing. It kept count.`
 
-Silent. Card: `You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.`
+Silent. Card: `You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back. The bait is still in your pocket.`
 
-Stay. Card: `You stay. He never says who he is and you never ask. The light on the shore is warm. The sun does not come up, and after a while you stop minding.`
-- home wished: `It was your cabin all along.`
+Stay. Card: `You stay. He took the sun down with him and did not come back up. The seat behind you is empty again. It does not get light, and after a while you stop minding.`
 
 Deep. Card: `The gold is where you left it. So is everything else. The water is warmer than you thought, and full of light, and there is no bottom.`
 - kept: `The golden fish goes down with you. It knows the way.`
@@ -356,7 +355,7 @@ Timed functions in the existing cinematic system. Durations are targets.
 - **Forever** (instant on grant): `frozen = 1`. Cloud drift stops, birds hang, fish-jump rings stop, the sun holds until the sunset cinematic. Nothing says so.
 - **Eyes** (2 s, once in act 2 between casts): `lanternFlicker` to 0.1 for the first second, `eyes` 0 to 1 to 0 over 2 s: about eight pairs of red-eye pixels (index 21) on the two or three surface rows near the boat, positions fixed per run, faint reflections. Reused for one frame in the dark ending's last flicker.
 - **Companion turn** moves from wish 3 into the red cinematic at the pupil beat.
-- **Stay** (14 s): the companion turns to face the fisherman (a face variant with lantern-coloured eyes, not red), `boatX` drifts toward the cabin light over 8 s (toward the left shore if there is no cabin), the red sun does not move, the lantern glow warms, slow fade to black over the last 3 s.
+- **Stay** (about 16 s): after the three lines, the companion stands (a standing frame, taller, still dark), `pupilDx` snaps toward the companion over 0.4 s and the heartbeat quickens; at about 2 s he leaps: a dark leaping frame follows a parabola from the stern to the red disc over 1.6 s (no boat drift; the boat rocks with two rings at the push-off); on impact the glow spikes for two frames, the crunch plays, `pupil` closes, and the disc drops from its line into the sea exactly as in the still-water cut (`sunY` to below the horizon over 1.5 s, the hiss, two rings, a big splash), the stalk recoils upward (`stalkCut`), `companion` goes to 0 as the disc goes under (he went with it, no separate splash); then `mood` 2 to 1 over 5 s, `starA` 0 to 1, `ash` to 0, `sunGlow` and `horizGlow` to the night values, the lantern stays lit and its glow warms slightly; the boat sits where it is; slow fade to black over the last 3 s. The sun does not come back.
 - **Deep** (14 s): the horizon rises past the top of the screen over 6 s (the mirror's source row shifts so the reflection fills the frame), the palette dims toward the night ramp, stars appear below, the boat becomes a silhouette seen from beneath near the top, the gold pile glints once, fade.
 - **Silent**: the cut cinematic with the silent flag (section 4, Endings).
 
@@ -387,7 +386,7 @@ The world is a set of numbers in `WS`. Every scene below says which of them it O
 | Home | `jaw` 0 to 1 over 4.2 s, fangs, black at 4.15 s | everything in the red |
 | Dark | `lid` 0 to 1 over 1.6 s; `sunGlow` and `horizGlow` to 0 over 3 s; `dim` 0 to 11 over t 1 to 5.5; `ash` to 0 over 3 s; `lanternFlicker` random over t 6 to 8 with one `eyes` frame; `lantern` 0 at t 8; black at 8.3 | pupil hidden under the lid, stalk stays, companion stays turned |
 | Still water | `lineCut`; released: the sky fish drops below the horizon with a splash; `stalkCut` (silent: `stalk` to 0 instead, no snaps); `sunY` to `HY + 28` by t 2.6; `sunGlow` to 0, `horizGlow` to 0.15; `mood` 2 to 1 (t 3 to 6) to 0 (t 6 to 12); `ash` to 0; `starA` 0 to 1 to 0; `troubled` to 0; `gold` to 0 at the cut; at t 6 (dawn): `sunKind` 0, `sunR` 8, `stalk` 0, `companionTurn` 0, cabin light off, `frozen` 0, kept: splash and `goldKept` 0; `shoalOut` 1 from the cut: the shadows steer to the horizon at full weight, hurry, and are removed as they arrive; `sunY` back to rest with glow 1 by t 12.5; `lantern` 0 over t 9 to 11; `boatX` to +120 from t 11 | `sunX`; the companion stays in the stern facing the horizon; a sunk boat stays sunk (he rows it anyway) |
-| Stay | `companionTurn` to the face variant; `boatX` toward the cabin (or the left shore) over 8 s; `pupilDx` to 0 (the eye stops tracking); lantern glow radius up; heartbeat slows and stops; black over the last 3 s | `sunY` 178, mood 2, ash keeps falling, stalk |
+| Stay | the companion stands, then leaps along a parabola to the disc; `pupilDx` snaps to him; on impact: glow spike, `pupil` closed, `sunY` to below the horizon over 1.5 s with hiss, rings and splash, `stalkCut`, `companion` to 0; then `mood` 2 to 1 over 5 s, `starA` to 1, `ash` to 0, glows to night values, lantern warm; black over the last 3 s | `boatX` (no drift), `sunX` |
 | Deep | `dive` 0 to 1 over 6 s (the horizon row rises past the top; the mirror fills the frame); `dim` 0 to 6; stars in the lower half; the boat as a silhouette from beneath near the top; `ash` to 0; lantern glow to 0; one gold glint; black | mood 2 under the dim, `sunX` |
 | Restart | `resetWS` returns every field to the title values | |
 
@@ -403,7 +402,7 @@ The world is a set of numbers in `WS`. Every scene below says which of them it O
 - **Ash** exists only at mood above 1.5 and is cleared by the endings that leave the red (Dark, Still water, Deep). Home and Stay keep it falling.
 - **The lantern** lights at sunset 7.8 s, floats beside a sunk boat, dips once for the eyes, dies in Dark at t 8 and in Still water over t 9 to 11, and warms in Stay. Its glow is applied last in RGBA and follows its position.
 - **Troubled ladder**: 0, then 0.22 (wish 1), 0.35 (sunset), 0.55 (red), back to 0 at the dawn. Refusals never raise it. The ocean uses 0.15 while `far > 0` and restores the previous value.
-- **The companion** faces the horizon from the moment he appears until the red cinematic's pupil beat, turns back to the horizon at the still-water dawn, and faces the fisherman only in Stay.
+- **The companion** faces the horizon from the moment he appears until the red cinematic's pupil beat, turns back to the horizon at the still-water dawn, and in Stay stands, leaps at the sun and is gone with it.
 - **Kept fish alpha**: 1 in act 0, 0.7 in act 1, 0.45 in act 2, back to 1 whenever it speaks, 0 when lifted over the side, 0.05 after the silent ending.
 - **`sea`** is set once by the ocean and never cleared: the mountains are gone for the rest of that run, and every scene that read MOUNT (render, sun ring, stalk, jaw) must tolerate an empty shore. Home's jaw still closes; it is the sky and a fang line at the horizon.
 - **Props persist across scenes** unless a row above removes them: companion, cabin, gold, the sunk boat (the swimmer), shadows, kept fish, frozen, the open sea. A new scene never resets a prop it does not own.

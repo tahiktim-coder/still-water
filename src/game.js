@@ -379,20 +379,42 @@ const COMP_TURN = sprite([
   '000000000',
   '.0000000.',
 ]);
-// Facing the fisherman, who sits to his left: the lit side of the face and lantern-coloured eyes (Stay only).
-const COMP_FACE = sprite([
+// Stay (bible, section 8): he stands at his seat, taller and still dark, the turned face kept; then the
+// leaping frame, head and arms toward the sun on his left, the legs trailing.
+const COMP_STAND = sprite([
   '...000...',
   '..00000..',
-  '.1110000.',
-  '.L1L0000.',
-  '.1110000.',
+  '.0011100.',
+  '.01X1X10.',
+  '.0011100.',
+  '..00000..',
+  '...000...',
   '..00000..',
   '.0000000.',
-  '.00000000',
-  '000000000',
-  '000000000',
   '.0000000.',
+  '00.000.00',
+  '00.000.00',
+  '...000...',
+  '...000...',
+  '...0.0...',
+  '...0.0...',
+  '..00.00..',
 ]);
+const COMP_LEAP = sprite([
+  '.....000....',
+  '....00000...',
+  '0...00000...',
+  '00...000....',
+  '.00.00000...',
+  '..000000000.',
+  '...00000.000',
+  '....0000..00',
+  '.....00....0',
+  '....00......',
+  '....0.......',
+  '...0........',
+]);
+const LEAP_ARC = 30; // how high the parabola rises above the straight line from the seat to the disc
 const BIRD = [sprite(['1...1', '.1.1.', '..1..']), sprite(['.....', '11.11', '..1..'])];
 const EXCL = sprite(['.1.', '1b1', '1b1', '1b1', '.1.', '1b1', '.1.']);
 const ICON = sprite(['.bbb.b', 'bbbbbb', '.bbb.b']);
@@ -629,7 +651,7 @@ const ENDINGS = {
   dark: { title: 'Dark', text: 'You sit with the lantern until it gutters out. Sometimes something takes the bait. You never reel it in.' },
   cut: { title: 'Still water', text: 'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.' },
   swallowed: { title: 'Swallowed', text: 'You asked to be taken where the fish are. Somewhere far above, the sun is still shining on a lake with no boat on it.' },
-  stay: { title: 'Stay', text: 'You stay. He never says who he is and you never ask. The light on the shore is warm. The sun does not come up, and after a while you stop minding.' },
+  stay: { title: 'Stay', text: 'You stay. He took the sun down with him and did not come back up. The seat behind you is empty again. It does not get light, and after a while you stop minding.' },
   deep: { title: 'Deep', text: 'The gold is where you left it. So is everything else. The water is warmer than you thought, and full of light, and there is no bottom.' },
 };
 const SILENT_TEXT = 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.';
@@ -676,7 +698,6 @@ const END_VARIANTS = {
       hear: 'You can still hear them from the shore. You stop listening.',
     },
   },
-  stay: { order: ['home'], lines: { home: 'It was your cabin all along.' } },
   deep: { kept: 'The golden fish goes down with you. It knows the way.', order: [], lines: {} },
 };
 // The wish button labels, read back on the ending card.
@@ -704,8 +725,9 @@ function resetWS() {
     goldKept: 0, boatSunk: 0, frozen: 0, far: 0, sea: 0, eyes: 0, farBoat: 0,
     // Phase 3: the ocean. swallow is the radius of the opening water; boatDrop the boat's fall into it.
     swallow: 0, boatDrop: 0,
-    // Phase 4: companionFace swaps the turned sprite for the one facing the fisherman; lanternWarm widens the glow (Stay).
-    companionFace: 0, lanternWarm: 0,
+    // Stay: companionStand swaps in the standing frame, leap is his progress along the parabola to the disc
+    // (held at 1 while he rides it down), rock the boat's push-off wobble, lanternWarm widens the glow.
+    companionStand: 0, leap: 0, rock: 0, lanternWarm: 0,
     // Phase 6: dive is the Deep descent (the horizon rises past the top and the mirror fills the frame);
     // glint is the gold pile's two-frame sparkle seen from beneath.
     dive: 0, glint: 0,
@@ -1212,8 +1234,8 @@ function drawFarBoat(t, far) {
   stampR(s, x0, y0, WL);
   G.tip = { x: x0 + s.w / 2, y: y0 }; // a cast from out here leaves from the silhouette itself
 }
-// Facing the horizon, turned (the red), or facing the fisherman (Stay).
-function compSprite() { return WS.companionFace > 0.5 ? COMP_FACE : WS.companionTurn > 0.5 ? COMP_TURN : COMP; }
+// Facing the horizon, turned (the red), or standing (Stay).
+function compSprite() { return WS.companionStand > 0.5 ? COMP_STAND : WS.companionTurn > 0.5 ? COMP_TURN : COMP; }
 // The boat's left corner on screen, the origin of every sprite in the boat group.
 function boatLeft() { return Math.round(boatCentreX(WS.far) - BOAT.w / 2); }
 // The gold sink (bible, section 8): at boatSunk 1 the hull rides SINK_PX lower, which puts the prow curl and
@@ -1284,14 +1306,29 @@ function drawBoatGroup(t) {
   const far = WS.far;
   if (far > 0.5) { drawFarBoat(t, far); return; }
   if (WS.dive > 0) { drawSwimmerBeneath(); return; }
-  const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2);
+  const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2) + rockPx(t);
   const bx = boatLeft(), dy = boatSinkPx() + bob;
   stampR(BOAT, bx, WL - BOAT.wl + dy, WL);
   drawLantern(t, bx, dy);
   if (WS.gold > 0) drawGoldPile(bx, dy);
   drawKeptFish(t, bx, dy);
-  if (WS.companion > 0) stampR(compSprite(), bx + COMP_DX, compY(dy) + swimBob(t, 2.6), WL, WS.companion);
+  if (WS.companion > 0) drawCompanion(t, bx, dy);
   drawFisherman(t, bx, dy);
+}
+// The push-off (Stay): a small rock of the whole boat that dies out as WS.rock tweens back to 0.
+const rockPx = t => Math.round(Math.sin(t * 15) * WS.rock * 1.6);
+// A taller frame keeps his feet where the seated frame's are.
+const seatTop = (s, dy) => compY(dy) - (s.h - COMP.h);
+// At his seat, or (Stay) in the air: the leaping frame follows a parabola from the seat to the red disc,
+// then rides the disc down at leap 1. It is a reflecting sprite whose mirror line slides from the boat's
+// waterline to the horizon, where the disc's own reflection is, so the two go under together.
+function drawCompanion(t, bx, dy) {
+  if (WS.leap <= 0) { stampR(compSprite(), bx + COMP_DX, seatTop(compSprite(), dy) + swimBob(t, 2.6), WL, WS.companion); return; }
+  const p = WS.leap, s = COMP_LEAP;
+  const x0 = bx + COMP_DX - 2, y0 = seatTop(s, dy);
+  const x1 = WS.sunX - s.w / 2, y1 = WS.sunY - s.h / 2 + 1;
+  const x = lerp(x0, x1, p), y = lerp(y0, y1, p) - LEAP_ARC * 4 * p * (1 - p);
+  stampR(s, Math.round(x), Math.round(y), Math.round(lerp(WL, HY, p)));
 }
 function drawBobber() {
   const b = G.bob;
@@ -1818,18 +1855,48 @@ const CINE_DARK = {
     at('fade', 8.3, () => UI.fade(1, 1));
   },
 };
-// Stay (bible, section 8): he turns to face the fisherman, the boat drifts toward the cabin light (the left
-// shore if there is none), the red sun stays, the lantern warms, the heartbeat slows and stops, then black.
-const STAY_DRIFT_CABIN = -56, STAY_DRIFT_SHORE = -76;
+// Stay (bible, section 8): two claims collide over him. He stands, the eye snaps to him and the heartbeat
+// quickens; he leaps from the stern along a parabola to the red disc; on impact the glow spikes, the eye
+// closes and the disc drops from its line into the sea exactly as in the still-water cut, and he goes under
+// with it. Then the night comes back without a sun: the lantern stays lit and warms a little, the boat sits
+// where it is, and the last three seconds fade to black. The sun never returns; sunX never moves.
+const STAY_LOOK = 7;                    // pupilDx toward the stern, which is to the right of the disc
+const STAY_LEAP_AT = 2, STAY_LEAP_DUR = 1.6, STAY_HIT = STAY_LEAP_AT + STAY_LEAP_DUR;
+const STAY_DROP = 1.5, STAY_UNDER = STAY_HIT + STAY_DROP, STAY_NIGHT = 5, STAY_FADE_AT = 13;
+function stayPushOff() {
+  WS.companionStand = 0; WS.rock = 1; tween(WS, 'rock', 0, 1.2);
+  const x = boatLeft() + COMP_DX + 4;
+  ring(x, WL + 1); ring(x + 3, WL + 2); SFX.plop();
+}
+function stayImpact() { WS.sunGlow = 2.4; WS.pupil = 0; SFX.crunch(); }
+function stayDiscHitsWater() { SFX.hiss(2.2); ring(SUNX, HY + 3, true); ring(SUNX, HY + 3); splash(SUNX, HY + 2, 10); SFX.drone(false); }
+function stayGoneUnder() { WS.companion = 0; WS.leap = 0; }
 const CINE_STAY = {
-  dur: 14,
-  init(s) { s.x0 = WS.boatX; s.to = WS.cabin > 0 ? STAY_DRIFT_CABIN : STAY_DRIFT_SHORE; },
+  dur: 16,
+  init(s) {
+    s.y0 = WS.sunY;
+    WS.companionStand = 1;
+    tween(WS, 'pupilDx', STAY_LOOK, 0.4);
+    G.hbGap = HB_GAP * 0.45; G.hb = Math.min(G.hb, 0.4); // the heartbeat quickens
+  },
   update(t, dt, at, s) {
-    at('face', 0.4, () => { WS.companionTurn = 1; WS.companionFace = 1; tween(WS, 'pupilDx', 0, 1.5); });
-    WS.boatX = lerp(s.x0, s.to, E.io(clamp((t - 0.6) / 8, 0, 1)));
-    WS.lanternWarm = clamp((t - 1) / 7, 0, 1);
-    G.hbGap = t < 9 ? HB_GAP + t * 0.45 : 1e9; // the heartbeat slows, then stops
-    at('fade', 11, () => UI.fade(1, 3));
+    at('leap', STAY_LEAP_AT, stayPushOff);
+    if (t >= STAY_LEAP_AT && WS.companion > 0) WS.leap = clamp((t - STAY_LEAP_AT) / STAY_LEAP_DUR, 0, 1);
+    at('hit', STAY_HIT, stayImpact);
+    at('unspike', STAY_HIT + 0.07, () => { WS.sunGlow = 1.25; }); // the spike lasts two frames
+    if (t >= STAY_HIT) {
+      WS.sunY = lerp(s.y0, HY + 28, E.in(clamp((t - STAY_HIT) / STAY_DROP, 0, 1)));
+      WS.stalkCut = clamp((t - STAY_HIT) / 0.7, 0, 1);
+    }
+    at('hiss', STAY_HIT + 1.3, stayDiscHitsWater);
+    at('under', STAY_UNDER, stayGoneUnder);
+    if (t > STAY_HIT + 0.1) WS.sunGlow = lerp(1.25, 0.12, clamp((t - STAY_HIT - 0.1) / 2.5, 0, 1));
+    const k = clamp((t - STAY_UNDER) / STAY_NIGHT, 0, 1);
+    if (k > 0) {
+      WS.mood = lerp(2, 1, k); WS.starA = k; WS.ash = 1 - k;
+      WS.horizGlow = lerp(1.3, 0.3, k); WS.lanternWarm = 0.6 * k;
+    }
+    at('fade', STAY_FADE_AT, () => UI.fade(1, 3));
   },
 };
 // The released sky fish drops below the horizon with a splash (the cut and silent endings).
@@ -2340,8 +2407,9 @@ function endCut() {
 }
 function endStay() {
   dlgRun([
-    comp('Then stay.'),
-    red('Someone to sit with you. It’s what you asked for.'),
+    red('Stay with them. Two wishes, one seat.'),
+    comp('He said he’d stay with me.'),
+    red('He said a lot of things.'),
   ], () => playCine(CINE_STAY, () => showEnding('stay')));
 }
 // Deep (bible, sections 4 and 8): down for the gold. The horizon rises past the top of the screen and the
