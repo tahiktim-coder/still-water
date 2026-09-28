@@ -15,8 +15,9 @@ Each wish quietly borrows a figure from Slavic water lore, never named: Pushkin'
 
 ### Why the fish brings the sun
 
-The player must see this chain, so it is said three times in plain words:
+The player must see this chain, so it is said three times in plain words. It starts with the bait:
 
+0. The fisherman was given a bait by a stranger who called it cursed or blessed and laughed. He casts it with a throwaway thought, `Something interesting, for once.` The bait takes wishes literally: the golden fish surfaces and its second line is `Something interesting, you said. Here I am.` From then on everything he thinks near that bait is an order.
 1. The fisherman, act 0: `I could watch that sun forever.`
 2. The fish quotes it after wish 1 (`You said you could watch that sun forever. You'll get to.`) and promises after wish 2 (`You'll miss the sun. I'll bring you another.`), on every path including refusals.
 3. The fish delivers it: `But first, the sun I promised you.` / `You said you could watch it forever. I listened.` and opens wish 3 with `There it is. You can watch it forever now.`
@@ -26,7 +27,7 @@ The recount at wish 3 always ends with `and the sun you wanted.`
 ## 2. Rules for copy
 
 - Sentence case. Short. Eerie. Dialogue under 90 characters (the wish 3 recount may run to 125), captions under 60, card lines under 60. This file writes apostrophes straight; the game renders every one as the typographic ’.
-- The fisherman never speaks in the fish's panel and never in the caption strip. His lines appear in a THOUGHT BUBBLE (section 4b): a thin comic-book bubble with small text, floating above him to the right, with a tail of small circles down to his head. He thinks three lines of his own in act 0, thinks each choice he taps for a moment before the fish answers, and thinks "Take me back." on the open sea. Everything else quotes him. The companion's lines use the same bubble on his side of the boat. Narrator captions stay in the caption strip, no quotes.
+- The fisherman never speaks in the fish's panel and never in the caption strip. His lines appear in a THOUGHT BUBBLE (section 4b): a thin comic-book bubble with small text, floating above him to the right, with a tail of small circles down to his head. He thinks four lines of his own in act 0 (the bait, the throwaway wish, the sun twice), thinks each choice he taps for a moment before the fish answers, and thinks "Take me back." on the open sea. Everything else quotes him. The companion's lines use the same bubble on his side of the boat. Narrator captions stay in the caption strip, no quotes.
 - The golden fish is polite, patient and never lies. It gives exactly what was asked for and reads the player's own words back as consent. It never threatens. It is never rude, only accurate. Its rules begin with "Nobody".
 - Never say memory, remember, past, stuck, grief, nostalgia, lure, or "you are the fish". "Bait" appears once in dialogue, at wish 3. The Dark ending's base card keeps its own "bait" because it shipped that way.
 - No line explains a metaphor the picture already shows.
@@ -38,7 +39,7 @@ The recount at wish 3 always ends with `and the sun you wanted.`
 
 `STORY` gains: `kept` (bool), `firstAsk` ('company' | 'fish' | 'home' | 'nothing'), `refused` (0 to 2), `answered` (null | true | false), `ocean` ('none' | 'waited' | 'swallowed'), `said` (0 to 3, how many of the fisherman's lines have shown), `usedRepl` (set of card replacements already fired this run), `tap` and `tapPool` (how many of the companion's current line pool have shown, and which pool it was; the code uses these instead of a per-act `compTaps`), `keptNext` (kept, act 1: the next normal card closes into golden scene 2), `casts` (for the opening captions), `shown1` (species whose act 1 card showed, so act 2 picks another). Existing: `wishes[]` (granted wishes only, in order), `heard`, `goldenNext`, `actCatches`, `lastSpecies`. Saved across runs: `stillwater-endings` (list), `stillwater-runs` (count), `stillwater-last` (the last ending id).
 
-`WS` gains: `goldKept` (0 to 1, the fish in the boat; alpha ladder 1.0 in act 0, 0.7 in act 1, 0.45 in act 2, 0.05 after the silent ending), `boatSunk` (0 to 1, the gold sink), `frozen` (0 or 1, clouds and birds stop), `far` (0 to 1, the ocean pull-back), `shoreShift` (px, the mountains closer after the ocean), `eyes` (0 to 1, the water full of eyes), `farBoat` (0 or 1, title only), `boatSink` (px the boat sits lower; +2 in the red if gold), `swallow` and `boatDrop` (the Swallowed circle and the fall), `companionFace` and `lanternWarm` (Stay), `dive` and `glint` (Deep), `shoalOut` (the still-water dawn: the shoal leaves as it reaches the horizon).
+`WS` gains: `goldKept` (0 to 1, the fish in the boat; alpha ladder 1.0 in act 0, 0.7 in act 1, 0.45 in act 2, 0.05 after the silent ending), `boatSunk` (0 to 1, the gold sink), `frozen` (0 or 1, clouds and birds stop), `far` (0 to 1 and back, the ocean camera pull-back), `sea` (0 to 1, the mountains gone; set once by the ocean and held at 1 for the rest of the run), `eyes` (0 to 1, the water full of eyes), `farBoat` (0 or 1, title only), `swallow` and `boatDrop` (the Swallowed circle and the fall), `companionFace` and `lanternWarm` (Stay), `dive` and `glint` (Deep), `shoalOut` (the still-water dawn: the shoal leaves as it reaches the horizon).
 
 Endings: `home`, `dark`, `cut`, `stay`, `deep`, `swallowed`. Silent is a variant of `cut`. The counter says "of 6". `ENDINGS` becomes a composer: base + one variant sentence + the asked-for list; `UI.ending` receives `{title, text, asked}` and the template gets an `#endAsked` block under the text.
 
@@ -64,9 +65,12 @@ Unchanged text. Two silent additions: three bone pixels of a knife on the gunwal
 The boat rows in from the left at dawn while the title fades (a short dip to black, then `boatX` from -208, off screen, to 0 over 4 s). Casting is not possible until it arrives. Captions, one per beat, in pace with play:
 
 - On start, narr: `Nothing on the lake is moving except you.`
-- When the first cast lands, Fisherman (bubble): `First time here.`
+- When the boat has arrived and before the first cast, Fisherman (bubble): `The stranger's bait. Cursed or blessed, he said, and laughed.` The float carries one gold pixel (index 13) on the hook for all of act 0.
+- When the first cast lands, Fisherman (bubble): `Something interesting, for once.`
 - After the first card closes, Fisherman (bubble): `Look at that sun.`
 - After the second card closes, Fisherman (bubble): `I could watch that sun forever.`
+
+These four are his only lines before the fish surfaces. `First time here.` is no longer said by him; the fish still says `First time here, you said.` because he thought it, and that is the point.
 
 While a bubble is on screen the tutorial prompt is hidden and no nibble or bite happens, so two texts never share the stage. A line that did not get to show carries over to the next beat. `STORY.said` counts them.
 
@@ -79,6 +83,7 @@ Prompts and fail copy unchanged. After catch 3: `The water goes very still.` The
 The fish surfaces at the left. Splash, rings, chime. Three seconds of total silence before it speaks.
 
 - Golden fish: `Wait. Don't gut me, fisherman.` On a later run this line is `You again. Or someone wearing you.`; if the last ending was Home: `Back out already? It doesn't usually let go.`
+- Golden fish: `Something interesting, you said. Here I am.`
 - Golden fish: `Put me back and I'll grant you a wish. Three, if you're patient.`
 - Choice: **Let it go** / **Keep it**
 
@@ -220,7 +225,7 @@ Refused twice (either path, replaces the lines above):
 - Golden fish: `One wish left. You said you could watch that sun forever, then asked for nothing twice.`
 - Golden fish: `It wants to see why.`
 
-Then the red cinematic as coded, with four changes: the companion turns at the pupil beat (inside the cinematic, before anyone speaks); the pupil slides toward the boat only if the player ever asked for something; if `heard`, at the stalk beat The lake whispers `i could watch that sun forever. i could watch that sun forever.` (the fisherman's words back from every fish at once); if gold, the boat sinks two more pixels when the line goes taut. The cinematic's own narr caption at 0.6 s stays: `Something rises where the sun went down.` There is no caption at the pupil beat.
+Then the red cinematic as coded, with three changes: the companion turns at the pupil beat (inside the cinematic, before anyone speaks); the pupil slides toward the boat only if the player ever asked for something; if `heard`, at the stalk beat The lake whispers `i could watch that sun forever. i could watch that sun forever.` (the fisherman's words back from every fish at once). (The gold path's extra two-pixel sink is gone: the boat is already under.) The cinematic's own narr caption at 0.6 s stays: `Something rises where the sun went down.` There is no caption at the pupil beat.
 
 #### Wish 3
 
@@ -363,7 +368,7 @@ The world is a set of numbers in `WS`. Every scene below says which of them it O
 | Opening row-in | `boatX` -208 to 0 over 4 s, under a 0.4 s dip to black | everything else as the title |
 | Act 0 play | nothing | mood 0, sun at rest, troubled 0 |
 | Golden scene 1 | the sky fish (`goldFish`) appears and dives; kept: `goldKept` 0 to 1 and no sky fish | the world |
-| Wish 1 grant | company: `companion` 0 to 1 over 2.2 s. Home: `cabin` 0 to 1 over 2.2 s. Fish: the ocean cutscene, then `fishShadows` 1 and `shoreShift` 10. Nothing: no change | mood 0 |
+| Wish 1 grant | company: `companion` 0 to 1 over 2.2 s. Home: `cabin` 0 to 1 over 2.2 s. Fish: the ocean cutscene, then `sea` 1 for good, `fishShadows` 1 and the giant shapes beneath. Nothing: no change | mood 0 |
 | Cost drop (after any granted wish 1) | `sunY` +8, hold 1 s, +8 (about 5 s total), starting as the first cost line begins; `troubled` to 0.22 | mood 0; `sunX` never moves |
 | Ocean | `sea` 0 to 1 over 6 s and then held at 1 for the rest of the run (mountains gone for good); `far` 0 to 1 over 6 s and back to 0 over 4 s at the end (camera only); boat silhouettes by `far`; giant shadows, kept alive at a slow rate for the rest of the run; the big one crosses left to right over about 8 s and settles under the boat, with a rising low swell and no stinger; `troubled` 0.15 while `far > 0`, then 0.22 with the cost; birds hidden while `sea > 0.5` | sun, mood, clouds keep drifting; no companion or cabin can exist on this path |
 | Open sea play (fish-wish runs) | the giant shadows keep passing | `sea` 1; everything else as the equivalent lake scene |
@@ -374,8 +379,8 @@ The world is a set of numbers in `WS`. Every scene below says which of them it O
 | Sunset | `sunY` to `HY + 14` over 7.5 s; `mood` 0 to 1 over t 1 to 8; `sunGlow` to 0.12 (forever: floor 0.4); `horizGlow` to 0.3; `starA` to 1 from t 5 (forever: stays 0); `troubled` to 0.35; `lantern` 1 at 7.8 s | `sunX`, companion, cabin, gold, sunk boat, `frozen` (a frozen sky stays frozen through the night) |
 | Companion question | nothing | the night |
 | Act 2 play | once: `lanternFlicker` 0.1 for 1 s and `eyes` 0 to 1 to 0 over 2 s | mood 1, sun below the horizon, stars as the sunset left them |
-| Red sequence | the float dragged to the horizon; released: sky fish at the sun's spot; kept: `goldKept` to 1; gold: `boatSink` +2 | mood 1, stars |
-| Red cinematic | `sunKind` 1, `sunR` 16, `sunY` `HY + 24` to 178 over 8.5 s; `mood` 1 to 2 over t 1.5 to 9; `sunGlow` to 1.25; `horizGlow` to 1.3; `starA` from whatever it finds to 0 by t 6; `troubled` to 0.55; `ash` 0 to 1 from t 6; `stalk` from t 9.2; `pupil` from t 12; `companionTurn` 1 at t 13.6; `pupilDx` from t 13.6 only if the player ever asked; heartbeat from t 13.6 | lantern 1, cabin, gold, sunk boat, `frozen`, `shoreShift` |
+| Red sequence | the float dragged to the horizon; released: sky fish at the sun's spot; kept: `goldKept` to 1 | mood 1, stars |
+| Red cinematic | `sunKind` 1, `sunR` 16, `sunY` `HY + 24` to 178 over 8.5 s; `mood` 1 to 2 over t 1.5 to 9; `sunGlow` to 1.25; `horizGlow` to 1.3; `starA` from whatever it finds to 0 by t 6; `troubled` to 0.55; `ash` 0 to 1 from t 6; `stalk` from t 9.2; `pupil` from t 12; `companionTurn` 1 at t 13.6; `pupilDx` from t 13.6 only if the player ever asked; heartbeat from t 13.6 | lantern 1, cabin, gold, sunk boat, `frozen`, `sea` |
 | Wish 3 | nothing | the red |
 | Home | `jaw` 0 to 1 over 4.2 s, fangs, black at 4.15 s | everything in the red |
 | Dark | `lid` 0 to 1 over 1.6 s; `sunGlow` and `horizGlow` to 0 over 3 s; `dim` 0 to 11 over t 1 to 5.5; `ash` to 0 over 3 s; `lanternFlicker` random over t 6 to 8 with one `eyes` frame; `lantern` 0 at t 8; black at 8.3 | pupil hidden under the lid, stalk stays, companion stays turned |

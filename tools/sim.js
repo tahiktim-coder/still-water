@@ -69,7 +69,7 @@ const plans = [
   [[0, 3, 3, 0], 'let go, nothing, nothing -> home'],
   [[1, 1, 2, 1], 'keep, fish (wait), gold -> dark', null, { wait: true }],
   // A third element is a sentence the ending card must end with; a fourth is options ({ wait } holds the
-  // bot's hand through the ocean window, so the big one leaves).
+  // bot's hand through the ocean window, so the big one leaves; { has } is a sentence the card must contain).
   [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'You asked once for nothing. It kept count.'],
   [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'after a while you stop minding.', { tap: true }],
   // Phase 5, the kept fish: act 1 is a normal hook (one more catch), the fish speaks from the boat, and
@@ -81,6 +81,12 @@ const plans = [
   // after Cut the line (no Stay) or after Stay with them.
   [[0, 2, 2, 3], 'let go, home, gold -> deep', 'and there is no bottom.'],
   [[1, 0, 0, 2, 0, 4], 'keep, company (someone), gold, yes -> deep (kept)', 'The golden fish goes down with you. It knows the way.'],
+  // Phase 9: the fish wish waited out continues on the open sea (no shore) to Home, Dark and Still water; the
+  // gold sink leaves the fisherman in the water, and the Still water and Dark cards swap their verb.
+  [[0, 1, 0, 0], 'let go, fish (wait), forever -> home (sea)', 'The lake is full. It was always full.', { wait: true }],
+  [[0, 1, 1, 2], 'let go, fish (wait), hear -> cut (sea)', 'The fish behind you all face one way. You do not look.', { wait: true }],
+  [[0, 2, 2, 2], 'let go, home, gold -> cut (swimming)', null, { has: 'You swim until the water is only water.' }],
+  [[0, 1, 2, 1], 'let go, fish (wait), gold -> dark (swimming, sea)', null, { wait: true, has: 'You hang in the water beside the lantern until it gutters out.' }],
 ];
 let ok = true;
 const seen = {};
@@ -88,6 +94,7 @@ for (const [plan, label, cardEnd, opts] of plans) {
   const r = play(plan, label, opts);
   ok = ok && r.ok;
   if (cardEnd && !r.text.endsWith(cardEnd)) { ok = false; console.log('   card should end with: ' + cardEnd); }
+  if (opts && opts.has && r.text.indexOf(opts.has) < 0) { ok = false; console.log('   card should contain: ' + opts.has); }
   if (r.id) seen[r.id] = true;
 }
 // One line per ending id (six, plus the silent variant of cut), then the verdict: every plan must end and
