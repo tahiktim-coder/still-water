@@ -679,6 +679,7 @@ function resetWS() {
     // Phase 6: dive is the Deep descent (the horizon rises past the top and the mirror fills the frame);
     // glint is the gold pile's two-frame sparkle seen from beneath.
     dive: 0, glint: 0,
+    shoalOut: 0, // the still-water dawn: the shoal steers to the horizon at full weight and leaves as it arrives
   });
 }
 const G = {
@@ -794,17 +795,21 @@ function spawnShadows() {
 }
 function updShadows(dt) {
   if (!WS.fishShadows) return;
-  for (const s of SHAD) {
-    s.a += (hash2(s.x | 0, s.y | 0, (G.t * 2) | 0) - 0.5) * 1.2 * dt;
-    s.a += Math.sin(shadowHeading(s) - s.a) * 2 * dt;
+  for (let k = SHAD.length - 1; k >= 0; k--) {
+    const s = SHAD[k];
+    if (!WS.shoalOut) s.a += (hash2(s.x | 0, s.y | 0, (G.t * 2) | 0) - 0.5) * 1.2 * dt;
+    s.a += Math.sin(shadowHeading(s) - s.a) * (WS.shoalOut ? 6 : 2) * dt;
     if (Math.sin(s.a) > 0) s.a = -s.a; // never past horizontal: every shadow keeps moving toward the horizon
     s.x += Math.cos(s.a) * s.sp * dt;
-    s.y += Math.sin(s.a) * s.sp * 0.3 * dt;
+    s.y += Math.sin(s.a) * s.sp * (WS.shoalOut ? 1.2 : 0.3) * dt; // at the dawn they hurry
     const cx = Math.cos(s.a);
     if (Math.abs(cx) > 0.15) s.dir = cx >= 0 ? 1 : -1;
     if (s.x < -10) s.x = W + 8;
     if (s.x > W + 10) s.x = -8;
-    if (s.y < SHAD_TOP) { s.y = H - 22 - Math.random() * 12; s.x = Math.random() * W; s.a = shadowHeading(s); }
+    if (s.y < SHAD_TOP) {
+      if (WS.shoalOut) { SHAD.splice(k, 1); continue; } // bible, Still water: removed as they arrive
+      s.y = H - 22 - Math.random() * 12; s.x = Math.random() * W; s.a = shadowHeading(s);
+    }
     if (s.y > H - 20) s.y = H - 20;
   }
 }
@@ -1740,6 +1745,7 @@ const cutCine = silent => ({
     at('cut', 0.15, () => {
       if (silent) { if (G.bob) G.bob.taut = false; SFX.splash(); }
       else { WS.lineCut = true; G.bob = null; SFX.snap(); if (WS.gold > 0) tween(WS, 'gold', 0, 0.8); }
+      WS.shoalOut = 1;
       goldFishDrop();
       splash(SUNX - 3, HY + 2, 6);
     });

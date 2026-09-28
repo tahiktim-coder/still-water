@@ -214,7 +214,6 @@ body {
 'use strict';
 const IS_BROWSER = typeof window !== 'undefined' && typeof document !== 'undefined';
 
-// ---------------------------------------------------------------- constants
 const W = 216, HY = 236, H_MIN = 384, H_MAX = 470;
 let H = H_MIN;
 const SUNX = 104, SUN0Y = 172;
@@ -224,7 +223,6 @@ const ROD_LEN = 28;
 const REST_A = -2.25, BACK_A = -1.05, FWD_A = -2.85, AIM_A = -2.55;
 const JAW_MAX = 92;
 
-// ---------------------------------------------------------------- utils
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 const E = {
@@ -260,7 +258,6 @@ function fbm(x, y, s, oct) {
   return f / tot;
 }
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
-// continuous ramp value -> integer index, with clean bands and ordered dither only at transitions
 function dith(f, x, y) {
   const fl = Math.floor(f);
   let fr = f - fl;
@@ -269,15 +266,12 @@ function dith(f, x, y) {
 }
 const ci = v => (v < 0 ? 0 : v > 11 ? 11 : v);
 
-// ---------------------------------------------------------------- palettes
-// Ramp indices 0..11 recolour with the mood. Accents 12..21 are special colours.
 const hexc = s => [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
 const RAMP = {
   day: ['#0a1a33', '#0e2444', '#13305a', '#1a3f72', '#214f89', '#2a609e', '#3673b1', '#4687c2', '#5e9ed3', '#7fb6e1', '#a9d2ee', '#eaf7ff'].map(hexc),
   night: ['#02030a', '#060a1a', '#0b1128', '#111938', '#172248', '#1e2b58', '#263568', '#314177', '#3e4f86', '#506096', '#6878a8', '#8e9cc4'].map(hexc),
   blood: ['#060103', '#130207', '#24040c', '#380710', '#520b14', '#6e0f17', '#8c1519', '#aa1d1b', '#c62b1f', '#de4426', '#f06838', '#ff9e5e'].map(hexc),
 };
-// 12 bobber, 13-16 gold ramp, 17 lantern, 18 fish eye, 19 black, 20 star, 21 red eyes, 22-23 bone, 24 eye glint
 const ACC = {
   day: ['#e2483a', '#5c3a08', '#a86f12', '#e2aa2a', '#ffe27c', '#ffd27a', '#1a0c02', '#000000', '#ffffff', '#ff3322', '#eee4d2', '#a89a86', '#7d1a12'].map(hexc),
   night: ['#e0503f', '#3e2a0a', '#7c5614', '#c2902c', '#f2d47c', '#ffc766', '#1a0c02', '#000000', '#e8eeff', '#ff3322', '#c9c6d2', '#7c7a8c', '#7d1a12'].map(hexc),
@@ -314,22 +308,13 @@ function buildPalette(mood, dim) {
   for (let j = 0; j < aa.length; j++) setPal(12 + j, lerp(aa[j][0], ab[j][0], t), lerp(aa[j][1], ab[j][1], t), lerp(aa[j][2], ab[j][2], t));
 }
 
-// ---------------------------------------------------------------- buffers
 const TOP = new Uint8Array(W * HY);          // above-horizon frame (sky, sun, clouds, mountains)
 const MOUNT = new Uint8Array(W * HY).fill(255);
-// Two cloud layers drift at different speeds, each a strip CW wide that wraps seamlessly: the big
-// cumulus (near, faster) and the small wisps high up and by the horizon (far, slower). idx holds the
-// shaded indices. vis holds, per cloud pixel, the least sun-corridor factor (0..255) at which it still
-// shows, so the corridor that keeps the sun's path clear (KCOR, fixed to the screen) is cut at sample
-// time and stays put while the clouds move through it.
 const CW = W * 2;
 const CLOUDS = [
   { speed: 3, ph: 0, off: 0, oy: 0, idx: new Uint8Array(CW * HY).fill(255), vis: new Uint8Array(CW * HY) },
   { speed: 1.1, ph: Math.PI, off: 0, oy: 0, idx: new Uint8Array(CW * HY).fill(255), vis: new Uint8Array(CW * HY) },
 ];
-// Cumulus: layer, cx, base y, width, height, bumps, rmin, rmax. Each is a union of circles: a row along
-// the flat base with the largest in the middle and a lifted second row on top (the cauliflower). The
-// first half of the strip is the sky on screen at t = 0; the rest fills the hidden half.
 const CUMULUS = [
   [0, 36, 94, 118, 46, 9, 9, 14],
   [0, 178, 54, 90, 38, 8, 8, 13],
@@ -351,8 +336,6 @@ function alloc() {
   RIPX = new Int8Array(H);
 }
 
-// ---------------------------------------------------------------- world generation
-// Noise made periodic in x over the strip: the last CLOUD_SEAM columns blend toward column 0.
 const CLOUD_SEAM = 24;
 function tiled(fn, x, y) {
   const s = x - (CW - CLOUD_SEAM);
@@ -368,7 +351,6 @@ function genClouds() {
   const clouds = CUMULUS.map(c => makeCumulus(c, rng));
   CLOUDS.forEach((L, k) => { L.idx.fill(255); L.vis.fill(0); genCloudLayer(L, clouds.filter(c => c.layer === k)); });
 }
-// One cumulus as circles: a base row whose bottoms sit just under the flat base, and a lifted top row.
 function makeCumulus([layer, cx, base, w, h, n, r0, r1], rng) {
   const circles = [], half = w * 0.5 - r0;
   const bump = (u, k) => lerp(r0, r1, (1 - Math.pow(Math.abs(u), 1.5)) * (0.75 + 0.25 * rng())) * k;
@@ -384,7 +366,6 @@ function makeCumulus([layer, cx, base, w, h, n, r0, r1], rng) {
   }
   return { layer, cx, base, top: base - h, w, h, r1, circles };
 }
-// Signed distance to the silhouette (negative inside), the owning cloud's base and top per pixel.
 function cloudField(clouds) {
   const sd = new Float32Array(CW * HY).fill(99), cb = new Float32Array(CW * HY), ct = new Float32Array(CW * HY);
   for (const c of clouds) {
@@ -419,9 +400,6 @@ function genCloudLayer(L, clouds) {
     L.vis[i] = Math.min(254, Math.round(255 * 3 / (3 - d)));
   }
 }
-// depth is the distance inside the silhouette, lit the contour's facing toward the light (1 straight
-// at it); vy is 0 at the base and 1 at the top; low pales the clouds near the horizon. A thick bright
-// band along the lit upper contour, a softer band under it, a mid body and a flat dark base.
 function shadeCloud(depth, lit, y, base, top) {
   const vy = clamp((base - y) / Math.max(1, base - top), 0, 1), low = 0.5 * y / HY;
   const hw = 2 + 2.5 * lit;
@@ -431,7 +409,6 @@ function shadeCloud(depth, lit, y, base, top) {
   if (lit > 0 && depth < hw + 2.5) return 10.2;
   return 8.4 + 1.1 * vy + low;
 }
-// Per-layer offsets for this frame: the drift, and a slow breathing of a pixel or two.
 function cloudTick() {
   for (const L of CLOUDS) {
     L.off = Math.floor(cloudT * L.speed) % CW;
@@ -529,7 +506,6 @@ function genStars() {
   }
 }
 
-// ---------------------------------------------------------------- sprites
 const CH = { '.': 255, '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, a: 10, b: 11, R: 12, d: 13, g: 14, y: 15, w: 16, L: 17, E: 18, K: 19, S: 20, X: 21 };
 function sprite(rows) {
   const h = rows.length, w = rows[0].length;
@@ -586,7 +562,6 @@ const COMP_TURN = sprite([
   '000000000',
   '.0000000.',
 ]);
-// Facing the fisherman, who sits to his left: the lit side of the face and lantern-coloured eyes (Stay only).
 const COMP_FACE = sprite([
   '...000...',
   '..00000..',
@@ -615,8 +590,6 @@ const CABIN = sprite([
   '.00000000.',
 ]);
 const GOLDPILE = sprite(['...y.w..', '..yygyy.', '.gyygyyg', 'dgggdggd']);
-// The kept golden fish (bible, section 8): about 10 by 4 in the gold indices 13 to 16, lying in the boat
-// bottom beside the gold-pile slot, head to the left. KEPT_OPEN is the open-mouth variant used while it talks.
 const KEPT = sprite(['..wyyw..d.', 'dywwwwygdd', '.gyyyyygd.', '..dgg...d.']);
 const KEPT_OPEN = sprite(['..wyyw..d.', '.ywwwwygdd', 'dgyyyyygd.', '..dgg...d.']);
 const KEPT_DX = 40, KEPT_DY = -10;   // from the boat's corner and the waterline
@@ -640,10 +613,8 @@ function makeBoat() {
     for (let y = top; y <= bot; y++) set(ox + x, y, 0);
   }
   for (let x = 4; x < L - 4; x++) set(ox + x, tops[x] + 2, 1); // plank line
-  // The stern seat, an empty plank exactly where the companion sits, so he visibly fills it (bible, Title).
   const seatY = wl + COMP_DY + COMP.h - 1;
   for (let x = COMP_DX - 1; x <= COMP_DX + COMP.w; x++) { set(x, seatY - 1, 3); set(x, seatY, 1); }
-  // The knife: three bone pixels on the gunwale beside the lantern pole.
   const ky = tops[KNIFE_X] - 1;
   set(ox + KNIFE_X, ky, 23); set(ox + KNIFE_X + 1, ky, 22); set(ox + KNIFE_X + 2, ky, 22);
   const line = (pts, thick) => {
@@ -665,7 +636,6 @@ function makeBoat() {
   return { w, h, data, wl };
 }
 
-// procedural pixel fish, head facing left
 function makeFish(o) {
   const L = o.len, tl = o.tail, ht = o.ht, dh = o.dorsalH || 0;
   const bar = o.barbel ? 3 : 0;
@@ -736,10 +706,6 @@ function makeFish(o) {
 const FPAL = { o: 3, b: 6, m: 8, l: 10, s: 11, f: 5, e: 1 };
 const GPAL = { o: 13, b: 14, m: 15, l: 16, s: 16, f: 14, e: 18 };
 let BOAT, GOLD, GOLD_OPEN;
-// The far boat silhouettes for the ocean (bible, section 8): the hull with the fisherman and the lantern
-// pole flattened to index 0, then downscaled by 2 and 4 with nearest-neighbour cells (a cell is dark if any
-// source pixel in it is, so the thin hull lines and the prow curl survive), and a 5 by 2 speck. Each keeps a
-// waterline row wl for the reflecting stamp.
 let BOAT_FAR2, BOAT_FAR4, BOAT_SPECK;
 function shrink(s, k) {
   const w = Math.ceil(s.w / k), h = Math.ceil(s.h / k);
@@ -756,8 +722,6 @@ function boatSilhouette() {
   for (let y = BOAT.wl - 25; y < BOAT.wl - 21; y++) for (let x = 6; x < 9; x++) data[y * w + x] = 0;
   return { w, h, data, wl: BOAT.wl };
 }
-// The boat seen from beneath (the Deep ending): the flattened silhouette turned over, its waterline row
-// at the top, the hull and the people hanging down from the surface.
 let BOAT_BENEATH;
 function vflip(s) {
   const data = new Uint8Array(s.w * s.h);
@@ -789,7 +753,6 @@ const SPECIES = [
   { id: 'eel', names: ['Needle eel', 'Knot eel', 'Endless eel'], len: 24, ht: 3, tail: 2, eel: true, wt: [0.3, 0.9], d: 1.1 },
   { id: 'grayling', names: ['Pale grayling', 'Pale grayling', 'Ash grayling'], len: 14, ht: 6, tail: 4, dorsalH: 4, fork: true, wt: [0.3, 0.8], d: 1.0 },
 ];
-// One card line per species per act (story bible, section 5).
 const DESC = {
   perch: ['You can see its heart beating through it.', 'There is an old hook inside it. Not yours.', 'No eyes. It still turns toward the lantern.'],
   char: ['Its scales show you the sky. You check. It matches.', 'Its scales show you a red sky.', 'Its scales show your boat from underneath.'],
@@ -798,7 +761,6 @@ const DESC = {
   eel: ['Longer than it has any right to be.', 'It knotted itself so you couldn\u2019t keep it.', 'It is still coming out of the water.'],
   grayling: ['It smells of snow.', 'It smells of smoke.', 'It smells like you.'],
 };
-// The act 2 card voice, only if the player asked to hear the fish, keyed to the first wish.
 const VOICE = {
   company: 'I wished for company too. Now I have plenty.',
   fish: 'I wished for more fish too. Here I am.',
@@ -815,8 +777,6 @@ const ENDINGS = {
   deep: { title: 'Deep', text: 'The gold is where you left it. So is everything else. The water is warmer than you thought, and full of light, and there is no bottom.' },
 };
 const SILENT_TEXT = 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.';
-// One variant sentence per ending card (bible, section 4 Ending cards): kept, else (Still water only) the
-// one-refusal line, else the most relevant wish in the order given per ending, else refused twice.
 const END_VARIANTS = {
   home: {
     kept: 'The golden fish slips out of the boat as you go in.',
@@ -861,18 +821,15 @@ const END_VARIANTS = {
   stay: { order: ['home'], lines: { home: 'It was your cabin all along.' } },
   deep: { kept: 'The golden fish goes down with you. It knows the way.', order: [], lines: {} },
 };
-// The wish button labels, read back on the ending card.
 const WISH_LABELS = {
   company: 'Someone to sit with me', fish: 'Take me where the fish are', home: 'A home on the shore',
   forever: 'Make this day last forever', hear: 'Let me hear the fish', gold: 'Gold. A boat full of it',
 };
-// The recount at wish 3: the player's own labels shifted to the second person, one clause per granted wish, in order.
 const RECOUNT = {
   company: 'someone to sit with you', fish: 'where the fish are', home: 'a home on the shore',
   forever: 'a day that lasts forever', hear: 'to hear the fish', gold: 'a boat full of gold',
 };
 
-// ---------------------------------------------------------------- state
 const WS = {};
 function resetWS() {
   Object.assign(WS, {
@@ -880,16 +837,11 @@ function resetWS() {
     pupil: 0, pupilDx: 0, stalk: 0, stalkCut: 0, troubled: 0, starA: 0, lantern: 0, lanternFlicker: 1,
     jaw: 0, companion: 0, companionTurn: 0, cabin: 0, fishShadows: 0, gold: 0, boatSink: 0, boatX: 0, ash: 0,
     lineCut: false, goldFish: null,
-    // story bible, section 3. Only frozen is read in this phase; the rest are drawn by later phases.
     goldKept: 0, boatSunk: 0, frozen: 0, far: 0, eyes: 0, farBoat: 0,
-    // Phase 3: the ocean. shoreShift is px the mountains sit closer to the horizon after the ocean;
-    // swallow is the radius of the opening water; boatDrop the boat's fall into it.
     shoreShift: 0, swallow: 0, boatDrop: 0,
-    // Phase 4: companionFace swaps the turned sprite for the one facing the fisherman; lanternWarm widens the glow (Stay).
     companionFace: 0, lanternWarm: 0,
-    // Phase 6: dive is the Deep descent (the horizon rises past the top and the mirror fills the frame);
-    // glint is the gold pile's two-frame sparkle seen from beneath.
     dive: 0, glint: 0,
+    shoalOut: 0, // the still-water dawn: the shoal steers to the horizon at full weight and leaves as it arrives
   });
 }
 const G = {
@@ -899,9 +851,6 @@ const G = {
   capUntil: 0, saidUntil: 0, saidPending: [],
   arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0,
 };
-// wishes holds granted wishes only, in order. kept, firstAsk, refused, answered, ocean, said and usedRepl follow
-// the bible, section 3: said counts the fisherman's lines that have shown, usedRepl the card replacements fired.
-// casts counts casts for the opening captions; shown1 lists the species whose act 1 card was shown, for the act 2 pick.
 const freshStory = () => ({
   act: 0, catches: 0, actCatches: 0, wishes: [], heard: false, goldenNext: false, lastSpecies: null,
   kept: false, firstAsk: null, refused: 0, answered: null, ocean: 'none', said: 0, usedRepl: [], casts: 0, shown1: [],
@@ -910,11 +859,9 @@ const freshStory = () => ({
 });
 const STORY = freshStory();
 const has = w => STORY.wishes.indexOf(w) >= 0;
-// Across runs (bible, section 7): completed runs and the last ending, from storage plus this session.
 const RUN = { count: 0, last: null };
 const isLaterRun = () => RUN.count > 0;
 
-// ---------------------------------------------------------------- UI (DOM in browser, stub elsewhere)
 let UI = null;
 function stubUI() {
   const log = [];
@@ -929,7 +876,6 @@ function stubUI() {
   };
 }
 
-// ---------------------------------------------------------------- tweens
 const TW = [];
 function untween(obj, key) {
   for (let k = TW.length - 1; k >= 0; k--) if (TW[k].obj === obj && TW[k].key === key) TW.splice(k, 1);
@@ -949,7 +895,6 @@ function updTweens(dt) {
   }
 }
 
-// ---------------------------------------------------------------- particles, rings, ambient life
 const PARTS = [], RINGS = [], ASH = [], SHAD = [], BIRDS = [];
 let birdTimer = 3, jumpTimer = 5;
 function splash(x, y, n) {
@@ -966,7 +911,6 @@ function updParts(dt) {
   }
 }
 function ring(x, y, big) { RINGS.push({ x, y, r: 1, v: big ? 26 : 12, life: 0, max: big ? 2.6 : 1.6 }); }
-// A bubble: a small round ring that grows a little and pops (the gold sink).
 function bubble(x, y) { RINGS.push({ x, y, r: 1, v: 3, life: 0, max: 0.5 + Math.random() * 0.4, round: true }); }
 function updRings(dt) {
   if (WS.frozen) return; // frozen, a ring in flight holds, like the birds (bible, 8b)
@@ -990,8 +934,6 @@ function updAsh(dt) {
     }
   }
 }
-// The shoal. Every shadow faces the horizon from the moment it spawns and drifts toward the sun's
-// column; one that reaches the horizon comes back in at the bottom, so they all keep going the same way.
 const SHAD_TOP = HY + 12;
 function shadowHeading(s) { return Math.atan2(HY - 200 - s.y, WS.sunX - s.x); }
 function spawnShadows() {
@@ -1005,17 +947,21 @@ function spawnShadows() {
 }
 function updShadows(dt) {
   if (!WS.fishShadows) return;
-  for (const s of SHAD) {
-    s.a += (hash2(s.x | 0, s.y | 0, (G.t * 2) | 0) - 0.5) * 1.2 * dt;
-    s.a += Math.sin(shadowHeading(s) - s.a) * 2 * dt;
+  for (let k = SHAD.length - 1; k >= 0; k--) {
+    const s = SHAD[k];
+    if (!WS.shoalOut) s.a += (hash2(s.x | 0, s.y | 0, (G.t * 2) | 0) - 0.5) * 1.2 * dt;
+    s.a += Math.sin(shadowHeading(s) - s.a) * (WS.shoalOut ? 6 : 2) * dt;
     if (Math.sin(s.a) > 0) s.a = -s.a; // never past horizontal: every shadow keeps moving toward the horizon
     s.x += Math.cos(s.a) * s.sp * dt;
-    s.y += Math.sin(s.a) * s.sp * 0.3 * dt;
+    s.y += Math.sin(s.a) * s.sp * (WS.shoalOut ? 1.2 : 0.3) * dt; // at the dawn they hurry
     const cx = Math.cos(s.a);
     if (Math.abs(cx) > 0.15) s.dir = cx >= 0 ? 1 : -1;
     if (s.x < -10) s.x = W + 8;
     if (s.x > W + 10) s.x = -8;
-    if (s.y < SHAD_TOP) { s.y = H - 22 - Math.random() * 12; s.x = Math.random() * W; s.a = shadowHeading(s); }
+    if (s.y < SHAD_TOP) {
+      if (WS.shoalOut) { SHAD.splice(k, 1); continue; } // bible, Still water: removed as they arrive
+      s.y = H - 22 - Math.random() * 12; s.x = Math.random() * W; s.a = shadowHeading(s);
+    }
     if (s.y > H - 20) s.y = H - 20;
   }
 }
@@ -1023,7 +969,6 @@ function spawnBirds() {
   const fromL = Math.random() < 0.5, y = 40 + Math.random() * 80, n = 2 + ((Math.random() * 3) | 0);
   for (let k = 0; k < n; k++) BIRDS.push({ x: fromL ? -8 - k * 9 : W + 8 + k * 9, y: y + (Math.random() - 0.5) * 12 + k * 3, vx: (fromL ? 1 : -1) * (14 + Math.random() * 4), ph: Math.random() * 3 });
 }
-// Birds only while it is day, the shore is near and the day is not frozen (bible, 8c). Frozen, they hang.
 function updBirds(dt) {
   if (WS.frozen) return;
   birdTimer -= dt;
@@ -1046,10 +991,6 @@ function updJumps(dt) {
   }
 }
 
-// ---------------------------------------------------------------- rendering
-// The mountains sink toward the horizon (bible, Ocean): their height is scaled by 1 - far and, after the
-// ocean, they sit shoreShift px lower for the rest of the run. Output row y samples the source row that
-// high above the horizon; past far 0.98 nothing of them remains.
 function mountShift(x, y, inv, sh) {
   const ys = HY - Math.round((HY - y + sh) * inv);
   return ys < 0 ? 255 : MOUNT[ys * W + x];
@@ -1132,7 +1073,6 @@ function stampTop(s, x0, y0, alpha) {
   }
 }
 const CABIN_X = 62, CABIN_Y = HY - 12;
-// After the ocean the shore sits lower, and the cabin keeps its feet on it (never below the horizon).
 function cabinY() { return Math.min(CABIN_Y + WS.shoreShift, HY - CABIN.h); }
 function topExtras(t) {
   if (WS.starA > 0.02) {
@@ -1154,9 +1094,6 @@ function topExtras(t) {
     }
   }
 }
-// The sun's reflection is one pixel larger than the disc (bible, 8c). The white sun is redrawn in the
-// water with the sunPix rule at radius sr + 1 (fill and rim both a pixel further out); the red sun,
-// whose pupil must stay as mirrored, only gets a rim in its edge colour outside the disc.
 function sunRing(y, row, src, ixr, dyS, darkF, haze) {
   const srow = src * W;
   const sx = WS.sunX, sr = WS.sunR, r0 = (sr + 0.4) * (sr + 0.4), r1 = (sr + 1.4) * (sr + 1.4);
@@ -1171,9 +1108,6 @@ function sunRing(y, row, src, ixr, dyS, darkF, haze) {
     FRAME[row + x] = ci(dith(v - darkF + haze, x, y));
   }
 }
-// The Deep descent (bible, section 8): the horizon row rises past the top of the screen with WS.dive, and
-// the mirror's source rows are spread so the whole sky fills the growing water region. At dive 0 the
-// horizon is HY and every source row maps one to one, as before.
 function waterTop() { return WS.dive > 0 ? Math.max(0, Math.round(HY - (HY + 6) * WS.dive)) : HY; }
 function computeWater(t) {
   FRAME.set(TOP, 0);
@@ -1230,8 +1164,6 @@ function drawRings() {
     }
   }
 }
-// One fish shadow, size 1 being the shoal's. Larger ones (the ocean, 2x to 6x) get a flared tail. a dithers
-// it away as it fades. Head toward dir.
 function drawShadowShape(sx, sy, dir, size, a) {
   for (let k = -5 * size; k <= 4 * size; k++) {
     const kk = k / size, tail = kk * dir < -3;
@@ -1249,15 +1181,11 @@ function drawShadows() {
   if (!WS.fishShadows) return;
   for (const s of SHAD) drawShadowShape(s.x, s.y, s.dir, 1, 1);
 }
-// The ocean (bible, section 8): a dozen large shadows drifting to the horizon, then the big one.
 const OCEAN = { shad: [], big: null, tr0: 0 };
 function drawOceanShadows() {
   for (const s of OCEAN.shad) drawShadowShape(s.x, s.y, s.dir, s.size, s.a);
   if (OCEAN.big) drawBigShadow(OCEAN.big);
 }
-// The big one's plan shape, u along the body (head at u = -1, tail tip at u = 1), v across it, both -1..1.
-// Returns the darkness 0..1 inside, 0 outside: an elliptical body with a ridge down the middle, a pair of
-// pectoral fins, and a forked tail that flares from the root.
 function bigShape(u, v) {
   const av = Math.abs(v);
   if (u < 0.44) { // body, an ellipse from -1 to 0.44
@@ -1284,8 +1212,6 @@ function drawBigShadow(b) {
     }
   }
 }
-// The Swallowed circle (bible, section 8): the water inside an ellipse around the boat goes to the darkest
-// index, with a rippling edge a shade lighter. In the water only, never reflected.
 const SWALLOW_CY = WL + 6;
 function drawSwallow(t) {
   const r = WS.swallow;
@@ -1305,8 +1231,6 @@ function drawSwallow(t) {
     }
   }
 }
-// The eyes in the water (bible, section 8): about eight pairs of red pixels on the surface rows under
-// the horizon beside the boat, fixed per run, with a dimmer pair a row below as the glint. Never reflected.
 const EYES = [];
 function genEyes() {
   const rng = mulberry32(RUN.count + 7); // fixed per run, and the shots stay deterministic
@@ -1374,8 +1298,6 @@ function drawRod(hx, hy, wl) {
   }
   G.tip = { x: tx, y: ty };
 }
-// While far > 0 the boat's centre slides toward the middle of the screen; past 0.5 it is a silhouette
-// (half, quarter, then a speck) with the rod, line, float and lantern hidden (bible, Ocean).
 const boatCentreX = far => lerp(BOAT_X + WS.boatX + BOAT.w / 2, W / 2, far);
 function farBoatSprite(far) { return far <= 0.75 ? BOAT_FAR2 : far <= 0.92 ? BOAT_FAR4 : BOAT_SPECK; }
 function drawFarBoat(t, far) {
@@ -1384,16 +1306,10 @@ function drawFarBoat(t, far) {
   stampR(s, x0, y0, WL);
   G.tip = { x: x0 + s.w / 2, y: y0 }; // a cast from out here leaves from the silhouette itself
 }
-// Facing the horizon, turned (the red), or facing the fisherman (Stay).
 function compSprite() { return WS.companionFace > 0.5 ? COMP_FACE : WS.companionTurn > 0.5 ? COMP_TURN : COMP; }
-// The boat's left corner on screen, the origin of every sprite in the boat group.
 function boatLeft() { return Math.round(boatCentreX(WS.far) - BOAT.w / 2); }
-// The gold sink (bible, section 8): at boatSunk 1 the hull rides SINK_PX lower, so the waterline sits at the
-// gunwale and the rows under it are the water (the reflecting stamp masks them); the people stand another
-// LEG_PX lower in the flooded hull, legs under. boatSink is the red sequence's two extra pixels on top.
 const SINK_PX = 5, LEG_PX = 2;
 function boatSinkPx() { return Math.round(WS.boatSunk * SINK_PX + WS.boatSink); }
-// The lantern hangs from its pole, or floats beside the stern at water level once the boat has settled.
 function drawLantern(t, bx, dy) {
   const sunk = WS.boatSunk;
   const lpx = bx + 9, ltop = WL - 27 + dy;
@@ -1408,8 +1324,6 @@ function drawLantern(t, bx, dy) {
   }
   G.lanternPos = { x: lx + 1, y: ly + 1.5 };
 }
-// Deep: the boat as a dark shape hanging from the surface near the top of the screen, seen from beneath,
-// with the gold pile's one glint. Rows above the water top are the sky and are not drawn.
 function drawBoatBeneath() {
   const hy = waterTop(), bx = boatLeft(), s = BOAT_BENEATH;
   const y0 = Math.max(hy, 4) - 1 - boatSinkPx();
@@ -1486,14 +1400,11 @@ function drawLine() {
     linePix(x, y);
   }
 }
-// The talking test shared by the sky fish and the boat fish: a Golden fish line is still typing.
 function fishSpeaking() {
   const L = DLG.cur;
   return !!(L && L.text && DLG.n < L.text.length && /fish/i.test(L.who || ''));
 }
 const mouthOpen = t => ((t * 10) | 0) & 1;
-// The kept fish in the boat bottom. Its alpha follows the ladder and returns to 1 whenever it speaks,
-// with a soft sparkle (bible, section 8). Not shown out on the ocean, when the boat is a speck.
 function drawKeptFish(t, bx, dy) {
   const speaking = fishSpeaking();
   const a = speaking ? 1 : WS.goldKept;
@@ -1557,7 +1468,6 @@ function composite() {
 const FANGS_UP = [[50, 9, 118], [77, 12, 150], [104, 14, 172], [131, 12, 150], [158, 9, 118]];
 const FANGS_DN = [[37, 8, 96], [63, 11, 124], [90, 13, 142], [118, 13, 142], [145, 11, 124], [171, 8, 96]];
 function drawFang(cx, hb, len, tip, dir) {
-  // dir = 1: hangs from above, tip pointing down. dir = -1: rises from below.
   for (let k = 0; k <= len; k++) {
     const y = Math.round(tip - dir * k);
     if (y < 0 || y >= H) continue;
@@ -1672,7 +1582,6 @@ function render(t) {
   applyGlows(t);
 }
 
-// ---------------------------------------------------------------- audio (synthesised, no files)
 const SFX = {
   ctx: null, out: null, buf: null, muted: false, drn: null,
   init() {
@@ -1768,10 +1677,6 @@ const SFX = {
   },
 };
 
-// ---------------------------------------------------------------- dialogue
-// A line is {who, text, style, choices, mark}, {act: fn} or {pause: seconds}. mark asks the UI for the
-// wrong question mark (the companion's question). A choice whose pick() does not start a new dlgRun
-// lets the current list continue, so a choice can sit in the middle of a scene.
 const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0 };
 function dlgRun(lines, done) {
   DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.run++;
@@ -1830,7 +1735,6 @@ function dlgTap() {
   dlgNext();
 }
 
-// ---------------------------------------------------------------- cinematics
 let CINE = null;
 function playCine(def, done) {
   CINE = { def, t: 0, fired: {}, done, st: {} };
@@ -1845,8 +1749,6 @@ function cineUpdate(dt) {
   c.def.update(c.t, dt, at, c.st);
   if (CINE === c && c.t >= c.def.dur) { CINE = null; if (c.done) c.done(); }
 }
-// The sunset. After a refusal the caption changes. If the day was wished to last forever the stars
-// never come up and the glow under the horizon never fully dies.
 const sunsetCine = refused => ({
   dur: 10,
   init(s) { s.y0 = WS.sunY; s.tr0 = WS.troubled; },
@@ -1863,8 +1765,6 @@ const sunsetCine = refused => ({
     at('lan', 7.8, () => { tween(WS, 'lantern', 1, 0.7); cap('You light the lantern.', 2.6); SFX.match(); });
   },
 });
-// The red sun. The companion turns at the pupil beat, before anyone speaks. The pupil slides toward
-// the boat only if the player ever asked for something. If the fish were heard, the lake whispers.
 const CINE_RED = {
   dur: 15.5,
   init(s) {
@@ -1919,8 +1819,6 @@ const CINE_DARK = {
     at('fade', 8.3, () => UI.fade(1, 1));
   },
 };
-// Stay (bible, section 8): he turns to face the fisherman, the boat drifts toward the cabin light (the left
-// shore if there is none), the red sun stays, the lantern warms, the heartbeat slows and stops, then black.
 const STAY_DRIFT_CABIN = -56, STAY_DRIFT_SHORE = -76;
 const CINE_STAY = {
   dur: 14,
@@ -1933,7 +1831,6 @@ const CINE_STAY = {
     at('fade', 11, () => UI.fade(1, 3));
   },
 };
-// The released sky fish drops below the horizon with a splash (the cut and silent endings).
 function goldFishDrop() {
   const g = WS.goldFish;
   if (!g) return;
@@ -1942,8 +1839,6 @@ function goldFishDrop() {
     tween(g, 'a', 0, 0.2, E.lin, () => { if (WS.goldFish === g) WS.goldFish = null; });
   });
 }
-// The cut, or (silent) the line going slack: no snap, and the stalk sinks with the disc. No caption on
-// the cut itself: the interrupted word, the snap and the splash say it. Silent gets `The line goes slack.`
 const cutCine = silent => ({
   dur: 17.5,
   init(s) { s.y0 = WS.sunY; s.tr0 = WS.troubled; },
@@ -1951,6 +1846,7 @@ const cutCine = silent => ({
     at('cut', 0.15, () => {
       if (silent) { if (G.bob) G.bob.taut = false; SFX.splash(); }
       else { WS.lineCut = true; G.bob = null; SFX.snap(); if (WS.gold > 0) tween(WS, 'gold', 0, 0.8); }
+      WS.shoalOut = 1;
       goldFishDrop();
       splash(SUNX - 3, HY + 2, 6);
     });
@@ -1984,15 +1880,11 @@ const cutCine = silent => ({
   },
 });
 
-// ---------------------------------------------------------------- story
-// The script is docs/story.md. The golden fish speaks in every act, including the red.
 const FISHN = 'Golden fish';
 const narr = text => ({ who: '', text, style: 'narr' });
 const fish = text => ({ who: FISHN, text });
 const red = text => ({ who: FISHN, text, style: 'red' });
 const whisperFish = text => ({ who: FISHN, text, style: 'whisper' });
-// The lake's one line (bible, section 4): a labelled whisper in the dialogue panel, shown from inside the red
-// cinematic. DLG is inactive there, so the text appears whole and the cinematic hides the panel itself.
 function lakeWhisper(text) { UI.dlgShow('The lake', 'whisper'); UI.dlgText(text); }
 function goldenScene() {
   G.bob = null;
@@ -2002,7 +1894,6 @@ function goldenScene() {
   SFX.chime();
   if (STORY.act === 0) wish1(); else wish2();
 }
-// Kept, act 1: the fish speaks from the boat with no surfacing splash (bible, Act 1).
 function keptScene() {
   G.bob = null;
   tween(WS, 'goldKept', 1, 0.8);
@@ -2015,16 +1906,13 @@ function goldenDive() {
   SFX.splash();
   tween(g, 'a', 0, 0.5, E.io, () => { if (WS.goldFish === g) WS.goldFish = null; });
 }
-// The kept fish dims one rung of the ladder as the scene ends (0.7 after wish 1, 0.45 after wish 2).
 function keptDim(act) { if (STORY.kept) tween(WS, 'goldKept', KEPT_LADDER[act], 1.5); }
-// Keep it: the sky fish is lifted into the boat, where it stays for the rest of the run.
 function keptLift() {
   const g = WS.goldFish;
   if (g) tween(g, 'a', 0, 0.4, E.lin, () => { if (WS.goldFish === g) WS.goldFish = null; });
   tween(WS, 'goldKept', 1, 1);
   splash(42, 262, 5); SFX.splash();
 }
-// The kept fish goes over the side (the still-water dawn; silently after the silent ending).
 function keptOver(withCaption) {
   if (!STORY.kept || WS.goldKept <= 0) return;
   const x = boatLeft() + KEPT_DX + 8;
@@ -2034,8 +1922,6 @@ function keptOver(withCaption) {
 }
 function startAct(act) { STORY.act = act; STORY.actCatches = 0; }
 
-// -- golden scene 1 and wish 1
-// The fish's first line changes on a later run (bible, sections 4 and 7).
 function greeting1() {
   if (!isLaterRun()) return 'Wait. Don’t gut me, fisherman.';
   return RUN.last === 'home' ? 'Back out already? It doesn’t usually let go.' : 'You again. Or someone wearing you.';
@@ -2050,7 +1936,6 @@ function wish1() {
     ] },
   ]);
 }
-// Keep it lifts the fish into the boat (keptLift); it dims each act and speaks from there (drawKeptFish).
 function wish1b(kept) {
   STORY.kept = kept;
   const L = kept ? [
@@ -2082,7 +1967,6 @@ const GRANT1 = {
     fish('Every light out here is for someone. That one is for you.'),
   ],
 };
-// The cost: the sun starts dropping as the first cost line begins. No caption; the drop is the sentence.
 const costLines = () => [
   { act: sunDrop },
   fish('A wish costs a little daylight. You said you could watch that sun forever.'),
@@ -2097,8 +1981,6 @@ function grant1(w) {
   dlgRun(GRANT1[w]().concat(costLines()), afterGrant1);
 }
 
-// -- the ocean (bible, sections 4 and 8). The shore sinks into haze, the boat shrinks to a speck on a vast
-// lit sea, huge shadows drift to the horizon, and one the width of the screen stops under the boat.
 const OCEAN_FAR_DUR = 6, OCEAN_BIG_T = 10, OCEAN_WINDOW = 12, OCEAN_RETURN = 4, SHORE_SHIFT = 10, SWALLOW_R = 130;
 function spawnOceanShadow(size) {
   const fromLeft = Math.random() < 0.5;
@@ -2143,8 +2025,6 @@ const CINE_OCEAN = {
   },
 };
 function oceanTold() { dlgRun([fish('Told you.')], () => setPhase('ocean')); }
-// The choice is made by input: a cast while the big one is under the boat is the Swallowed ending; waiting the
-// window out lets it leave. Skip fish counts as a cast here.
 function oceanCast() {
   STORY.ocean = 'swallowed';
   playCine(CINE_SWALLOW, () => showEnding('swallowed'));
@@ -2171,8 +2051,6 @@ function oceanLeave() {
   STORY.ocean = 'waited';
   playCine(CINE_OCEAN_BACK, () => dlgRun([fish('Look how they all go the same way.')].concat(costLines()), afterGrant1));
 }
-// The big one slides off left over 4 s, then the boat and the mountains come back over 4 s, the shore landing
-// SHORE_SHIFT px closer to the horizon for the rest of the run. The shoal stays. No caption about it.
 const CINE_OCEAN_BACK = {
   dur: OCEAN_RETURN * 2 + 0.6,
   init() {
@@ -2187,7 +2065,6 @@ const CINE_OCEAN_BACK = {
     });
   },
 };
-// The sun drops in two visible steps, about 16 px over 5 s, and the water grows a little troubled.
 const SUN_STEP = 8;
 function sunDrop() {
   const y0 = WS.sunY;
@@ -2210,8 +2087,6 @@ function refuse1() {
   });
 }
 
-// -- golden scene 2 and wish 2
-// Greeting by priority: kept and refused once > kept > refused once > default (bible, Golden scene 2).
 function greeting2() {
   if (STORY.kept && STORY.refused === 1) return 'You cast anyway. Habit. Still wanting nothing?';
   if (STORY.kept) return 'You cast anyway. Habit.';
@@ -2241,10 +2116,7 @@ const GRANT2 = {
     fish('Listen, then. They all say the same thing.'),
   ],
 };
-// Forever: the clouds stop, the birds hang, the fish stop jumping and the sun holds until the sunset
-// cinematic, which drives it directly (bible, 8b). Nothing says so.
 function freezeDay() { WS.frozen = 1; G.frozeT = G.t; untween(WS, 'sunY'); SFX.chime(); }
-// The lines that close a granted wish 2, then the sunset.
 function wish2Cost() {
   return [
     fish((STORY.refused === 1 ? 'That was my first, too.' : 'That was my second, too.') + ' This one costs the rest of the day.'),
@@ -2259,8 +2131,6 @@ function grant2(w) {
   if (w === 'gold') { grantGold(); return; }
   dlgRun(GRANT2[w]().concat(wish2Cost()), wish2Sunset);
 }
-// Gold (bible, Wish 2 grants and section 8): the pile appears, the boat settles to the gunwales in the sink
-// cutscene, then the apology and the usual cost lines.
 function grantGold() {
   dlgRun([
     fish('Gold. A boat full of it.'),
@@ -2268,8 +2138,6 @@ function grantGold() {
     { pause: 1.2 },
   ], () => playCine(CINE_SINK, () => dlgRun([fish('Sorry. Gold is heavy. You can always come back for it.')].concat(wish2Cost()), wish2Sunset)));
 }
-// The gold sink (5 s): boatSunk 0 to 1 over 3 s, bubbles along the hull for two seconds. The sunk state
-// persists for the rest of the run; the rod and the float still work from it.
 const CINE_SINK = {
   dur: 5,
   init() { tween(WS, 'boatSunk', 1, 3, E.io); SFX.hiss(2.4); },
@@ -2298,7 +2166,6 @@ function afterSunset() {
   if (has('company')) companionQuestion(() => setPhase('ready'));
   else setPhase('ready');
 }
-// The companion's one question, right after the lantern lights. The mark is drawn wrong.
 function companionQuestion(done) {
   const answer = yes => () => {
     STORY.answered = yes;
@@ -2312,8 +2179,6 @@ function companionQuestion(done) {
   ], done);
 }
 
-// -- the red sequence and wish 3
-// Refused twice replaces the whole set on either path (bible, Red sequence).
 function redLines() {
   const L = STORY.refused === 2 ? ['One wish left. You said you could watch that sun forever, then asked for nothing twice.', 'It wants to see why.']
     : STORY.kept ? ['That isn’t me pulling. It never was.', 'One wish left. But first, the sun I promised you.', 'You said you could watch it forever. I passed that on.']
@@ -2329,8 +2194,6 @@ function redSequence() {
   dlgRun([
     { pause: 1.4 },
     narr('The line goes taut. You did not feel a bite.'),
-    // Released: the fish appears above the horizon where the sun set. Kept: nothing appears in the sky;
-    // the boat fish glows back to 1 and speaks from there (bible, Red sequence).
     { act: () => {
       if (STORY.kept) { tween(WS, 'goldKept', 1, 0.9); return; }
       WS.goldFish = { x: SUNX - 14, y: HY - 24, a: 0, surf: HY + 1 }; tween(WS.goldFish, 'a', 1, 0.9); SFX.chime();
@@ -2339,7 +2202,6 @@ function redSequence() {
   ].concat(redLines()), () => playCine(CINE_RED, wish3));
 }
 const sentence = s => s.charAt(0).toUpperCase() + s.slice(1) + '.';
-// One line, up to 125 characters: the granted wishes in order, then always the sun.
 function recountLine() {
   const parts = STORY.wishes.map(w => RECOUNT[w]);
   return 'Everything you asked for. ' + parts.map(sentence).join(' ') + ' And the sun you wanted. Your words, not mine.';
@@ -2355,7 +2217,6 @@ function wish3Choices() {
   if (STORY.refused === 2) c.push({ label: 'Nothing', pick: endSilent });
   return c;
 }
-// The bible's ordered list: seven lines at most before the buttons, five in a typical run.
 function wish3() {
   const nothing = STORY.wishes.length === 0;
   const L = [
@@ -2372,7 +2233,6 @@ function wish3() {
   dlgRun(L);
 }
 
-// -- endings
 function endHome() {
   const L = [red('Home. Yes. Come inside.')];
   if (STORY.kept) L.push(whisperFish('Thank you.'));
@@ -2395,9 +2255,6 @@ function endStay() {
     red('Someone to sit with you. It’s what you asked for.'),
   ], () => playCine(CINE_STAY, () => showEnding('stay')));
 }
-// Deep (bible, sections 4 and 8): down for the gold. The horizon rises past the top of the screen and the
-// mirror fills the frame, the palette dims, stars show below, the boat hangs from the surface as a dark
-// shape seen from beneath, the gold glints once, then black. There is no bottom.
 function endDeep() {
   dlgRun([red('It’s still down there. All of it. Mind the waterline.')], () => playCine(CINE_DEEP, () => showEnding('deep')));
 }
@@ -2424,7 +2281,6 @@ const CINE_DEEP = {
     at('fade', 12, () => UI.fade(1, 2));
   },
 };
-// Silent: nothing, asked a third time. Counts as Still water. Kept: the boat fish dims with no caption.
 function endSilent() {
   const L = [narr('You say nothing.'), { pause: 3 }, narr('It waits. Then it splashes its tail once and goes down.')];
   if (STORY.kept) L.push({ act: () => tween(WS, 'goldKept', 0.05, 1.5) });
@@ -2453,9 +2309,6 @@ function saveRun(id) {
   saveJSON('stillwater-runs', Math.max(sessionRuns, +loadJSON('stillwater-runs', 0) || 0));
   saveJSON('stillwater-last', id);
 }
-// The ending card: the base text, one variant sentence, and what was asked for.
-// Priority: kept > one refusal (Still water only: a run with one refusal always has one granted wish, so this
-// line has to outrank the wish sentence to ever show) > the most relevant wish (order per ending) > refused twice.
 function endingVariant(id) {
   const v = END_VARIANTS[id];
   if (!v) return ''; // Swallowed has no variant sentence (bible, Ending cards)
@@ -2486,7 +2339,6 @@ function showEnding(id, variant) {
   UI.ending(composeEnding(id, variant), n);
 }
 
-// ---------------------------------------------------------------- fishing
 function promptFor(p) {
   if (p === 'ready' || p === 'ocean') return 'Tap to cast';
   if (p === 'waiting' && G.tutorial < 2) return 'Wait for the float to dip';
@@ -2494,19 +2346,15 @@ function promptFor(p) {
   if (p === 'reeling') return G.tutorial < 3 ? 'Hold to reel. Let go when it pulls hard.' : 'Hold to reel';
   return '';
 }
-// The tutorial prompt is hidden while a said caption is on screen, so two texts never share the stage.
 function refreshPrompt() { UI.prompt(G.t < G.saidUntil || !G.arrived ? '' : promptFor(G.phase)); }
 function setPhase(p) {
   G.phase = p; G.pt = 0;
   refreshPrompt();
 }
-// Captions, with their end time tracked so the said lines can wait their turn.
 function cap(t, dur, style) {
   G.capUntil = G.t + (dur || 2.5);
   UI.caption(t, dur, style);
 }
-// The fisherman's lines (bible, Opening): quoted, in the said style. A line that finds another caption on
-// screen waits in G.saidPending and shows at the next beat (a cast landing or a card closing).
 const SAID_DUR = 2.6;
 function saidBeat(text) {
   if (text) G.saidPending.push(text);
@@ -2514,14 +2362,11 @@ function saidBeat(text) {
   STORY.said++;
   showSaid(G.saidPending.shift());
 }
-// A quoted line in the said style, hiding the prompt while it is on screen.
 function showSaid(text) {
   cap('“' + text + '”', SAID_DUR, 'said');
   G.saidUntil = G.capUntil;
   refreshPrompt();
 }
-// A carried-over line also shows as soon as the stage is free during play, so the three lines cannot
-// cascade past the third catch (the fish quotes them right after).
 const SAID_PHASES = ['ready', 'casting', 'waiting'];
 function saidUpdate() {
   if (G.saidUntil && G.t >= G.saidUntil) { G.saidUntil = 0; refreshPrompt(); }
@@ -2540,11 +2385,6 @@ function cast() {
   setPhase('casting');
   SFX.whoosh();
 }
-// The eyes (bible, Act 2 play), once per run, between casts: on the first ready phase that lasts six
-// seconds without a cast, on the second ordinary act 2 cast if the player is quick, or, once the act 2
-// catch has made the next cast golden, half a second after the card closes (under "The water goes very
-// still"). A player who casts even faster than that gets them on the golden cast itself; at 2 s they are
-// over well before the earliest bite (3.7 s). The lantern dips for a second while they show.
 const EYES_WAIT = 6, EYES_WAIT_STILL = 0.5;
 function eyesLook() {
   if (G.eyesDone) return;
@@ -2560,7 +2400,6 @@ function eyesUpdate() {
   if (G.eyesDone || STORY.act !== 2 || G.phase !== 'ready' || G.pt < (STORY.goldenNext ? EYES_WAIT_STILL : EYES_WAIT)) return;
   eyesLook();
 }
-// In act 2 the golden cast has nothing bite for slightly too long.
 const RED_BITE_DELAY = 1.8;
 function startWaiting() {
   const golden = STORY.goldenNext;
@@ -2574,8 +2413,6 @@ function startWaiting() {
   G.wait = { t: 0, bite, nib };
   setPhase('waiting');
 }
-// The act 2 species is chosen from those whose act 1 line was not shown this run. After the later-run
-// hook line, the perch is excluded from the act 1 picks so the two hook lines never both show.
 function pickSpecies() {
   let pool = SPECIES.filter(s => s.id !== STORY.lastSpecies);
   if (STORY.act === 1 && usedRepl('lip')) pool = pool.filter(s => s.id !== 'perch');
@@ -2584,8 +2421,6 @@ function pickSpecies() {
   STORY.lastSpecies = s.id;
   return s;
 }
-// Conditional card replacements (bible, section 5): at most one per card, each fires at most once per run
-// (STORY.usedRepl), first match wins. once() returns null when the replacement has already fired.
 const usedRepl = key => STORY.usedRepl.indexOf(key) >= 0;
 function once(key, text) {
   if (usedRepl(key)) return null;
@@ -2663,15 +2498,12 @@ function land() {
 }
 function showCard(f) { setPhase('card'); UI.card(f); SFX.caught(); }
 function closeCard() { UI.cardHide(); afterCatch(); }
-// The fisherman's other two lines, after the first and second cards close.
 const OPENING_CAPS = { 1: 'Look at that sun.', 2: 'I could watch that sun forever.' };
 function stillCaption() {
   if (STORY.act === 0) return 'The water goes very still.';
   if (STORY.act === 1) return STORY.kept ? 'The water goes very still. The fish in the boat does not.' : 'The water goes very still again.';
   return STORY.kept ? 'The water goes very still. The flame leans toward your feet.' : 'The water goes very still. The lantern flame leans toward it.';
 }
-// Kept, act 1: the cast after the second catch is a normal hook with a normal card, and when that card
-// closes the fish speaks from the boat (STORY.keptNext marks the wait; bible, Act 1).
 function afterCatch() {
   STORY.catches++; STORY.actCatches++; G.tutorial++;
   UI.count(STORY.catches);
@@ -2742,8 +2574,6 @@ function fishUpdate(dt) {
   }
 }
 
-// ---------------------------------------------------------------- the companion (bible, section 6)
-// He only ever says the fisherman's words, bent a little. Pools are drawn in order, then the last repeats.
 const COMP_LINES = {
   day: ['Look at that sun.', 'First time here.', 'We could watch that sun forever.', 'Still there.'],
   night: ['Look at that sun.', 'It’s coming back.', 'Don’t you want it to?'],
@@ -2761,14 +2591,11 @@ function companionLine() {
   STORY.tap++;
   return text;
 }
-// One said-style caption instead of a cast. He never turns for it.
 function companionTap() {
   SFX.init(); SFX.resume();
   if (WS.companion <= 0.5) return;
   showSaid(companionLine());
 }
-// His sprite box padded by 3 px, only while he is there and the stage is his to answer: during play, or in
-// the red once he has turned and the last choices are showing.
 const COMP_PAD = 3;
 function companionHit(x, y) {
   if (WS.companion <= 0.5 || WS.far > 0.5) return false;
@@ -2778,7 +2605,6 @@ function companionHit(x, y) {
   return x >= x0 && x < x0 + COMP.w + 2 * COMP_PAD && y >= y0 && y < y0 + COMP.h + 2 * COMP_PAD;
 }
 
-// ---------------------------------------------------------------- input and flow
 function press() {
   SFX.init(); SFX.resume();
   const p = G.phase;
@@ -2793,10 +2619,6 @@ function press() {
 }
 function release() { G.holding = false; }
 
-// ---------------------------------------------------------------- test mode (temporary)
-// Skips the fishing minigame: one call lands the next fish, or triggers the golden
-// scene or the red sequence, exactly as a real catch would. Enable with ?test in the
-// URL or the T key. The S key or the Skip button performs a skip.
 let TEST = false;
 function setTestMode(on) {
   TEST = !!on;
@@ -2818,10 +2640,6 @@ function testCatch() {
   hook();
   if (G.phase === 'reeling' && G.reel) { G.reel.p = 1; land(); }
 }
-// The opening (bible, section 8): a short dip to black under the title fade, then the boat rows in from
-// off screen left in two eased strokes over 4 s, under the first caption. No cast until it has arrived.
-// The bible says -120, but BOAT_X is 118 and the hull 85 wide, so -120 would leave the boat on screen;
-// -208 is the value that actually starts it off the left edge. The dip hides the jump from the title's boat.
 const ROW_FROM = -208, ROW_DUR = 4, OPEN_DIP = 0.4;
 function startGame() {
   UI.title(false);
@@ -2889,7 +2707,6 @@ function init() {
   resetWS();
 }
 
-// ---------------------------------------------------------------- browser boot
 function makeUI() {
   const $ = id => document.getElementById(id);
   const el = {
@@ -2931,7 +2748,6 @@ function makeUI() {
     },
     cardHide() { el.card.classList.remove('on'); },
     dlgShow(who, style) { el.dlg.className = 'panel on ' + (style || ''); el.who.textContent = who || ''; el.who.hidden = !who; el.more.classList.remove('on'); },
-    // mark: the one line whose question mark is drawn wrong. Only that glyph gets a span; everything is text.
     dlgText(t, mark) {
       el.text.textContent = t;
       if (!mark || !t.endsWith('?')) return;

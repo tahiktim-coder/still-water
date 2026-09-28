@@ -68,3 +68,6 @@ if (which === 'all' || which === 'kept_red') shot('out_kept_red.png', (ws, G, S)
 // from the surface as a shape seen from beneath.
 if (which === 'all' || which === 'sink') shot('out_sink.png', (ws, G) => { ws.gold = 1; ws.boatSunk = 1; ws.sunY = 172 + 16; ws.troubled = 0.22; ws.companion = 1; g.setPhase('cine'); for (let k = 0; k < 9; k++) g.bubble(g.boatLeft() + 6 + k * 8, g.WL + (k % 3)); }, 4);
 if (which === 'all' || which === 'deep') shot('out_deep.png', (ws, G) => { redSky(ws); ws.lantern = 0; ws.ash = 0; ws.sunGlow = 0; ws.horizGlow = 0; ws.gold = 1; ws.boatSunk = 1; ws.boatSink = 2; ws.companion = 1; ws.companionTurn = 1; ws.dive = 0.6; ws.dim = 3; ws.starA = 0.7; ws.troubled = 0.2; g.setPhase('cine'); }, 7);
+// Phase 7, the still-water dawn with the shoal: the fish wish's shadows steer to the horizon at full weight
+// and leave as they arrive (shoalOut), under the returning sun.
+if (which === 'all' || which === 'cut_shoal') shot('out_cut_shoal.png', (ws) => { ws.mood = 0.6; ws.sunY = g.HY + 10; ws.sunGlow = 0.4; ws.horizGlow = 0.5; ws.starA = 0.4; ws.lantern = 1; ws.shoreShift = 10; ws.fishShadows = 1; g.spawnShadows(); ws.shoalOut = 1; ws.companion = 1; g.setPhase('cine'); for (let i = 0; i < 90; i++) g.update(1 / 30); }, 8);

@@ -2,7 +2,9 @@
 
 A short fishing tale. To play, open `dist/index.html` in a browser. It's best on a phone in portrait.
 
-Controls: tap to cast, then tap when the float dips. Hold to reel, and let go before the line snaps.
+Controls: tap to cast, then tap when the float dips. Hold to reel, and let go before the line snaps. When the golden fish speaks, tap to read on and pick an answer. Someone in the boat can be tapped too.
+
+A run takes about four minutes and ends one of six ways (Home, Dark, Still water, Stay, Deep, Swallowed), depending on what you ask for and what you keep. The endings you have found are counted on the title.
 
 ## Develop
 ```

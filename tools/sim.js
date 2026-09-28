@@ -89,7 +89,10 @@ for (const [plan, label, cardEnd, opts] of plans) {
   if (cardEnd && !r.text.endsWith(cardEnd)) { ok = false; console.log('   card should end with: ' + cardEnd); }
   if (r.id) seen[r.id] = true;
 }
-const need = ['home', 'dark', 'cut', 'cut:silent', 'swallowed', 'stay', 'deep'];
+// One line per ending id (six, plus the silent variant of cut), then the verdict: every plan must end and
+// all six ids must have been seen.
+const need = ['home', 'dark', 'cut', 'stay', 'deep', 'swallowed', 'cut:silent'];
+for (const id of need) console.log('ending ' + id.padEnd(11) + (seen[id] ? 'reached' : 'MISSING'));
 const missing = need.filter(id => !seen[id]);
-if (missing.length) { ok = false; console.log('missing endings: ' + missing.join(', ')); }
+if (missing.length) ok = false;
 console.log(ok ? 'ALL ENDINGS REACHED' : 'SOMETHING STALLED');

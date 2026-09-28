@@ -34,9 +34,11 @@ if (g.STORY.catches !== 3) fail('expected 3 catches, got ' + g.STORY.catches);
 
 // 3. Skipping through the whole game with a fixed plan reaches an ending fast.
 const plan = [1, 0, 0, 1, 0, 2]; // keep, company, someone, hear, yes, cut
-let ci = 0, last = -1;
+let ci = 0, last = -1, sawRed = false, redSkip = -1;
 while (g.phase !== 'end' && t < 400) {
   const p = g.phase;
+  if (g.WS.sunKind === 1 && !sawRed) { sawRed = true; redSkip = skips; } // the red cinematic has begun
+  if (p === 'ready' && g.G.arrived && g.STORY.act === 2 && g.STORY.goldenNext) skips++;
   if (t - last > 0.2) {
     if (p === 'ready' || p === 'card' || p === 'lost') g.testCatch();
     else if (p === 'dialog') { if (g.UI.choices) g.UI.choices[plan[ci++] || 0].cb(); else { g.press(); g.release(); } }
@@ -48,6 +50,10 @@ if (g.phase !== 'end') fail('never reached an ending, phase=' + g.phase + ' act=
 const ending = g.UI.log.filter(l => l[0] === 'ending').map(l => l[1].title);
 console.log(`ending=${ending.join(',')} catches=${g.STORY.catches} wishes=${g.STORY.wishes.join(',')} simulated=${t.toFixed(0)}s real=${Date.now() - t0}ms`);
 if (g.STORY.catches !== 7) fail('expected 7 catches over the run (kept: act 1 ends on a normal hook), got ' + g.STORY.catches);
+// 3a. The act 2 golden skip reached the red sequence (the line dragged to the horizon, then the red sun).
+if (!sawRed) fail('the act 2 skip never reached the red sequence');
+const redLine = g.UI.log.filter(l => l[0] === 'dlgShow').length;
+if (!redLine) fail('no dialogue was shown on the way to the red');
 
 // 3b. During the ocean window a skip acts as a cast into the big one, so the choice is never bypassed.
 g.resetAll(); g.press(); g.release(); tick(3);
