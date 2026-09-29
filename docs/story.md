@@ -123,6 +123,7 @@ A home on the shore:
 - The cabin lights on the far shore, directly under the sun.
 - Golden fish: `A home on the shore. One has just come free.`
 - Golden fish: `Every light out here is for someone. That one is for you.`
+- Someone is in it (phase 23). Nobody is ever seen: only three slow knocks from the shore in act 1 and again, slower, in act 2, the window blinking dark with each one, and the ending cards pay it off.
 
 Nothing (`refused = 1`, `firstAsk = 'nothing'`):
 - pause 1.2 s
@@ -137,7 +138,7 @@ After any granted wish, the sun starts dropping as the first line begins, so the
 
 ### Act 1, low sun. Two catches.
 
-Cards from section 5. The companion can be tapped (section 6). After catch 2:
+Cards from section 5. The companion can be tapped (section 6). Home path only: after the first catch's card closes, three slow knocks (`SFX.knock`, a short low muffled thump, about 0.55 s apart; the cabin window blinks dark with each) and the narr caption `Someone knocks on the cabin door.` It waits for the stage like any text. After catch 2:
 
 - released: `The water goes very still again.`
 - kept: `The water goes very still. The fish in the boat does not.` (shown when the next card closes, right before `You cast anyway. Habit.`, not a catch earlier)
@@ -152,7 +153,10 @@ Greeting, by priority: kept and refused once > kept > refused once > default.
 - refused once: `Back again. Still wanting nothing?`
 - default: `Back so soon? I'd only just got down. And this time?` (the same on the sea)
 
-The choices come straight under the greeting:
+Home path: the greeting stays as it is, and the fish adds one line after it, which carries the choices:
+- Golden fish: `Don't mind the knocking. They're not trying to get in.`
+
+The choices come straight under the greeting (home: under the knocking line):
 - Choice: **Make this day last forever** / **Let me hear the fish** / **Gold. A boat full of it** / **Nothing**
 
 #### Wish 2 grants
@@ -203,6 +207,7 @@ Say nothing (`answered = false`):
 The card carries a VOICE if `heard` (section 5). Once during act 2, between casts, the lantern dips for one second and for two seconds the water is full of eyes at the surface. Then it recovers. After the catch:
 - released: `The water goes very still. The flame leans toward it.`
 - kept: `The water goes very still. The flame leans to your feet.` (sunk: `The water goes very still. The flame leans toward the fish.`)
+- Home path, once that caption has ended: three knocks again, slower (about 0.8 s apart, the window blinking with each), and the narr caption `The knocking again. Slower.` The eyes wait for it.
 
 The golden cast: nothing bites for slightly too long (bite delay 1.8x), then the line goes taut and is dragged to the horizon. There is no bite, no `Tap now` and no way to miss it: when the bite time comes the red sequence starts. Kept: no sparkles and no chime; the fish is visibly in the boat.
 
@@ -229,12 +234,12 @@ Then the red cinematic as coded, with three changes: the companion turns at the 
 
 #### Wish 3
 
-Red style. One voice. The only insertions are the two optional lines marked below, in their places. Seven lines at most, five in a typical run.
+Red style. One voice. The only insertions are the optional lines marked below, in their places. Eight lines at most, five in a typical run.
 
 1. Golden fish: `There it is. Forever, like you said.`
 2. Golden fish: `That bait was never for fish. I should have said.` (the stranger's bait from act 0; this is the reveal, and it tells the player who the stranger was without saying so)
 3. Golden fish, the recount: `Everything you asked for.` then the granted wishes in order as short clauses, then `And forever.`, then `Your words, not mine.` All in one line, up to 125 characters. The clauses are the player's own labels, shifted to the second person: company `someone to sit with you`, fish `where the fish are`, home `a home on the shore`, forever `a day that never ends`, hear `to hear the fish`, gold `a boat full of gold`. Example: `Everything you asked for. Someone to sit with you. A boat full of gold. And forever. Your words, not mine.` If nothing was granted: `Nobody rows this far to want nothing. So why are you here.`
-4. Optional, companion present and silent: Companion: `Don't answer it. Cut the line.` Companion present and answered: Companion: `You said you'd stay.`
+4. Optional, companion present and silent: Companion: `Don't answer it. Cut the line.` Companion present and answered: Companion: `You said you'd stay.` then Golden fish, red: `You answered him. I did ask you not to.`
 5. Optional, kept: Golden fish, whisper from the boat: `I'm sorry.`
 6. Golden fish: `I sat where you sit. I said what you said. Three times.`
 7. Golden fish: `I'd like to go home now. What would you like.`
@@ -269,7 +274,7 @@ The card is composed from three parts: a BASE chosen by ending, location (lake o
 4. Sea, sunk: `The sea is quiet again. The gold is on the bottom, and it is a long way down. Somewhere a sun is coming up. Someone is rowing out.`
 - kept: `The golden fish slips out of the boat as you go in.` (sunk: `The golden fish follows you in.`)
 - companion: `The seat behind you is empty now. It was your turn.` (sunk: `The water behind you is empty now. It was your turn.`)
-- cabin: `The light on the shore goes out. Nobody was inside.`
+- cabin: `The knocking stops. Now it's you on the inside.`
 - heard: `You know the words already. You will say them.`
 - forever: `The day does not end. You aren't in it.`
 - nothing twice: `You asked for nothing, and then for home. Home was the only thing it had.`
@@ -283,7 +288,7 @@ The card is composed from three parts: a BASE chosen by ending, location (lake o
 - heard: `The lake keeps talking. You stop answering.` (sea: `The sea keeps talking. You stop answering.`)
 - companion: `Someone breathes behind you all night. You do not turn around.`
 - forever: `The day never ends. It never begins either.`
-- cabin: `The light on the shore stays on. Nobody comes down.`
+- cabin: `The knocking goes on all night. Nobody opens.`
 - nothing twice: `You asked for nothing twice. Here it is.`
 
 **Still water.** Priority: companion > cabin > kept > forever > heard (lake only) > nothing once > nothing twice.
@@ -294,7 +299,7 @@ The card is composed from three parts: a BASE chosen by ending, location (lake o
 13. Sea, sunk, did not hear: `You cut it. The red sun goes down for everyone. You swim for a while.`
 14. Sea, sunk, heard (unreachable: hear and gold share wish 2): `You cut it. The fish you can hear know the way. They carry you to a shore nobody from home has seen, and you start again there.`
 - companion: `There is someone in the stern. You do not ask. You row.` (sunk: `Someone swims behind you. You do not ask.`)
-- cabin: `The cabin is dark. You do not check whether anyone left.`
+- cabin: `The cabin goes dark. The knocking stops. You don't go back to see why.`
 - kept: `You lifted it over the side. It let you.` (sunk: `You let it go. It let you.`)
 - forever: `Dawn comes anyway. You did not ask for it.` (sea: `Dawn comes anyway, over nothing.`)
 - heard, lake: `You can still hear them from the shore. You stop listening.`
@@ -392,7 +397,7 @@ Timed functions in the existing cinematic system. Durations are targets.
 - **Forever** (instant on grant): `frozen = 1`. Cloud drift stops, birds hang, fish jumps stop spawning (a ring already in the water, and every later cast, bite or cinematic ring, still spreads and fades), the sun holds until the sunset cinematic. Nothing says so.
 - **Eyes** (2 s, once in act 2, 1.5 s after the golden cast lands, never under a caption; the line goes taut only after they have closed): `lanternFlicker` to 0.1 for the first second, `eyes` 0 to 1 to 0 over 2 s: about eight pairs of red-eye pixels (index 21) on the two or three surface rows near the boat, positions fixed per run, faint reflections. Reused for one frame in the dark ending's last flicker.
 - **Companion turn** moves from wish 3 into the red cinematic at the pupil beat.
-- **Stay** (about 16 s): after the three lines, the companion stands (a standing frame, taller, still dark; on the sunk path he does not stand, he leaps from the water where he floats), `pupilDx` snaps toward the companion over 0.4 s and the heartbeat quickens; at about 2 s he leaps: a dark leaping frame follows a parabola from the stern to the red disc over 1.6 s (no boat drift; the boat rocks with two rings at the push-off; sunk: the rings, no rock); on impact the glow spikes for two frames, the crunch plays, `pupil` closes, and the disc drops from its line into the sea exactly as in the still-water cut (`sunY` to below the horizon over 1.5 s, the hiss, two rings, a big splash), the stalk recoils upward (`stalkCut`), `companion` goes to 0 as the disc goes under (he went with it, no separate splash); then `mood` 2 to 1 over 5 s, `starA` 0 to 1 (forever: stays 0), `ash` to 0, `sunGlow` and `horizGlow` to the night values, the lantern stays lit and its glow warms slightly; the boat sits where it is; slow fade to black over the last 3 s. The sun does not come back.
+- **Stay** (about 16 s): after the three lines, the companion stands (a standing frame, taller, still dark; on the sunk path he does not stand, he leaps from the water where he floats), `pupilDx` snaps toward the companion over 0.4 s and the heartbeat quickens; at about 2 s he leaps: a dark leaping frame, stamped at 2x so it reads on a phone and rimmed 1 px in a bright ramp index on the edges facing the disc, follows a high parabola (its x leading) from the stern to the red disc over 2.4 s with a fading trail of three earlier positions in dark ramp indices, the eye's pupil tracking him through the arc (no boat drift; the boat rocks with two rings at the push-off; sunk: the rings, no rock); on impact the glow spikes for two frames, the crunch plays, `pupil` closes, the impact frame holds 0.45 s, and then the disc drops from its line into the sea exactly as in the still-water cut (`sunY` to below the horizon over 1.5 s, the hiss, two rings, a big splash), the stalk recoils upward (`stalkCut`), `companion` goes to 0 as the disc goes under (he went with it, no separate splash); then `mood` 2 to 1 over 5 s, `starA` 0 to 1 (forever: stays 0), `ash` to 0, `sunGlow` and `horizGlow` to the night values, the lantern stays lit and its glow warms slightly; the boat sits where it is; slow fade to black over the last 3 s. The sun does not come back.
 - **Deep** (14 s): the horizon rises past the top of the screen over 6 s (the mirror's source row shifts so the reflection fills the frame), the palette dims toward the night ramp, stars appear below, the swimmer becomes a silhouette seen from beneath near the top once the horizon has risen a few rows (`dive` past 0.02; the lantern and its glow go out at that same switch, not after it), with a one-pixel rim of light around the shapes; once the surface has risen past the upper third he sinks with the view and stays there (y 84), and below him the gold drifts as a cluster of glints with a warm glow on the water around it, flaring once; fade.
 - **Still water** (the cut cinematic, about 17.5 s): the cut, the drop and the dawn as in the ledger, then the dawn shows what the card says, chosen from the state the card composer reads. Lake, boat (situation 9) and Silent: he rows away to the right from 11 s. Sea, heard (12; 14 has no path but takes the same picture): at the dawn beat the giant shapes gather in a line just right of the boat and below it, all facing right; from 7 s a new coastline rises out of the horizon haze over 4 s (`newShore` 0 to 1): low, wide and flat, nothing like the fjord, long headlands with open water under the sun, one rising to a tall cliff, a small stack, and a thin dark-green line where it meets the sea (palette index 25, the only green), drawn into the sky buffer so it reflects; from 10 s he rows toward it with the shapes leading, and the picture fades from 15 s. Sea, not heard (11) and sea, sunk (13): at the dawn beat the camera pulls back exactly like the ocean (`far` 0 to 1 over 6 s), the boat (or the swimmer: head, shoulders and the floating lantern, then a 2 by 1 speck) shrinking through its far silhouettes to a speck at the centre; no shore; the speck drifts slowly (`farDrift`); fade from 15.5 s. Lake, sunk (10, about 15 s): at the dawn beat he swims left for 3.5 s and reaches the shore under the left mountain; black for about a second; the dawn fades back in with him at his old spot in the water, the lantern floating beside him and one gold glint below him (`goldBelow`), held 2.5 s, then fade.
 - **Silent**: the cut cinematic with the silent flag (section 4, Endings).
@@ -412,19 +417,19 @@ The world is a set of numbers in `WS`. Every scene below says which of them it O
 | Ocean | `sea` 0 to 1 over 6 s and then held at 1 for the rest of the run (mountains gone for good); `far` 0 to 1 over 6 s and back to 0 over 2.5 s at the end (camera only); boat silhouettes by `far`; giant shadows, kept alive at a slow rate for the rest of the run; the shoal alone until 9.5 s, then the big one fades in (presence 0 to 1 over 3 s) at the left edge and crosses over about 7 s to settle under the boat, with a rising low swell and no stinger; in the window, after 1 s, the prompt and the landing ring; `troubled` 0.15 while `far > 0`, then 0.22 with the cost; birds hidden while `sea > 0.5` | sun, mood, clouds keep drifting; no companion or cabin can exist on this path |
 | Open sea play (fish-wish runs) | the giant shadows keep passing | `sea` 1; everything else as the equivalent lake scene |
 | Swallowed | `whirl` 0 to 70 over 0.9 to 3.9 s, `whirlSpin` up then to 0 from 5 s, `whirlDark` 0 to 1 (0.85 after the stillness); `whirlBoat` 0 to 1.3 over 1.6 to 5 s (once round, under at the centre); the big one dims to 0.4; `seaEye` 0 to 1 over 5.7 to 6.9 s; black at 8.4 s; cutscene about 8.8 s | `far` 1, sun, mood |
-| Act 1 play | nothing | mood 0, sun lowered, troubled 0.22, wish 1 props |
+| Act 1 play | home only, after the first card: `cabinKnock` 1 to 0 over 0.3 s with each of three knocks (the window blinks dark) | mood 0, sun lowered, troubled 0.22, wish 1 props |
 | Golden scene 2 | sky fish appears and dives; kept: `goldKept` to 1 while speaking, then 0.7 | the world |
 | Wish 2 grant | forever: `frozen` 1. Gold: `gold` 0 to 1 over 1.5 s, then the gold sink (`boatSunk` 0 to 1 over 6 s; the boat is gone, the fisherman swims). Hear, Nothing: no change | mood 0 |
 | Sunset | `sunY` to `HY + 14` over 7.5 s; `mood` 0 to 1 over t 1 to 8; `sunGlow` to 0.12 (forever: floor 0.4); `horizGlow` to 0.3; `starA` to 1 from t 5 (forever: stays 0); `troubled` to 0.35; `lantern` 1 at 7.8 s | `sunX`, companion, cabin, gold, sunk boat, `frozen` (a frozen sky stays frozen through the night) |
 | Companion question | nothing | the night |
-| Act 2 play | once, 1.5 s after the golden cast lands: `lanternFlicker` 0.1 for 1 s and `eyes` 0 to 1 to 0 over 2 s | mood 1, sun below the horizon, stars as the sunset left them |
+| Act 2 play | home only, after the card's still caption: `cabinKnock` blinks with three slower knocks; once, 1.5 s after the golden cast lands (never under a caption): `lanternFlicker` 0.1 for 1 s and `eyes` 0 to 1 to 0 over 2 s | mood 1, sun below the horizon, stars as the sunset left them |
 | Red sequence | the float dragged to the horizon; released: sky fish at the sun's spot; kept: `goldKept` to 1 | mood 1, stars |
 | Red cinematic | `sunKind` 1, `sunR` 16, `sunY` `HY + 24` to 178 over 8.5 s; `mood` 1 to 2 over t 1.5 to 9; `sunGlow` to 1.25; `horizGlow` to 1.3; `starA` from whatever it finds to 0 by t 6; `troubled` to 0.55; `ash` 0 to 1 from t 6; `stalk` from t 9.2; `pupil` from t 12; `companionTurn` 1 at t 13.6; `pupilDx` from t 13.6 only if the player ever asked; heartbeat from t 13.6 | lantern 1, cabin, gold, sunk boat, `frozen`, `sea` |
 | Wish 3 | nothing | the red |
 | Home | `jaw` 0 to 1 over 4.2 s, fangs, black at 4.15 s | everything in the red |
 | Dark | `lid` 0 to 1 over 1.6 s; released: the sky fish fades over 1.5 s; `sunGlow` and `horizGlow` to 0 over 3 s; `dim` 0 to 11 over t 2.5 to 7 (under half while the caption shows); `ash` to 0 over 3 s; `lanternFlicker` random over t 6 to 8 with one `eyes` frame; `lantern` 0 at t 8; black at 8.3 | pupil hidden under the lid, stalk stays, companion stays turned |
 | Still water | `lineCut`; released: the sky fish drops below the horizon with a splash; `stalkCut` (silent: `stalk` to 0 instead, no snaps); `sunY` to `HY + 28` by t 2.6; `sunGlow` to 0, `horizGlow` to 0.15; `mood` 2 to 1 (t 3 to 6) to 0 (t 6 to 12); `ash` to 0; `starA` 0 to 1 to 0; `troubled` to 0; `gold` to 0 at the cut; at t 6 (dawn): `sunKind` 0, `sunR` 8, `stalk` 0, `companionTurn` 0, cabin light off (`cabinLit` to 0 over 1.5 s; `cabin` stays 1, the dark building stands), `frozen` 0, kept: splash and `goldKept` 0; `shoalOut` 1 from the cut: the shadows steer to the horizon at full weight, hurry, and are removed as they arrive; `sunY` back to rest with glow 1 by t 12.5; `lantern` 0 over t 9 to 11; then by the card's state (section 8, Still water): lake, boat and Silent: `boatX` to +120 from t 11; sea, heard: the shapes gather ahead of the boat at t 6, `newShore` 0 to 1 over t 7 to 11, `boatX` to +120 from t 10, fade from t 15; sea, not heard or sunk: `far` 0 to 1 over t 6 to 12, `farDrift` after, fade from t 15.5; lake, sunk: `boatX` to -58 over t 6 to 9.5, black at 9.7, back to 0 with `goldBelow` 1 at 10.1, fade in at 10.7, fade out at 13.7 (15 s) | `sunX`; the companion stays in the stern facing the horizon; a sunk boat stays sunk (he rows it anyway) |
-| Stay | the companion stands (sunk: no standing frame, no rock), then leaps along a parabola to the disc; `pupilDx` snaps to him; on impact: glow spike, `pupil` closed, `sunY` to below the horizon over 1.5 s with hiss, rings and splash, `stalkCut`, `companion` to 0; then `mood` 2 to 1 over 5 s, `starA` to 1 (forever: stays 0), `ash` to 0, glows to night values, lantern warm; black over the last 3 s | `boatX` (no drift), `sunX`, `frozen` |
+| Stay | the companion stands (sunk: no standing frame, no rock), then leaps (`leap` 0 to 1 over 2.4 s from t 2, the 2x rimmed frame on a high parabola with a three-step trail); `pupilDx` snaps to him, then follows his x through the arc; on impact (t 4.4): glow spike, `pupil` closed, a 0.45 s hold, then `sunY` to below the horizon over 1.5 s with hiss, rings and splash, `stalkCut`, `companion` to 0; then `mood` 2 to 1 over 5 s, `starA` to 1 (forever: stays 0), `ash` to 0, glows to night values, lantern warm; black over the last 3 s | `boatX` (no drift), `sunX`, `frozen` |
 | Deep | `dive` 0 to 1 over 6 s (the horizon row rises past the top; the mirror fills the frame); `dim` 0 to 6; stars in the lower half; the swimmer as a silhouette from beneath near the top from `dive` 0.02; `ash` to 0; `lantern` 0 at that switch (the glow goes with the sprite); one gold glint; black | mood 2 under the dim, `sunX` |
 | Restart | `resetWS` returns every field to the title values | |
 

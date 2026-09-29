@@ -455,7 +455,29 @@ const COMP_LEAP = sprite([
   '....0.......',
   '...0........',
 ]);
-const LEAP_ARC = 30; // how high the parabola rises above the straight line from the seat to the disc
+// Phase 23: at phone size the 12 px frame read as a speck, so the leap stamps it at 2x (nearest neighbour)
+// on a higher arc, with a fading trail of three earlier positions in dark ramp indices.
+const LEAP_ARC = 52; // how high the parabola rises above the straight line from the seat to the disc
+const LEAP_TRAIL = [{ dp: 0.06, v: 2, a: 0.6 }, { dp: 0.12, v: 3, a: 0.38 }, { dp: 0.18, v: 4, a: 0.2 }];
+function scale2(s) {
+  const w = s.w * 2, h = s.h * 2, data = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) data[y * w + x] = s.data[(y >> 1) * s.w + (x >> 1)];
+  return { w, h, data };
+}
+// Backlit by the eye: a 1 px rim of a bright ramp index on the edges facing the disc (left and below), so
+// the dark frame reads against the dark ridge behind the stern as well as against the sky.
+const LEAP_RIM = 10;
+function sunRim(s, v) {
+  const d = s.data.slice();
+  for (let j = 0; j < s.h; j++) for (let i = 0; i < s.w; i++) {
+    const k = j * s.w + i;
+    if (s.data[k] === 255) continue;
+    const left = i === 0 || s.data[k - 1] === 255, below = j === s.h - 1 || s.data[k + s.w] === 255;
+    if (left || below) d[k] = v;
+  }
+  return { w: s.w, h: s.h, data: d };
+}
+const COMP_LEAP2 = sunRim(scale2(COMP_LEAP), LEAP_RIM);
 const BIRD = [sprite(['1...1', '.1.1.', '..1..']), sprite(['.....', '11.11', '..1..'])];
 const EXCL = sprite(['.1.', '1b1', '1b1', '1b1', '.1.', '1b1', '.1.']);
 const ICON = sprite(['.bbb.b', 'bbbbbb', '.bbb.b']);
@@ -792,7 +814,7 @@ const END_EXTRA = {
     lines: {
       kept: { boat: 'The golden fish slips out of the boat as you go in.', sunk: 'The golden fish follows you in.' },
       company: { boat: 'The seat behind you is empty now. It was your turn.', sunk: 'The water behind you is empty now. It was your turn.' },
-      cabin: 'The light on the shore goes out. Nobody was inside.',
+      cabin: 'The knocking stops. Now it’s you on the inside.',
       heard: 'You know the words already. You will say them.',
       forever: 'The day does not end. You aren’t in it.',
       refused2: 'You asked for nothing, and then for home. Home was the only thing it had.',
@@ -805,7 +827,7 @@ const END_EXTRA = {
       heard: { lake: 'The lake keeps talking. You stop answering.', sea: 'The sea keeps talking. You stop answering.' },
       company: 'Someone breathes behind you all night. You do not turn around.',
       forever: 'The day never ends. It never begins either.',
-      cabin: 'The light on the shore stays on. Nobody comes down.',
+      cabin: 'The knocking goes on all night. Nobody opens.',
       refused2: 'You asked for nothing twice. Here it is.',
     },
   },
@@ -813,7 +835,7 @@ const END_EXTRA = {
     order: ['company', 'cabin', 'kept', 'forever', 'heard', 'refused1', 'refused2'],
     lines: {
       company: { boat: 'There is someone in the stern. You do not ask. You row.', sunk: 'Someone swims behind you. You do not ask.' },
-      cabin: 'The cabin is dark. You do not check whether anyone left.',
+      cabin: 'The cabin goes dark. The knocking stops. You don’t go back to see why.',
       kept: { boat: 'You lifted it over the side. It let you.', sunk: 'You let it go. It let you.' },
       forever: { lake: 'Dawn comes anyway. You did not ask for it.', sea: 'Dawn comes anyway, over nothing.' },
       heard: { lake: 'You can still hear them from the shore. You stop listening.' },
@@ -856,7 +878,7 @@ function resetWS() {
   Object.assign(WS, {
     mood: 0, dim: 0, sunX: SUNX, sunY: SUN0Y, sunR: 8, sunKind: 0, sunGlow: 1, horizGlow: 1, lid: 0,
     pupil: 0, pupilDx: 0, stalk: 0, stalkCut: 0, troubled: 0, starA: 0, lantern: 0, lanternFlicker: 1,
-    jaw: 0, companion: 0, companionTurn: 0, cabin: 0, cabinLit: 1, fishShadows: 0, gold: 0, boatX: 0, ash: 0,
+    jaw: 0, companion: 0, companionTurn: 0, cabin: 0, cabinLit: 1, cabinKnock: 0, fishShadows: 0, gold: 0, boatX: 0, ash: 0,
     lineCut: false, goldFish: null,
     // story bible, section 3. goldKept is the fish in the boat; boatSunk the gold sink (1: the boat is gone and
     // the fisherman swims); far the ocean camera pull-back (0 to 1 and back); sea the mountains gone (0 to 1,
@@ -883,7 +905,7 @@ const G = {
   phase: 'title', t: 0, pt: 0, holding: false, bob: null, cast: null, wait: null, reel: null, land: null,
   rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 },
   lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0, hbGap: HB_GAP,
-  capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [],
+  capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null,
   arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0,
 };
 // wishes holds granted wishes only, in order. kept, firstAsk, refused, answered, ocean, said and usedRepl follow
@@ -1158,7 +1180,7 @@ function topExtras(t) {
   if (!birdsHidden()) for (const b of BIRDS) stampTop(BIRD[((bt * 5 + b.ph) | 0) & 1], b.x | 0, b.y | 0);
   // The building fades with the mountains; its window goes dark on its own (cabinLit, the still-water dawn).
   drawNewShore();
-  if (WS.cabin > 0 && !seaGone()) stampTop(WS.cabinLit < 0.5 ? CABIN_DARK : CABIN, CABIN_X, CABIN_Y, WS.cabin * (1 - WS.sea));
+  if (WS.cabin > 0 && !seaGone()) stampTop(WS.cabinLit < 0.5 || WS.cabinKnock > 0.5 ? CABIN_DARK : CABIN, CABIN_X, CABIN_Y, WS.cabin * (1 - WS.sea));
   // The far boat reflects for free, and stays through the opening's dip to black (it leaves behind full black).
   if (WS.farBoat > 0 && (G.phase === 'title' || (G.open && G.open.stage === 0))) stampTop(FARBOAT, FAR_X, HY - FARBOAT.h);
   if (WS.stalk > 0) {
@@ -1601,11 +1623,31 @@ const seatTop = (s, dy) => compY(dy) - (s.h - COMP.h);
 // waterline to the horizon, where the disc's own reflection is, so the two go under together.
 function drawCompanion(t, bx, dy) {
   if (WS.leap <= 0) { stampR(lanternRim(compSprite()), bx + COMP_DX, seatTop(compSprite(), dy) + swimBob(t, 2.6), WL, WS.companion); return; }
-  const p = WS.leap, s = COMP_LEAP;
-  const x0 = bx + COMP_DX - 2, y0 = seatTop(s, dy);
-  const x1 = WS.sunX - s.w / 2, y1 = WS.sunY - s.h / 2 + 1;
-  const x = lerp(x0, x1, p), y = lerp(y0, y1, p) - LEAP_ARC * 4 * p * (1 - p);
-  stampR(s, Math.round(x), Math.round(y), Math.round(lerp(WL, HY, p)));
+  const p = WS.leap, s = COMP_LEAP2;
+  for (let k = LEAP_TRAIL.length - 1; k >= 0; k--) { // the oldest first, so the nearer ones sit on top
+    const tr = LEAP_TRAIL[k], q = p - tr.dp;
+    if (q <= 0 || p >= 1) continue; // no trail on the ground, and none once he rides the disc
+    const c = leapXY(q, bx, dy);
+    stampSolidR(s, Math.round(c.x - s.w / 2), Math.round(c.y - s.h / 2), leapWL(q), tr.v, tr.a);
+  }
+  const c = leapXY(p, bx, dy);
+  stampR(s, Math.round(c.x - s.w / 2), Math.round(c.y - s.h / 2), leapWL(p));
+}
+// The centre of the leaping frame: from his seat (feet on the plank) along the parabola to the disc's centre.
+function leapXY(p, bx, dy) {
+  const x0 = bx + COMP_DX + COMP.w / 2, y0 = compY(dy) + COMP.h - COMP_LEAP2.h / 2;
+  // x leads (out-eased), so he is over the open sky between the ridges before the top of the arc
+  return { x: lerp(x0, WS.sunX, E.out2(p)), y: lerp(y0, WS.sunY + 1, p) - LEAP_ARC * 4 * p * (1 - p) };
+}
+const leapWL = p => Math.round(lerp(WL, HY, p));
+// A sprite's silhouette in one index, Bayer-dithered to alpha in screen space (the leap's trail, an even
+// ghost rather than noise), reflected like any sprite.
+function stampSolidR(s, x0, y0, wl, v, alpha) {
+  for (let j = 0; j < s.h; j++) for (let i = 0; i < s.w; i++) {
+    const x = x0 + i, y = y0 + j;
+    if (s.data[j * s.w + i] === 255 || BAYER[((y & 3) << 2) | (x & 3)] > alpha) continue;
+    plotR(x, y, v, wl);
+  }
 }
 function drawBobber() {
   const b = G.bob;
@@ -1824,7 +1866,7 @@ function applyGlows(t) {
   }
   if (WS.goldBelow > 0 && G.goldBelow) glowTint(G.goldBelow.x, G.goldBelow.y, 8, 16, 0.7 * WS.goldBelow);
   if (WS.dive > DIVE_SWITCH && G.deepGold) glowTint(G.deepGold.x, G.deepGold.y, DEEP_GOLD_GLOW, 16, WS.glint > 0 ? 0.9 : 0.55);
-  const cab = WS.cabin * WS.cabinLit * (1 - WS.sea) * (1 - WS.dive); // the window's glow is fixed to the shore, which the dive leaves
+  const cab = WS.cabin * WS.cabinLit * (1 - WS.cabinKnock) * (1 - WS.sea) * (1 - WS.dive); // the window's glow is fixed to the shore, which the dive leaves
   if (cab > 0.4) {
     const wx = CABIN_X + 2.5, wy = CABIN_Y + 7;
     glowTint(wx, wy + s, 7, 17, 0.55 * cab); // the sky (and the cabin in it) slides down with the upper jaw
@@ -1950,6 +1992,7 @@ const SFX = {
     s.start(t, Math.random()); l.start(t); s.stop(t + d + 0.05); l.stop(t + d + 0.05);
   },
   crunch() { this.noise(0.9, 0.45, 'lowpass', 900, 60, 1.2); this.tone(90, 1, 'sawtooth', 0.25, 28); },
+  knock() { this.tone(88, 0.16, 'sine', 0.32, 52); this.noise(0.12, 0.16, 'lowpass', 380, 140, 1.2); }, // one knock, muffled by the water between
   heartbeat() { this.tone(52, 0.2, 'sine', 0.3, 40); this.tone(48, 0.22, 'sine', 0.24, 36, 0.26); },
   drone(on) {
     const c = this.ctx; if (!c) return;
@@ -2174,8 +2217,14 @@ const CINE_DARK = {
 // with it. Then the night comes back without a sun: the lantern stays lit and warms a little, the boat sits
 // where it is, and the last three seconds fade to black. The sun never returns; sunX never moves.
 const STAY_LOOK = 7;                    // pupilDx toward the stern, which is to the right of the disc
-const STAY_LEAP_AT = 2, STAY_LEAP_DUR = 1.6, STAY_HIT = STAY_LEAP_AT + STAY_LEAP_DUR;
-const STAY_DROP = 1.5, STAY_UNDER = STAY_HIT + STAY_DROP, STAY_NIGHT = 5, STAY_FADE_AT = 13;
+// Phase 23: a slower leap (2.4 s) so a phone can follow it, and the impact frame held STAY_HOLD before the drop.
+const STAY_LEAP_AT = 2, STAY_LEAP_DUR = 2.4, STAY_HIT = STAY_LEAP_AT + STAY_LEAP_DUR, STAY_HOLD = 0.45;
+const STAY_DROP_AT = STAY_HIT + STAY_HOLD, STAY_DROP = 1.5, STAY_UNDER = STAY_DROP_AT + STAY_DROP, STAY_NIGHT = 5, STAY_FADE_AT = 13;
+// The eye follows him through the arc: from STAY_LOOK at the stern to straight at him as he reaches it.
+function stayEyeTrack() {
+  const c = leapXY(WS.leap, boatLeft(), boatSinkPx());
+  WS.pupilDx = clamp((c.x - WS.sunX) * 0.12, -STAY_LOOK, STAY_LOOK);
+}
 function stayPushOff() {
   WS.companionStand = 0;
   if (!swimming()) { WS.rock = 1; tween(WS, 'rock', 0, 1.2); } // no boat to rock on the sunk path
@@ -2185,7 +2234,7 @@ function stayPushOff() {
 // The glow spike is skipped for a player who asked for less motion; the sky fish goes under with the sun.
 function stayImpact() {
   if (!REDUCED_MOTION) WS.sunGlow = 2.4;
-  WS.pupil = 0; SFX.crunch(); goldFishFade(STAY_DROP);
+  WS.leap = 1; WS.pupil = 0; SFX.crunch(); goldFishFade(STAY_HOLD + STAY_DROP);
 }
 function stayDiscHitsWater() { SFX.hiss(2.2); ring(SUNX, HY + 3, true); ring(SUNX, HY + 3); splash(SUNX, HY + 2, 10); SFX.drone(false); }
 function stayGoneUnder() { WS.companion = 0; WS.leap = 0; }
@@ -2199,16 +2248,16 @@ const CINE_STAY = {
   },
   update(t, dt, at, s) {
     at('leap', STAY_LEAP_AT, stayPushOff);
-    if (t >= STAY_LEAP_AT && WS.companion > 0) WS.leap = clamp((t - STAY_LEAP_AT) / STAY_LEAP_DUR, 0, 1);
+    if (t >= STAY_LEAP_AT && t < STAY_HIT && WS.companion > 0) { WS.leap = clamp((t - STAY_LEAP_AT) / STAY_LEAP_DUR, 0, 1); stayEyeTrack(); }
     at('hit', STAY_HIT, stayImpact);
-    at('unspike', STAY_HIT + 0.07, () => { WS.sunGlow = 1.25; }); // the spike lasts two frames
-    if (t >= STAY_HIT) {
-      WS.sunY = lerp(s.y0, HY + 28, E.in(clamp((t - STAY_HIT) / STAY_DROP, 0, 1)));
-      WS.stalkCut = clamp((t - STAY_HIT) / 0.7, 0, 1);
+    at('unspike', STAY_HIT + 0.07, () => { WS.sunGlow = 1.25; }); // the spike lasts two frames; the frame holds STAY_HOLD
+    if (t >= STAY_DROP_AT) {
+      WS.sunY = lerp(s.y0, HY + 28, E.in(clamp((t - STAY_DROP_AT) / STAY_DROP, 0, 1)));
+      WS.stalkCut = clamp((t - STAY_DROP_AT) / 0.7, 0, 1);
     }
-    at('hiss', STAY_HIT + 1.3, stayDiscHitsWater);
+    at('hiss', STAY_DROP_AT + 1.3, stayDiscHitsWater);
     at('under', STAY_UNDER, stayGoneUnder);
-    if (t > STAY_HIT + 0.1) WS.sunGlow = lerp(1.25, 0.12, clamp((t - STAY_HIT - 0.1) / 2.5, 0, 1));
+    if (t > STAY_DROP_AT + 0.1) WS.sunGlow = lerp(1.25, 0.12, clamp((t - STAY_DROP_AT - 0.1) / 2.5, 0, 1));
     const k = clamp((t - STAY_UNDER) / STAY_NIGHT, 0, 1);
     if (k > 0) {
       WS.mood = lerp(2, 1, k); WS.starA = WS.frozen ? 0 : k; WS.ash = 1 - k; // a frozen sky stays starless
@@ -2646,16 +2695,17 @@ function greeting2() {
   if (STORY.refused === 1) return 'Back again. Still wanting nothing?';
   return 'Back so soon? I’d only just got down. And this time?';
 }
+// Home path (phase 23): the greeting stays as it is and the knocking line follows it, carrying the choices.
+const KNOCK_LINE = 'Don’t mind the knocking. They’re not trying to get in.';
 function wish2() {
-  dlgRun([
-    { pause: 0.9 },
-    { who: FISHN, text: greeting2(), choices: [
-      { label: 'Make this day last forever', pick: () => grant2('forever') },
-      { label: 'Let me hear the fish', pick: () => grant2('hear') },
-      { label: 'Gold. A boat full of it', pick: () => grant2('gold') },
-      { label: 'Nothing', pick: refuse2 },
-    ] },
-  ]);
+  const choices = [
+    { label: 'Make this day last forever', pick: () => grant2('forever') },
+    { label: 'Let me hear the fish', pick: () => grant2('hear') },
+    { label: 'Gold. A boat full of it', pick: () => grant2('gold') },
+    { label: 'Nothing', pick: refuse2 },
+  ];
+  const ask = has('home') ? [fish(greeting2()), { who: FISHN, text: KNOCK_LINE, choices }] : [{ who: FISHN, text: greeting2(), choices }];
+  dlgRun([{ pause: 0.9 }].concat(ask));
 }
 const GRANT2 = {
   forever: () => [
@@ -2797,6 +2847,7 @@ function wish3() {
     red(nothing ? 'Nobody rows this far to want nothing. So why are you here.' : recountLine()),
   ];
   if (has('company')) L.push(comp(STORY.answered === true ? 'You said you’d stay.' : 'Don’t answer it. Cut the line.'));
+  if (STORY.answered === true) L.push(red('You answered him. I did ask you not to.'));
   if (STORY.kept) L.push(whisperFish('I’m sorry.'));
   L.push(
     red('I sat where you sit. I said what you said. Three times.'),
@@ -3184,8 +3235,9 @@ function afterCatch() {
   if (STORY.actCatches >= actNeed(STORY.act) && !STORY.goldenNext) {
     if (STORY.kept && STORY.act === 1) STORY.keptNext = true; // its still caption shows in keptScene
     else { STORY.goldenNext = true; cap(stillCaption(), 3.2); }
+    if (STORY.act === 2) knockBeat(1); // after the still caption: the knocking again, slower
   } else if (STORY.act === 0) thinkBeat(openingThought(STORY.catches));
-  else if (STORY.act === 1 && STORY.actCatches === 1) companionSpeaks();
+  else if (STORY.act === 1 && STORY.actCatches === 1) { companionSpeaks(); knockBeat(0); }
   setPhase('ready');
 }
 function fishUpdate(dt) {
@@ -3247,6 +3299,37 @@ function fishUpdate(dt) {
   } else if (ph === 'lost') {
     if (G.pt > 1.1) setPhase('ready');
   }
+}
+
+// ---------------------------------------------------------------- the knocking (phase 23, the home path)
+// Someone is in the cabin. Three slow knocks from the shore after the first act 1 card closes, and three
+// slower ones after the act 2 card (once its still caption is done). The caption waits for the stage like
+// any text (two texts never share it), each knock blinks the window (WS.cabinKnock), and leaving play drops
+// a knocking that has not finished.
+const KNOCKS = 3, KNOCK_HOLD = 1.8, KNOCK_BLINK = 0.3;
+const KNOCK_BEATS = [
+  { gap: 0.55, text: 'Someone knocks on the cabin door.' },
+  { gap: 0.8, text: 'The knocking again. Slower.' },
+];
+const KNOCK_PHASES = ['ready', 'card', 'casting', 'waiting', 'bite', 'reeling', 'landing', 'lost'];
+function knockBeat(k) {
+  if (!has('home') || WS.cabin < 0.5 || seaGone()) return;
+  G.knock = { gap: KNOCK_BEATS[k].gap, text: KNOCK_BEATS[k].text, at: -1, n: 0 };
+}
+function knockUpdate() {
+  const k = G.knock;
+  if (!k) return;
+  if (KNOCK_PHASES.indexOf(G.phase) < 0) { G.knock = null; return; }
+  if (k.at < 0) {
+    if (G.t < G.capUntil || G.t < G.thinkUntil) return;
+    k.at = G.t;
+    cap(k.text, k.gap * (KNOCKS - 1) + KNOCK_HOLD);
+  }
+  if (G.t - k.at < k.n * k.gap) return;
+  k.n++;
+  SFX.knock();
+  WS.cabinKnock = 1; tween(WS, 'cabinKnock', 0, KNOCK_BLINK, E.lin);
+  if (k.n >= KNOCKS) G.knock = null;
 }
 
 // ---------------------------------------------------------------- the companion (bible, section 6)
@@ -3376,7 +3459,7 @@ function resetAll() {
   resetWS();
   Object.assign(STORY, freshStory());
   loadRun();
-  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 } });
+  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null, arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 } });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
   OCEAN.shad.length = 0; OCEAN.big = null; OCEAN.tr0 = 0;
   cloudT = 0; genEyes();
@@ -3405,6 +3488,7 @@ function update(dt) {
   openingUpdate(dt);
   thinkUpdate();
   fishUpdate(dt);
+  knockUpdate(); // before the eyes, which wait for the stage to be clear
   eyesUpdate();
   if (!WS.frozen) cloudT += dt;
   dlgUpdate(dt);

@@ -111,6 +111,11 @@ function play(plan, label, opts) {
 // with the boat sunk), and no other ending's card carries it. Situation 14 (sea, sunk, heard) is in the table
 // but has no path: hear and gold are both wish 2.
 const BAIT_END = 'There is a bait in your pocket. It has an eye.';
+// Phase 23, the knocking on the home path: both captions and the fish's line, and the cabin card sentences.
+const KNOCKS = ['Someone knocks on the cabin door.', 'The knocking again. Slower.', 'Don’t mind the knocking. They’re not trying to get in.'];
+const CABIN_HOME = 'The knocking stops. Now it’s you on the inside.';
+const CABIN_DARK = 'The knocking goes on all night. Nobody opens.';
+const CABIN_CUT = 'The cabin goes dark. The knocking stops. You don’t go back to see why.';
 const NEXT_SUN = ' Somewhere a sun is coming up. Someone is rowing out.';
 const BASES = {
   1: 'The lake is quiet again. The fish are hungry.' + NEXT_SUN,
@@ -146,16 +151,16 @@ const plans = [
   [[0, 0, 0, 0, 0, 0], 'let go, company (someone), forever, yes -> home', 'The seat behind you is empty now. It was your turn.', { base: 1, says: ['Someone. You didn’t ask who.', 'ay that never ends. And forever. Your words, not mine.', 'First time out here. Look at that sun.'] }],
   [[1, 1, 1, 1], 'keep, fish (wait), hear -> dark (sea)', 'The golden fish dries in the bottom of the boat. It stops asking before you do.', { wait: true, base: 7 }],
   [[0, 1], 'let go, fish, cast into the big one -> swallowed', null, { base: 20 }],
-  [[0, 2, 2, 2], 'let go, home, gold -> cut (lake, sunk: no pocket line)', 'The cabin is dark. You do not check whether anyone left.', { base: 10, noPocket: true, says: ['You reach for the knife in your belt.'] }],
+  [[0, 2, 2, 2], 'let go, home, gold -> cut (lake, sunk: no pocket line)', CABIN_CUT, { base: 10, noPocket: true, says: ['You reach for the knife in your belt.'].concat(KNOCKS) }],
   [[1, 0, 0, 1, 1, 2], 'keep, company (someone), hear, say nothing -> cut', 'There is someone in the stern. You do not ask. You row. ' + BAIT_END, { base: 9, says: ['You cut the line last time. It’s the same line.', 'You cast anyway. Habit. And this time?', 'You light the lantern. The shore does not.'] }],
   [[0, 3, 3, 3], 'let go, nothing, nothing, nothing -> silent', 'Some evenings, the sunset looks back. ' + BAIT_END, { base: 19, says: ['You said you could stay out here forever. There’s time.'] }],
   [[0, 3, 0, 0], 'let go, nothing, forever -> home', 'The day does not end. You aren’t in it.', { base: 1, says: ['You again. Or someone wearing you.'] }],
-  [[1, 2, 3, 2], 'keep, home, nothing -> cut', 'The cabin is dark. You do not check whether anyone left. ' + BAIT_END, { base: 9, says: ['You light the lantern.'], saysNot: ['The shore does not.'] }],
+  [[1, 2, 3, 2], 'keep, home, nothing -> cut', CABIN_CUT + ' ' + BAIT_END, { base: 9, says: ['You light the lantern.'].concat(KNOCKS), saysNot: ['The shore does not.'] }],
   [[0, 3, 3, 0], 'let go, nothing, nothing -> home', 'You asked for nothing, and then for home. Home was the only thing it had.', { base: 1 }],
   [[1, 1, 2, 1], 'keep, fish (wait), gold -> dark (sea, sunk)', 'The golden fish circles you all night, glowing less each time.', { wait: true, base: 8, says: ['The sun slips into the sea like a coin into a well.', 'Don’t leave me out here.'] }],
   [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'Dawn comes anyway. You did not ask for it. ' + BAIT_END, { base: 9 }],
   [[0, 3, 2, 2], 'let go, nothing, gold -> cut (lake, sunk, the one-refusal line)', 'You asked once for nothing. It kept count.', { base: 10, noPocket: true }],
-  [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'The day did not end. Now it will not begin.', { tap: true, base: '15f', says: ['Stay with him', 'Stay with him. Two wishes, one seat.'] }],
+  [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'The day did not end. Now it will not begin.', { tap: true, base: '15f', says: ['Stay with him', 'Stay with him. Two wishes, one seat.', 'You answered him. I did ask you not to.'], saysNot: KNOCKS }],
   [[0, 0, 0, 2, 0, 3], 'let go, company (someone), gold, yes -> stay (sunk)', 'after a while you stop minding.', { base: 16 }],
   // Phase 5, the kept fish: act 1 is a normal hook (one more catch), the fish speaks from the boat, and
   // the ending card carries the kept sentence where nothing outranks it.
@@ -167,7 +172,8 @@ const plans = [
   // line (no Stay) or after Stay with him.
   [[0, 2, 2, 3], 'let go, home, gold -> deep', 'and there is no bottom.', { base: 17 }],
   [[1, 0, 0, 2, 0, 4], 'keep, company (someone), gold, yes -> deep (kept)', 'The golden fish goes down with you. It knows the way.', { base: 17 }],
-  [[0, 2, 2, 0], 'let go, home, gold -> home (lake, sunk)', 'The light on the shore goes out. Nobody was inside.', { base: 2 }],
+  [[0, 2, 2, 0], 'let go, home, gold -> home (lake, sunk)', CABIN_HOME, { base: 2, says: KNOCKS }],
+  [[0, 2, 3, 1], 'let go, home, nothing -> dark (lake, the cabin line)', CABIN_DARK, { base: 5, says: KNOCKS }],
   [[0, 2, 1, 1], 'let go, home, hear -> dark (lake)', 'The lake keeps talking. You stop answering.', { base: 5 }],
   // Phase 9, the open sea: the fish wish waited out continues on the open sea (no shore) to every ending
   // but Stay; the gold sink leaves the fisherman in the water.

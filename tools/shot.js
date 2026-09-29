@@ -39,6 +39,13 @@ if (which === 'all' || which === 'red') shot('out_red.png', (ws) => { ws.mood = 
 if (which === 'all' || which === 'low') shot('out_low.png', (ws) => { ws.sunY = 172 + 16; ws.troubled = 0.22; }, 3.3); // after wish 1: the sun two steps lower
 if (which === 'all' || which === 'wish') shot('out_wish.png', (ws) => { ws.companion = 1; ws.cabin = 1; ws.gold = 1; ws.boatSunk = 1; ws.fishShadows = 1; g.spawnShadows(); ws.goldFish = { x: 44, y: 238, a: 1, surf: 262 }; ws.sunY = 182; ws.troubled = 0.22; }, 4);
 
+// Phase 23, the knocking: act 1 on the home path with the cabin window lit, then blinked dark on a knock;
+// and the act 2 night on a knock (the window's glow off for that beat).
+const low = ws => { ws.cabin = 1; ws.sunY = 188; ws.troubled = 0.22; };
+if (which === 'all' || which === 'knock') shot('out_knock.png', (ws) => { low(ws); ws.cabinKnock = 1; }, 3.3);
+if (which === 'all' || which === 'knock_night') shot('out_knock_night.png', (ws) => { ws.cabin = 1; ws.mood = 1; ws.sunY = g.HY + 14; ws.sunGlow = 0.12; ws.horizGlow = 0.3; ws.starA = 1; ws.lantern = 1; ws.troubled = 0.35; ws.cabinKnock = 1; }, 5);
+if (which === 'all' || which === 'knock_night_lit') shot('out_knock_night_lit.png', (ws) => { ws.cabin = 1; ws.mood = 1; ws.sunY = g.HY + 14; ws.sunGlow = 0.12; ws.horizGlow = 0.3; ws.starA = 1; ws.lantern = 1; ws.troubled = 0.35; }, 5);
+
 // Phase 2 scenes. night() is the act 2 night as out_night.png sets it up.
 const night = ws => { ws.mood = 1; ws.sunY = g.HY + 14; ws.sunGlow = 0.12; ws.horizGlow = 0.3; ws.starA = 1; ws.lantern = 1; ws.companion = 1; ws.troubled = 0.35; };
 if (which === 'all' || which === 'open') shot('out_open.png', (ws) => { g.setPhase('ready'); ws.boatX = -60; }, 1.2); // mid row-in
