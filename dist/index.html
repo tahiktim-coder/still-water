@@ -407,7 +407,8 @@ function genClouds() {
   }
   const rng = mulberry32(1337);
   const clouds = CUMULUS.map(c => makeCumulus(c, rng));
-  CLOUDS.forEach((L, k) => { L.idx.fill(255); L.vis.fill(0); genCloudLayer(L, clouds.filter(c => c.layer === k)); });
+  CLOUDS.forEach((L, k) => { L.idx.fill(255); L.vis.fill(0); genCloudLayer(L, clouds.filter(c => c.layer === k)); L.band = cloudBand(L); });
+  cloudView();
 }
 function makeCumulus([layer, cx, base, w, h, n, r0, r1], rng) {
   const circles = [], half = w * 0.5 - r0;
@@ -472,13 +473,39 @@ function cloudTick() {
     L.off = Math.floor(cloudT * L.speed) % CW;
     L.oy = Math.round(Math.sin(cloudT * 0.06 + L.ph) * 1.4);
   }
+  cloudView();
+}
+const CLOUD_FAR_S = 0.5, CLOUD_TILE_DX = [157, 311], CLOUD_TILES = [9, 0], CLOUD_BAND_GAP = 3;
+for (const L of CLOUDS) { L.band = HY; L.xs = new Int32Array(W); L.rb = new Int32Array(HY); L.rd = new Int32Array(HY); }
+function cloudView() {
+  const is = 1 / lerp(1, CLOUD_FAR_S, clamp(WS.far, 0, 1));
+  for (let k = 0; k < CLOUDS.length; k++) {
+    const L = CLOUDS[k];
+    for (let x = 0; x < W; x++) L.xs[x] = wrapX(Math.round(SUNX + (x - SUNX) * is) + L.off);
+    for (let y = 0; y < HY; y++) cloudRow(L, k, y, Math.round(HY - (HY - y) * is) + L.oy);
+  }
+}
+function cloudRow(L, k, y, sy) {
+  if (sy >= 0) { L.rb[y] = Math.min(sy, HY - 1) * CW; L.rd[y] = 0; return; }
+  const t = -sy - 1, n = Math.floor(t / L.band) + 1;
+  if (n > CLOUD_TILES[k]) { L.rb[y] = -1; return; }
+  L.rb[y] = (L.band - 1 - (t % L.band)) * CW; L.rd[y] = (n * CLOUD_TILE_DX[k]) % CW;
+}
+function cloudBand(L) {
+  let low = 0;
+  for (let i = 0; i < L.idx.length; i++) if (L.idx[i] !== 255) low = Math.floor(i / CW);
+  return Math.min(HY, low + 1 + CLOUD_BAND_GAP);
+}
+function cloudAt(L, x, y) {
+  const rb = L.rb[y];
+  if (rb < 0) return -1;
+  let bx = L.xs[x] + L.rd[y]; if (bx >= CW) bx -= CW;
+  return rb + bx;
 }
 function cloudIdx(x, y) {
   for (let k = 0; k < CLOUDS.length; k++) {
-    const L = CLOUDS[k];
-    let bx = x + L.off; if (bx >= CW) bx -= CW;
-    const v = L.idx[clamp(y + L.oy, 0, HY - 1) * CW + bx];
-    if (v !== 255) return v;
+    const cp = cloudAt(CLOUDS[k], x, y);
+    if (cp >= 0 && CLOUDS[k].idx[cp] !== 255) return CLOUDS[k].idx[cp];
   }
   return 255;
 }
@@ -1281,7 +1308,7 @@ function renderTop(t) {
   const i1 = 1 / (g1 * g1), i2 = 1 / (g2 * g2);
   const srr = (sr + 0.4) * (sr + 0.4);
   const lidH = sr * (1 - WS.lid);
-  const L0 = CLOUDS[0], L1 = CLOUDS[1], idx0 = L0.idx, vis0 = L0.vis, idx1 = L1.idx, vis1 = L1.vis, off0 = L0.off, off1 = L1.off;
+  const L0 = CLOUDS[0], L1 = CLOUDS[1], idx0 = L0.idx, vis0 = L0.vis, idx1 = L1.idx, vis1 = L1.vis, xs0 = L0.xs, xs1 = L1.xs;
   for (let y = 0; y < HY; y++) {
     const ty = y / HY;
     const base = 4.1 + 4.5 * Math.pow(ty, 1.5);
@@ -1289,7 +1316,7 @@ function renderTop(t) {
     const hb = hg * 1.7 * Math.exp(-(dyh * dyh) / 700);
     const dy = y - sy, dy2 = dy * dy;
     const row = y * W;
-    const row0 = clamp(y + L0.oy, 0, HY - 1) * CW, row1 = clamp(y + L1.oy, 0, HY - 1) * CW;
+    const row0 = L0.rb[y], row1 = L1.rb[y], rd0 = L0.rd[y], rd1 = L1.rd[y];
     const litY = SUN0Y - y; // a corridor edge this far above the sun is sun-lit where litY < 3.2 |dx|
     for (let x = 0; x < W; x++) {
       const i = row + x;
@@ -1297,9 +1324,9 @@ function renderTop(t) {
       if (m !== 255 && !shifted) { TOP[i] = m; continue; }
       const dx = x - sx, d2 = dx * dx + dy2;
       const g = glow * (2.1 * Math.exp(-d2 * i1) + 1.2 * Math.exp(-d2 * i2)) + hb * Math.exp(-(dx * dx) / 4500);
-      let bx = x + off0; if (bx >= CW) bx -= CW;
-      let cp = row0 + bx, c = idx0[cp], cv = vis0;
-      if (c === 255) { bx = x + off1; if (bx >= CW) bx -= CW; cp = row1 + bx; c = idx1[cp]; cv = vis1; }
+      let bx = xs0[x] + rd0; if (bx >= CW) bx -= CW;
+      let cp = row0 + bx, c = row0 < 0 ? 255 : idx0[cp], cv = vis0;
+      if (c === 255 && row1 >= 0) { bx = xs1[x] + rd1; if (bx >= CW) bx -= CW; cp = row1 + bx; c = idx1[cp]; cv = vis1; }
       let v = -1;
       if (c !== 255) {
         const k = KCOR[i], vv = cv[cp];

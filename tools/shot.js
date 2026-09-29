@@ -174,6 +174,10 @@ function zoomFrame(swim) {
 }
 if (which === 'all' || which === 'zoom_strip') strip('out_zoom_strip.png', ZOOM_FARS, zoomFrame(false));
 if (which === 'all' || which === 'zoom_swim_strip') strip('out_zoom_swim_strip.png', ZOOM_FARS, zoomFrame(true));
+// Phase 26: the clouds pull back with the camera: the same eight frames at a fixed cloud time, the clouds
+// shrinking toward the horizon under the sun and more of them filling the sky that opens above.
+function cloudZoomFrame(f) { const t = zoomFrame(false)(f); g.setCloudT(40); return t; }
+if (which === 'all' || which === 'zoom_clouds_strip') strip('out_zoom_clouds_strip.png', ZOOM_FARS, cloudZoomFrame);
 // Phase 25, Swallowed as one lunge: eight frames from the cast into the big one (seconds into the cinematic):
 // the head rising round the speck, the mouth open with the speck on its lip, the speck and the sheet tipping
 // in, the mouth closing, the head sinking, the splash, the shadow swimming away, the empty sea.
