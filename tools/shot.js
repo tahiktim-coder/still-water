@@ -144,3 +144,30 @@ if (which === 'all' || which === 'tension_hi') shot('out_tension_hi.png', (ws, G
 if (which === 'all' || which === 'jaws') shot('out_jaws.png', (ws) => { redSky(ws); ws.companion = 1; ws.companionTurn = 1; ws.jaw = 0.55; g.setPhase('cine'); }, 7);
 if (which === 'all' || which === 'night_rim') shot('out_night_rim.png', (ws) => { night(ws); ws.companion = 1; }, 5);
 if (which === 'all' || which === 'deep_glint') shot('out_deep_glint.png', (ws, G) => { redSky(ws); ws.lantern = 0; ws.ash = 0; ws.sunGlow = 0; ws.horizGlow = 0; ws.gold = 1; ws.boatSunk = 1; ws.dive = 0.95; ws.dim = 5; ws.starA = 0.9; ws.troubled = 0.15; g.setPhase('cine'); }, 9);
+// Phase 24, the zoom the player can follow: eight frames across the pull-back (far 0 to 1, the mountains
+// sinking in step), tiled four across into one contact sheet, each settled 1.6 s so a tracking ring is out;
+// the same for the swimmer (a sunk run at sea).
+const ZOOM_FARS = [0, 0.14, 0.28, 0.43, 0.57, 0.71, 0.86, 1], ZOOM_COLS = 4, ZOOM_SC = 2;
+function zoomStrip(name, swim) {
+  const H = g.H, rows = Math.ceil(ZOOM_FARS.length / ZOOM_COLS);
+  const png = new PNG({ width: W * ZOOM_SC * ZOOM_COLS, height: H * ZOOM_SC * rows });
+  ZOOM_FARS.forEach((f, k) => {
+    g.resetAll();
+    const out = save();
+    const ws = g.WS;
+    ws.sea = f; ws.troubled = 0.15; g.setPhase('cine');
+    if (swim) { ws.gold = 1; ws.boatSunk = 1; }
+    ws.far = f;
+    for (let i = 0; i < 96; i++) g.update(1 / 60); // 1.6 s: the first ring is out and spreading
+    ws.far = f;
+    g.render(6);
+    const ox = (k % ZOOM_COLS) * W * ZOOM_SC, oy = Math.floor(k / ZOOM_COLS) * H * ZOOM_SC;
+    for (let y = 0; y < H * ZOOM_SC; y++) for (let x = 0; x < W * ZOOM_SC; x++) {
+      const p = out[Math.floor(y / ZOOM_SC) * W + Math.floor(x / ZOOM_SC)], i = ((oy + y) * png.width + ox + x) * 4;
+      png.data[i] = p & 255; png.data[i + 1] = (p >>> 8) & 255; png.data[i + 2] = (p >>> 16) & 255; png.data[i + 3] = 255;
+    }
+  });
+  fs.writeFileSync(path.join(OUT_DIR, name), PNG.sync.write(png));
+}
+if (which === 'all' || which === 'zoom_strip') zoomStrip('out_zoom_strip.png', false);
+if (which === 'all' || which === 'zoom_swim_strip') zoomStrip('out_zoom_swim_strip.png', true);

@@ -631,52 +631,79 @@ function fishMarks(o, out, w, L, bar, cy) {
 const FPAL = { o: 3, b: 6, m: 8, l: 10, s: 11, f: 5, e: 1 };
 const GPAL = { o: 13, b: 14, m: 15, l: 16, s: 16, f: 14, e: 18 };
 let BOAT, GOLD, GOLD_OPEN;
-// The far boat silhouettes for the ocean (bible, section 8): the hull with the fisherman and the lantern
-// pole flattened to index 0, then downscaled by 2 and 4 with nearest-neighbour cells (a cell is dark if any
-// source pixel in it is, so the thin hull lines and the prow curl survive), and a 5 by 2 speck. Each keeps a
-// waterline row wl for the reflecting stamp.
-let BOAT_FAR2, BOAT_FAR4, BOAT_SPECK, SPECK_LEAN_R, SPECK_LEAN_L, SWIM_FAR2, SWIM_FAR4, SWIM_SPECK;
-// The swimmer's far silhouettes (a sunk run at sea, Still water): his head and shoulders above the water with
-// the floating lantern beside him, shrunk the same way, and a 2 by 1 speck. SWIM_OFF is its centre's offset
-// from the boat's centre at full size, so the swap past far 0.5 does not jump.
-const SWIM_LX = 6, SWIM_FX = 18;
-let SWIM_OFF = 0;
-function shrink(s, k) {
-  const w = Math.ceil(s.w / k), h = Math.ceil(s.h / k);
+// The zoom silhouettes for the ocean pull-back (bible, section 8, phase 24). The whole boat group (hull,
+// fisherman, the rod at rest, the lantern on its pole) is drawn once into one canvas in the boat's own dark
+// indices (accents read as index 1), then shrunk at each of FAR_SCALES with nearest-neighbour cells, a cell
+// taking the darkest source pixel in it, so the thin hull lines, the rod and the curled ends survive while
+// they are more than a pixel; then the 5 by 2 speck. farSprite picks one from WS.far step by small step (the
+// step before the first is the live group itself). Each frame keeps its anchor (ax the group's centre column,
+// wl the waterline row) and its rod tip (tx, ty), so it shrinks round the point the camera glides toward.
+// The swimmer (a sunk run at sea) has the same ladder: head, shoulders, the rod and the floating lantern.
+const FAR_SCALES = [0.85, 0.72, 0.6, 0.5, 0.42, 0.34, 0.27, 0.2, 0.14, 0.09];
+const ZOOM_H = 40, SWIM_CX = 18; // the canvas rows above the waterline (the rod tip at rest is 37 up); the swimmer's centre column
+let BOAT_ZOOM, SWIM_ZOOM, BOAT_SPECK, SPECK_LEAN_R, SPECK_LEAN_L, SWIM_SPECK;
+// A canvas in boat coordinates: x from the boat's left, y relative to the waterline (negative is up).
+function zoomCanvas(cx) {
+  const w = BOAT.w, h = ZOOM_H, data = new Uint8Array(w * h).fill(255);
+  const put = (x, y, v) => {
+    x = Math.round(x); y = h + Math.round(y);
+    if (x < 0 || x >= w || y < 0 || y >= h) return;
+    const i = y * w + x, d = v < 12 ? v : 1;
+    if (data[i] === 255 || d < data[i]) data[i] = d;
+  };
+  return { w, h, data, cx, put };
+}
+function zoomSprite(c, s, x0, y0, rows) {
+  for (let y = 0; y < Math.min(s.h, rows || s.h); y++) for (let x = 0; x < s.w; x++) if (s.data[y * s.w + x] !== 255) c.put(x0 + x, y0 + y, s.data[y * s.w + x]);
+}
+function zoomRod(c, hx, hy) {
+  const dx = Math.cos(REST_A), dy = Math.sin(REST_A);
+  for (let k = 0; k <= ROD_LEN * 2; k++) c.put(hx + dx * k / 2, hy + dy * k / 2, 0);
+  c.tx = Math.round(hx + dx * ROD_LEN); c.ty = c.h + Math.round(hy + dy * ROD_LEN);
+}
+function zoomLantern(c, ly) {
+  for (let j = 0; j < 4; j++) for (let i = 0; i < 3; i++) c.put(6 + i, ly + j, i === 0 || i === 2 || j === 0 || j === 3 ? 0 : 2);
+}
+function boatZoomSource() {
+  const c = zoomCanvas(BOAT.w / 2);
+  zoomSprite(c, BOAT, 0, -BOAT.wl);
+  zoomSprite(c, FISHER, 18, FISHER_DY);
+  for (let y = -27; y < -8; y++) c.put(9, y, 0); // the lantern pole and its hook
+  c.put(8, -27, 0); c.put(7, -27, 0); c.put(7, -26, 0);
+  zoomLantern(c, LANTERN_DY);
+  zoomRod(c, 18, FISHER_DY + 9);
+  return c;
+}
+function swimZoomSource() {
+  const c = zoomCanvas(SWIM_CX);
+  zoomSprite(c, FISHER, 18, -FISHER_FLOAT, FISHER_FLOAT);
+  zoomLantern(c, -4);
+  zoomRod(c, 18, -FISHER_FLOAT + 9);
+  return c;
+}
+// One step of the ladder: the source shrunk round its anchor column and its waterline.
+function zoomFrame(c, sc) {
+  const ax = Math.ceil(c.cx * sc), w = Math.ceil(c.w * sc) + 2, h = Math.ceil(c.h * sc);
   const data = new Uint8Array(w * h).fill(255);
-  for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) if (s.data[y * s.w + x] !== 255) data[Math.floor(y / k) * w + Math.floor(x / k)] = 0;
-  return { w, h, data, wl: Math.round(s.wl / k) };
+  for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) {
+    const v = c.data[y * c.w + x];
+    if (v === 255) continue;
+    const dx = ax + Math.floor((x - c.cx) * sc), dy = h + Math.floor((y - c.h) * sc);
+    if (dx < 0 || dx >= w || dy < 0) continue;
+    const i = dy * w + dx;
+    if (data[i] === 255 || v < data[i]) data[i] = v;
+  }
+  return { w, h, data, wl: h, ax, tx: ax + Math.floor((c.tx - c.cx) * sc), ty: h + Math.floor((c.ty - c.h) * sc) };
 }
-function boatSilhouette() {
-  const w = BOAT.w, h = BOAT.h, data = new Uint8Array(w * h).fill(255);
-  const put = (spr, x0, y0) => { for (let y = 0; y < spr.h; y++) for (let x = 0; x < spr.w; x++) if (spr.data[y * spr.w + x] !== 255) data[(y0 + y) * w + x0 + x] = 0; };
-  put(BOAT, 0, 0);
-  put(FISHER, 18, BOAT.wl - 24);
-  for (let y = BOAT.wl - 27; y < BOAT.wl - 8; y++) data[y * w + 9] = 0; // the lantern pole
-  for (let y = BOAT.wl - 25; y < BOAT.wl - 21; y++) for (let x = 6; x < 9; x++) data[y * w + x] = 0;
-  return { w, h, data, wl: BOAT.wl };
-}
-function swimmerSilhouette() {
-  const w = SWIM_FX - SWIM_LX + FISHER.w, h = FISHER_FLOAT, data = new Uint8Array(w * h).fill(255);
-  for (let y = 0; y < h; y++) for (let x = 0; x < FISHER.w; x++) if (FISHER.data[y * FISHER.w + x] !== 255) data[y * w + SWIM_FX - SWIM_LX + x] = 0;
-  for (let y = h - 3; y < h; y++) for (let x = 0; x < 3; x++) data[y * w + x] = 0; // the lantern afloat
-  return { w, h, data, wl: h };
-}
-function buildFarSwimmer() {
-  const full = swimmerSilhouette();
-  SWIM_FAR2 = shrink(full, 2);
-  SWIM_FAR4 = shrink(full, 4);
-  SWIM_SPECK = sprite(['00']); SWIM_SPECK.wl = 1;
-  SWIM_OFF = SWIM_LX + full.w / 2 - BOAT.w / 2;
-}
+const speckOf = (rows, wl) => Object.assign(sprite(rows), { wl, ax: rows[0].length / 2, tx: rows[0].length / 2, ty: 0 });
 function buildFarBoats() {
-  buildFarSwimmer();
-  const full = boatSilhouette();
-  BOAT_FAR2 = shrink(full, 2);
-  BOAT_FAR4 = shrink(full, 4);
-  BOAT_SPECK = sprite(['.000.', '00000']); BOAT_SPECK.wl = 2;
-  SPECK_LEAN_R = sprite(['..000', '0000.']); SPECK_LEAN_R.wl = 2; // tipped toward the whirlpool's centre
-  SPECK_LEAN_L = sprite(['000..', '.0000']); SPECK_LEAN_L.wl = 2;
+  const boat = boatZoomSource(), swim = swimZoomSource();
+  BOAT_ZOOM = FAR_SCALES.map(sc => zoomFrame(boat, sc));
+  SWIM_ZOOM = FAR_SCALES.map(sc => zoomFrame(swim, sc));
+  BOAT_SPECK = speckOf(['.000.', '00000'], 2);
+  SWIM_SPECK = speckOf(['00'], 1);
+  SPECK_LEAN_R = speckOf(['..000', '0000.'], 2); // tipped toward the whirlpool's centre
+  SPECK_LEAN_L = speckOf(['000..', '.0000'], 2);
 }
 function buildSprites() {
   BOAT = makeBoat();
@@ -903,7 +930,7 @@ function resetWS() {
 }
 const G = {
   phase: 'title', t: 0, pt: 0, holding: false, bob: null, cast: null, wait: null, reel: null, land: null,
-  rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 },
+  rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 }, farRing: 0.6,
   lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0, hbGap: HB_GAP,
   capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null,
   arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0,
@@ -986,7 +1013,9 @@ function updParts(dt) {
     if (p.life > p.max || (p.g > 0 && p.vy > 0 && p.y >= p.floor)) PARTS.splice(k, 1);
   }
 }
-function ring(x, y, big) { RINGS.push({ x, y, r: 1, v: big ? 26 : 12, life: 0, max: big ? 2.6 : 1.6 }); }
+// sc scales its spread; a dark ring (the far boat’s tracking cue) shades the water down instead of up, so it
+// reads on the bright glare under the sun.
+function ring(x, y, big, sc = 1, dark = false) { RINGS.push({ x, y, r: 1, v: (big ? 26 : 12) * sc, life: 0, max: big ? 2.6 : 1.6, dark }); }
 // A bubble: a small round ring that grows a little and pops (the gold sink).
 function bubble(x, y) { RINGS.push({ x, y, r: 1, v: 3, life: 0, max: 0.5 + Math.random() * 0.4, round: true }); }
 function updRings(dt) {
@@ -1255,7 +1284,7 @@ function computeWater(t) {
 function drawRings() {
   for (const r of RINGS) {
     const fade = 1 - r.life / r.max;
-    const add = fade > 0.5 ? 2 : 1;
+    const add = fade > (r.dark ? 0.25 : 0.5) ? 2 : 1;
     const rx = r.r, ry = r.round ? r.r : r.r * 0.32;
     const n = Math.max(12, Math.ceil(rx * 5));
     for (let k = 0; k < n; k++) {
@@ -1264,7 +1293,7 @@ function drawRings() {
       if (y < HY || y >= H || x < 0 || x >= W) continue;
       if (hash2(k, (r.life * 10) | 0, 5) > fade + 0.3) continue;
       const i = y * W + x, u = FRAME[i];
-      if (u < 12) FRAME[i] = ci(u + add);
+      if (u < 12) FRAME[i] = ci(r.dark ? u - add : u + add);
     }
   }
 }
@@ -1463,21 +1492,36 @@ function drawRod(hx, hy, wl) {
   }
   G.tip = { x: tx, y: ty };
 }
-// While far > 0 the boat's centre slides toward the middle of the screen; past 0.5 it is a silhouette
-// (half, quarter, then a speck) with the rod, line, float and lantern hidden (bible, Ocean).
-const boatCentreX = far => lerp(BOAT_X + WS.boatX + BOAT.w / 2, W / 2 + WS.farDrift, far);
-function farBoatSprite(far) {
-  if (swimming()) return far <= 0.75 ? SWIM_FAR2 : far <= 0.92 ? SWIM_FAR4 : SWIM_SPECK;
-  return far <= 0.75 ? BOAT_FAR2 : far <= 0.92 ? BOAT_FAR4 : BOAT_SPECK;
+// The camera pull-back (bible, Ocean, phase 24): the group's anchor (its centre column on the waterline)
+// glides from where it sits to the centre of the horizon on the same eased far that picks the frame, so the
+// eye can follow it all the way; the frames step down FAR_STEPS sizes, the live group first and the speck last.
+const FAR_STEPS = FAR_SCALES.length + 2;
+const farStep = far => Math.min(FAR_STEPS - 1, Math.floor(far * FAR_STEPS));
+const farLive = () => farStep(WS.far) === 0;
+const zoomCx = () => (swimming() ? SWIM_CX : BOAT.w / 2);
+const zoomAnchorX = () => lerp(BOAT_X + WS.boatX + zoomCx(), W / 2 + WS.farDrift, WS.far);
+function farSprite(far) {
+  const k = farStep(far), sw = swimming();
+  if (k > FAR_SCALES.length) return sw ? SWIM_SPECK : BOAT_SPECK;
+  return (sw ? SWIM_ZOOM : BOAT_ZOOM)[k - 1];
 }
 // In the whirlpool the speck rides the spiral instead (drawWhirlBoat).
-function drawFarBoat(t, far) {
+function drawFarBoat() {
   if (WS.whirlBoat > 0) { drawWhirlBoat(); return; }
-  const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2);
-  const s = farBoatSprite(far), off = swimming() ? SWIM_OFF * (1 - far) : 0;
-  const x0 = Math.round(boatCentreX(far) + off - s.w / 2), y0 = WL - s.wl + bob;
+  const s = farSprite(WS.far), x0 = Math.round(zoomAnchorX() - s.ax), y0 = WL - s.wl;
   stampR(s, x0, y0, WL);
-  G.tip = { x: x0 + s.w / 2, y: y0 }; // a cast from out here leaves from the silhouette itself
+  G.tip = { x: x0 + s.tx, y: y0 + s.ty }; // a cast from out here leaves from the silhouette's rod
+}
+// The tracking cue: while the camera is out (far > 0) a small ring leaves the group's waterline every
+// FAR_RING_GAP seconds, sized to the frame, so even the speck visibly sits on the water (not in the whirlpool).
+const FAR_RING_GAP = 1.2, FAR_RING_FIRST = 0.6, FAR_RING_MIN = 1;
+function farRings(dt) {
+  if (WS.far <= 0 || WS.whirl > 0 || WS.whirlBoat > 0) { G.farRing = FAR_RING_FIRST; return; }
+  G.farRing += dt;
+  if (G.farRing < FAR_RING_GAP) return;
+  G.farRing -= FAR_RING_GAP;
+  const w = farLive() ? BOAT.w : farSprite(WS.far).w;
+  ring(zoomAnchorX(), WL + 1, false, clamp(w / 18, FAR_RING_MIN, 2.4), true); // it outgrows the frame
 }
 // Swallowed: the speck goes once round the centre on a shrinking spiral, leaning in toward it, and slips
 // under at the centre (whirlBoat past 1). It starts where it sat, on the whirlpool's far side.
@@ -1494,7 +1538,7 @@ function drawWhirlBoat() {
 // Facing the horizon, turned (the red), or standing (Stay).
 function compSprite() { return WS.companionStand > 0.5 ? COMP_STAND : WS.companionTurn > 0.5 ? COMP_TURN : COMP; }
 // The boat's left corner on screen, the origin of every sprite in the boat group.
-function boatLeft() { return Math.round(boatCentreX(WS.far) - BOAT.w / 2); }
+function boatLeft() { return Math.round(zoomAnchorX() - zoomCx()); }
 // The gold sink (bible, section 8): at boatSunk 1 the hull rides SINK_PX lower, which puts the prow curl and
 // the lantern pole under the waterline too, so the reflecting stamp masks the whole boat. The people do not
 // go with it: each rides the hull down only until it floats (FISHER_FLOAT rows of the fisherman above the
@@ -1593,8 +1637,7 @@ function drawFisherman(t, bx, dy) {
 }
 const DIVE_SWITCH = 0.02; // Deep: the view swaps to the shape from beneath once the horizon has risen a little
 function drawBoatGroup(t) {
-  const far = WS.far;
-  if (far > 0.5) { drawFarBoat(t, far); return; }
+  if (!farLive()) { drawFarBoat(); return; }
   if (WS.dive > DIVE_SWITCH) { drawSwimmerBeneath(); return; } // a few rows of rise first, no one-frame cut
   const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2) + rockPx(t);
   const bx = boatLeft(), dy = boatSinkPx() + bob;
@@ -1857,7 +1900,7 @@ function glowTint(cx, cy, r, acc, str) {
 }
 function applyGlows(t) {
   const s = jawShift();
-  if (WS.lantern > 0.01 && WS.lanternFlicker > 0.05 && WS.far <= 0.5) { // far out the lantern is hidden, and so is its light
+  if (WS.lantern > 0.01 && WS.lanternFlicker > 0.05 && farLive()) { // far out the lantern is a silhouette, and its light is off
     const fl = WS.lanternFlicker * WS.lantern * (0.88 + 0.12 * Math.sin(t * 13) * Math.sin(t * 7.3));
     const lx = G.lanternPos.x, ly = G.lanternPos.y;
     const warm = WS.lanternWarm;
@@ -1891,7 +1934,7 @@ function render(t) {
   drawGoldFish(t);
   drawLanding();
   drawParts(t);
-  if (WS.far <= 0.5 || G.bob) drawLine(); // far out there is no rod; a float in the water still trails its line
+  if (farLive() || G.bob) drawLine(); // far out the rod is in the silhouette; a float in the water still trails its line
   composite();
   drawFangs();
   drawUIPix(t);
@@ -2301,7 +2344,7 @@ function cutShore(t, at) {
   WS.boatX = rowAway(t, SHORE_ROW, SHORE_ROW_DUR);
   at('fade', SHORE_FADE, () => UI.fade(1, 2.5));
 }
-const SPECK_FAR = 6, SPECK_DRIFT = 1.2, SPECK_FADE = 15.5;
+const SPECK_FAR = 8, SPECK_DRIFT = 1.2, SPECK_FADE = 15.5;
 function cutSpeck(t, at) {
   WS.far = E.io(clamp((t - 6) / camDur(SPECK_FAR), 0, 1));
   WS.farDrift = Math.max(0, t - 6 - SPECK_FAR) * SPECK_DRIFT;
@@ -2480,7 +2523,7 @@ function grant1(w) {
 
 // -- the ocean (bible, sections 4 and 8). The shore sinks into the sky for good, the boat shrinks to a speck
 // on a vast lit sea, huge shadows drift to the horizon, and one the width of the screen stops under the boat.
-const OCEAN_FAR_DUR = 6, OCEAN_SPAWN_T = 1.4, OCEAN_SPAWN_GAP = 0.35, OCEAN_BIG_T = 9.5, OCEAN_CROSS = 7, OCEAN_WINDOW = 10, OCEAN_RETURN = 2.5, OCEAN_FADE_IN = 3;
+const OCEAN_FAR_DUR = 8, OCEAN_SPAWN_T = 1.4, OCEAN_SPAWN_GAP = 0.35, OCEAN_BIG_T = 11.5, OCEAN_CROSS = 7, OCEAN_WINDOW = 10, OCEAN_RETURN = 2.5, OCEAN_FADE_IN = 3;
 function spawnOceanShadow(size) {
   const fromLeft = Math.random() < 0.5;
   const x = fromLeft ? -10 + Math.random() * W * 0.45 : W + 10 - Math.random() * W * 0.45; // already in the water, fading in
@@ -3459,7 +3502,7 @@ function resetAll() {
   resetWS();
   Object.assign(STORY, freshStory());
   loadRun();
-  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null, arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 } });
+  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null, arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 }, farRing: FAR_RING_FIRST });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
   OCEAN.shad.length = 0; OCEAN.big = null; OCEAN.tr0 = 0;
   cloudT = 0; genEyes();
@@ -3492,7 +3535,7 @@ function update(dt) {
   eyesUpdate();
   if (!WS.frozen) cloudT += dt;
   dlgUpdate(dt);
-  updParts(dt); updRings(dt); updAsh(dt); updShadows(dt); updOcean(dt); updBirds(dt); updJumps(dt);
+  updParts(dt); farRings(dt); updRings(dt); updAsh(dt); updShadows(dt); updOcean(dt); updBirds(dt); updJumps(dt);
   ambientUpdate(dt);
 }
 function init() {
