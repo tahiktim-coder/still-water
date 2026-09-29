@@ -613,7 +613,7 @@ let BOAT, GOLD, GOLD_OPEN;
 // pole flattened to index 0, then downscaled by 2 and 4 with nearest-neighbour cells (a cell is dark if any
 // source pixel in it is, so the thin hull lines and the prow curl survive), and a 5 by 2 speck. Each keeps a
 // waterline row wl for the reflecting stamp.
-let BOAT_FAR2, BOAT_FAR4, BOAT_SPECK, SWIM_FAR2, SWIM_FAR4, SWIM_SPECK;
+let BOAT_FAR2, BOAT_FAR4, BOAT_SPECK, SPECK_LEAN_R, SPECK_LEAN_L, SWIM_FAR2, SWIM_FAR4, SWIM_SPECK;
 // The swimmer's far silhouettes (a sunk run at sea, Still water): his head and shoulders above the water with
 // the floating lantern beside him, shrunk the same way, and a 2 by 1 speck. SWIM_OFF is its centre's offset
 // from the boat's centre at full size, so the swap past far 0.5 does not jump.
@@ -653,6 +653,8 @@ function buildFarBoats() {
   BOAT_FAR2 = shrink(full, 2);
   BOAT_FAR4 = shrink(full, 4);
   BOAT_SPECK = sprite(['.000.', '00000']); BOAT_SPECK.wl = 2;
+  SPECK_LEAN_R = sprite(['..000', '0000.']); SPECK_LEAN_R.wl = 2; // tipped toward the whirlpool's centre
+  SPECK_LEAN_L = sprite(['000..', '.0000']); SPECK_LEAN_L.wl = 2;
 }
 function buildSprites() {
   BOAT = makeBoat();
@@ -860,8 +862,10 @@ function resetWS() {
     // the fisherman swims); far the ocean camera pull-back (0 to 1 and back); sea the mountains gone (0 to 1,
     // then held at 1 for the rest of the run).
     goldKept: 0, boatSunk: 0, frozen: 0, far: 0, sea: 0, eyes: 0, farBoat: 0,
-    // Phase 3: the ocean. swallow is the radius of the opening water; boatDrop the boat's fall into it.
-    swallow: 0, boatDrop: 0,
+    // Phase 22, Swallowed: whirl is the whirlpool's radius, whirlSpin its turning, whirlDark its dark centre,
+    // whirlPh the accumulated turn; whirlBoat the speck's way round the spiral (1 at the centre, past 1 under);
+    // seaEye the eye opening where it went down.
+    whirl: 0, whirlSpin: 0, whirlDark: 0, whirlPh: 0, whirlBoat: 0, seaEye: 0,
     // Stay: companionStand swaps in the standing frame, leap is his progress along the parabola to the disc
     // (held at 1 while he rides it down), rock the boat's push-off wobble, lanternWarm widens the glow.
     companionStand: 0, leap: 0, rock: 0, lanternWarm: 0,
@@ -1262,7 +1266,7 @@ function drawShadows() {
   for (const s of SHAD) drawShadowShape(s.x, s.y, s.dir, 1, 1);
 }
 // The ocean (bible, section 8): a dozen large shadows drifting to the horizon, then the big one.
-const OCEAN = { shad: [], big: null, tr0: 0 };
+const OCEAN = { shad: [], big: null, tr0: 0, hint: false };
 function drawOceanShadows() {
   for (const s of OCEAN.shad) drawShadowShape(s.x, s.y, s.dir, s.size, s.a);
   if (OCEAN.big) drawBigShadow(OCEAN.big);
@@ -1283,8 +1287,10 @@ function bigShape(u, v) {
   const p = lerp(0.14, 0.72, tt), notch = 0.55 * tt * tt * tt;
   return av < p && av > notch ? 0.3 + 0.3 * (1 - av / p) : 0;
 }
+// a is its presence (0 to 1 as it fades in from the deep): each shade step is dithered by it.
 function drawBigShadow(b) {
-  const hw = b.w * 0.5, hh = b.h * 0.5, deep = b.deep > 0.5 ? 1 : 0; // deeper reads a shade darker
+  const hw = b.w * 0.5, hh = b.h * 0.5, a = b.a === undefined ? 1 : b.a;
+  if (a <= 0) return;
   const y0 = Math.max(HY, Math.floor(b.y - hh * 1.5)), y1 = Math.min(H - 1, Math.ceil(b.y + hh * 1.5));
   const x0 = Math.max(0, Math.floor(b.x - hw - 2)), x1 = Math.min(W - 1, Math.ceil(b.x + hw + 2));
   for (let y = y0; y <= y1; y++) {
@@ -1293,64 +1299,74 @@ function drawBigShadow(b) {
       const d = bigShape(-(x + rip - b.x) / hw, v);
       if (d <= 0) continue;
       const i = row + x, f = FRAME[i];
-      if (f < 12) FRAME[i] = Math.max(0, f - deep - (d > 0.7 ? 4 : d > 0.4 ? 3 : 2));
+      if (f < 12) FRAME[i] = Math.max(0, f - Math.floor((d > 0.7 ? 4 : d > 0.4 ? 3 : 2) * a + BAYER[((y & 3) << 2) | (x & 3)]));
     }
   }
 }
-// The Swallowed circle (bible, section 8): the water inside an ellipse around the boat goes to the darkest
-// index, with a rippling edge a shade lighter. In the water only, never reflected.
-const SWALLOW_CY = WL + 6;
-function drawSwallow(t) {
-  const r = WS.swallow;
-  if (r <= 0.5) return;
-  const cx = W / 2, cy = SWALLOW_CY, ry = r * 0.45;
-  const y0 = Math.max(HY, Math.floor(cy - ry - 4)), y1 = Math.min(H - 1, Math.ceil(cy + ry + 4));
-  for (let y = y0; y <= y1; y++) {
-    const dy = (y - cy) / 0.45, rip = RIPX[y], row = y * W;
-    const x0 = Math.max(0, Math.floor(cx - r - 4)), x1 = Math.min(W - 1, Math.ceil(cx + r + 4));
-    for (let x = x0; x <= x1; x++) {
-      const dx = x + rip - cx, d = Math.sqrt(dx * dx + dy * dy);
-      if (d > r + 3) continue;
-      const edge = r + Math.sin(Math.atan2(dy, dx) * 9 + t * 6) * 1.6 + (hash2(x, y, (t * 8) | 0) - 0.5) * 1.5;
-      const i = row + x;
-      if (d < edge - 2.5) FRAME[i] = 0;
-      else if (d < edge && FRAME[i] < 12) FRAME[i] = SWALLOW_LIP; // a paler lip, so the edge reads as a rim
+// The Swallowed whirlpool (bible, section 8): inside an ellipse around the sinking point the water already
+// computed is resampled at an angle that grows toward the centre, so the mirrored sky visibly turns; three
+// spiral arms lighten and darken it, and the centre sinks to the darkest index. The far half is squashed
+// under the horizon. In the water only, never reflected.
+const WHIRL_R = 70, WHIRL_CY = WL + 8, WHIRL_UP = 12, WHIRL_FLAT = 0.4, WHIRL_WIND = 2.4, WHIRL_ARMS = 3;
+const WSCR = new Uint8Array(216 * 600);
+const whirlRy = r => ({ up: Math.min(r * WHIRL_FLAT, WHIRL_UP), dn: r * WHIRL_FLAT });
+function whirlSrc(x, y, r, ry, rot, out) { // the source pixel of (x, y) and its depth q, into out
+  const dx = x - W / 2, up = y < WHIRL_CY, ey = (y - WHIRL_CY) * (r / (up ? ry.up : ry.dn)), d = Math.sqrt(dx * dx + ey * ey);
+  if (d >= r) return false;
+  const q = 1 - d / r, a = Math.atan2(ey, dx) - rot(q), sy = d * Math.sin(a);
+  out.x = Math.round(W / 2 + d * Math.cos(a));
+  out.y = Math.round(WHIRL_CY + sy * ((sy < 0 ? ry.up : ry.dn) / r));
+  out.q = q; out.a = a;
+  return true;
+}
+const WSRC = { x: 0, y: 0, q: 0, a: 0 };
+function drawWhirl() {
+  const r = WS.whirl;
+  if (r < 1) return;
+  const ry = whirlRy(r), y0 = Math.max(HY + 1, Math.floor(WHIRL_CY - ry.up)), y1 = Math.min(H - 1, Math.ceil(WHIRL_CY + ry.dn));
+  const x0 = Math.max(0, Math.floor(W / 2 - r)), x1 = Math.min(W - 1, Math.ceil(W / 2 + r));
+  WSCR.set(FRAME.subarray(y0 * W, (y1 + 1) * W), 0);
+  const wind = WHIRL_WIND * (r / WHIRL_R), ph = WS.whirlPh, rot = q => q * q * wind + q * ph;
+  const spin = WS.whirlSpin, dark = WS.whirlDark * 11;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (!whirlSrc(x, y, r, ry, rot, WSRC)) continue;
+    const sy = clamp(WSRC.y, y0, y1), sx = clamp(WSRC.x, 0, W - 1);
+    let v = WSCR[(sy - y0) * W + sx];
+    if (v > 11) v = 11;
+    const arm = Math.sin(WHIRL_ARMS * WSRC.a) * spin * Math.min(1, WSRC.q * 4);
+    const f = v + (arm > 0.7 ? 2 : arm > 0.4 ? 1 : arm < -0.5 ? -1 : 0) - dark * Math.pow(WSRC.q, 1.3);
+    FRAME[y * W + x] = ci(dith(f, x, y));
+  }
+}
+// The eye where the boat went down (bible, Swallowed): an almond about 40 px wide in the dark ramp, a gold
+// iris (13 to 16) and a black slit pupil (19), the same eye as the bait and the red sun, looking up.
+const SEA_EYE_HW = 20, SEA_EYE_HH = 7, SEA_IRIS = 6;
+function seaEyePix(dx, dy, e) { // the index for a pixel of the eye, or -1 outside it
+  const u = dx / SEA_EYE_HW;
+  if (Math.abs(u) >= 1) return -1;
+  const lid = (1 - u * u) * e, top = Math.round(-SEA_EYE_HH * lid), bot = Math.round(SEA_EYE_HH * 0.8 * lid);
+  if (dy < top - 1 || dy > bot + 1) return -1;
+  if (dy < top || dy > bot || top === 0) return 0; // the lid line
+  const ir = Math.hypot(dx, dy);
+  if (ir <= SEA_IRIS) {
+    if (Math.abs(dx) <= 1.2 * (1 - (dy / SEA_IRIS) * (dy / SEA_IRIS)) + 0.2) return 19; // the slit
+    if (dx === -2 && dy === -3) return 20; // one glint
+    const lit = (-dx - dy) / (SEA_IRIS * 1.4) + 0.5 - ir / (SEA_IRIS * 3);
+    return lit > 0.75 ? 16 : lit > 0.45 ? 15 : lit > 0.15 ? 14 : 13;
+  }
+  return dy < top + 2 ? 2 : Math.abs(u) > 0.75 ? 3 : 4; // the white, in the dark ramp, shaded under the lid
+}
+function drawSeaEye() {
+  const e = WS.seaEye;
+  if (e <= 0.02) return;
+  const cx = W / 2, cy = WHIRL_CY;
+  for (let dy = -SEA_EYE_HH - 1; dy <= SEA_EYE_HH + 1; dy++) {
+    const y = cy + dy;
+    if (y <= HY || y >= H) continue;
+    for (let dx = -SEA_EYE_HW; dx <= SEA_EYE_HW; dx++) {
+      const v = seaEyePix(dx, dy, e);
+      if (v >= 0) FRAME[y * W + cx + dx] = v;
     }
-  }
-  swallowTeeth(r, cx, cy, ry);
-}
-// Bone teeth (22 lit, 23 shade) inside the opening: a sparse row hanging from the horizon and another rising
-// from the lower arc, each rooted TOOTH_SET px in from the lip, spaced unevenly, each its own length and width,
-// curving toward the middle of the mouth, so it reads as a mouth opening and not a grin. They grow with it.
-const SWALLOW_LIP = 7, SWALLOW_TOOTH_GAP = 20, TOOTH_SET = 4;
-function swallowTooth(x, y, hb, len, dir, lean) {
-  for (let k = 0; k < len; k++) {
-    const yy = y + dir * k, q = k / len, half = Math.round(hb * (1 - q)), xs = x + Math.round(lean * q * q * len * 0.45);
-    if (yy <= HY || yy >= H) continue;
-    for (let dx = -half; dx <= half; dx++) {
-      const xx = xs + dx;
-      if (xx >= 0 && xx < W) FRAME[yy * W + xx] = dx < 0 || (dx === 0 && k === len - 1) ? 22 : 23;
-    }
-  }
-}
-// One tooth's own size from its index: 0.55 to 1.35 of the base length, some of them wider.
-function toothAt(k, x, y, dir, r, cx) {
-  const h = hash2(k, 17, 7), base = clamp(r / 16, 2, 6);
-  const len = Math.max(2, Math.round(base * (0.55 + 0.8 * h))), hb = r < 50 ? 1 : h > 0.55 ? 2 : 1;
-  swallowTooth(x, y, hb, len, dir, Math.sign(cx - x));
-}
-const toothStep = k => SWALLOW_TOOTH_GAP * (0.6 + 0.8 * hash2(k, 3, 11)); // uneven spacing
-function swallowTeeth(r, cx, cy, ry) {
-  if (r < 14) return;
-  const top = HY + 1 + Math.round(TOOTH_SET / 2), dyTop = (top - cy) / ry; // under the horizon lip
-  if (Math.abs(dyTop) < 1) {
-    const half = r * Math.sqrt(1 - dyTop * dyTop) - TOOTH_SET * 3;
-    for (let x = cx - half + toothStep(0) * 0.5, k = 1; x <= cx + half; x += toothStep(k), k++) toothAt(k, Math.round(x), top, 1, r, cx);
-  }
-  const arc = Math.PI * r, rr = r - TOOTH_SET, ryy = ry - TOOTH_SET * 0.6;
-  for (let d = toothStep(50) * 0.5, k = 51; d < arc; d += toothStep(k), k++) {
-    const an = (d / arc) * Math.PI, x = Math.round(cx + Math.cos(an) * rr), y = Math.round(cy + Math.sin(an) * ryy);
-    if (y > top + 8) toothAt(k, x, y, -1, r, cx);
   }
 }
 // The eyes in the water (bible, section 8): about eight pairs of red pixels on the surface rows under
@@ -1432,13 +1448,26 @@ function farBoatSprite(far) {
   if (swimming()) return far <= 0.75 ? SWIM_FAR2 : far <= 0.92 ? SWIM_FAR4 : SWIM_SPECK;
   return far <= 0.75 ? BOAT_FAR2 : far <= 0.92 ? BOAT_FAR4 : BOAT_SPECK;
 }
-// Over the Swallowed circle, and falling into it, it is drawn in front of the dark, unmasked, with a pale rim.
+// In the whirlpool the speck rides the spiral instead (drawWhirlBoat).
 function drawFarBoat(t, far) {
-  const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2), dy = bob + Math.round(WS.boatDrop);
+  if (WS.whirlBoat > 0) { drawWhirlBoat(); return; }
+  const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2);
   const s = farBoatSprite(far), off = swimming() ? SWIM_OFF * (1 - far) : 0;
-  const x0 = Math.round(boatCentreX(far) + off - s.w / 2), y0 = WL - s.wl + dy;
-  if (WS.swallow > 0.5) { stamp(s, x0, y0); rimBox(x0 - 1, y0 - 1, s.w + 2, s.h + 2); } else stampR(s, x0, y0, WL);
+  const x0 = Math.round(boatCentreX(far) + off - s.w / 2), y0 = WL - s.wl + bob;
+  stampR(s, x0, y0, WL);
   G.tip = { x: x0 + s.w / 2, y: y0 }; // a cast from out here leaves from the silhouette itself
+}
+// Swallowed: the speck goes once round the centre on a shrinking spiral, leaning in toward it, and slips
+// under at the centre (whirlBoat past 1). It starts where it sat, on the whirlpool's far side.
+const WHIRL_SINK = 0.3;
+function drawWhirlBoat() {
+  const p = Math.min(1, WS.whirlBoat), sink = clamp((WS.whirlBoat - 1) / WHIRL_SINK, 0, 1);
+  const ry = whirlRy(WHIRL_R), r0 = (WHIRL_CY - WL) * WHIRL_R / ry.up, rr = r0 * Math.pow(1 - p, 0.8);
+  const a = -Math.PI / 2 + p * Math.PI * 2, sn = Math.sin(a);
+  const x = W / 2 + rr * Math.cos(a), wl = Math.round(WHIRL_CY + rr * sn * ((sn < 0 ? ry.up : ry.dn) / WHIRL_R));
+  const c = Math.cos(a), s = c < -0.3 ? SPECK_LEAN_R : c > 0.3 ? SPECK_LEAN_L : BOAT_SPECK;
+  stampR(s, Math.round(x - s.w / 2), wl - s.wl + Math.round(sink * 3), wl);
+  G.tip = { x: Math.round(x), y: wl - s.wl }; // the line, while the float is still out, follows the speck
 }
 // Facing the horizon, turned (the red), or standing (Stay).
 function compSprite() { return WS.companionStand > 0.5 ? COMP_STAND : WS.companionTurn > 0.5 ? COMP_TURN : COMP; }
@@ -1810,7 +1839,9 @@ function render(t) {
   drawRings();
   drawShadows();
   drawOceanShadows();
-  drawSwallow(t);
+  drawWhirl();
+  drawSeaEye();
+  drawOceanMarker(t);
   drawEyes();
   SPR.fill(255);
   drawBoatGroup(t);
@@ -1904,6 +1935,20 @@ const SFX = {
   match() { this.noise(0.25, 0.12, 'bandpass', 2800, 900, 2); this.tone(180, 0.5, 'sine', 0.04, 120, 0.1); },
   hiss(d) { this.noise(d || 2, 0.16, 'highpass', 2200, 7000, 0.4); },
   rumble() { this.noise(4.5, 0.18, 'lowpass', 120, 300, 0.7); this.tone(38, 4.4, 'sawtooth', 0.1, 55); },
+  // Swallowed: a slow rising swirl, noise through a band-pass that falls and wobbles as it turns.
+  swirl() {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime, d = SWIRL_DUR;
+    const s = c.createBufferSource(); s.buffer = this.buf; s.loop = true;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(1500, t); f.frequency.exponentialRampToValueAtTime(130, t + d);
+    const l = c.createOscillator(); l.frequency.value = 2.5;
+    const lg = c.createGain(); lg.gain.value = 60;
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + d * 0.75); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    l.connect(lg); lg.connect(f.frequency); s.connect(f); f.connect(g); g.connect(this.out);
+    s.start(t, Math.random()); l.start(t); s.stop(t + d + 0.05); l.stop(t + d + 0.05);
+  },
   crunch() { this.noise(0.9, 0.45, 'lowpass', 900, 60, 1.2); this.tone(90, 1, 'sawtooth', 0.25, 28); },
   heartbeat() { this.tone(52, 0.2, 'sine', 0.3, 40); this.tone(48, 0.22, 'sine', 0.24, 36, 0.26); },
   drone(on) {
@@ -2386,10 +2431,11 @@ function grant1(w) {
 
 // -- the ocean (bible, sections 4 and 8). The shore sinks into the sky for good, the boat shrinks to a speck
 // on a vast lit sea, huge shadows drift to the horizon, and one the width of the screen stops under the boat.
-const OCEAN_FAR_DUR = 6, OCEAN_SPAWN_T = 1.4, OCEAN_SPAWN_GAP = 0.35, OCEAN_BIG_T = 5.5, OCEAN_CROSS = 8, OCEAN_WINDOW = 10, OCEAN_RETURN = 2.5, SWALLOW_R = 130;
+const OCEAN_FAR_DUR = 6, OCEAN_SPAWN_T = 1.4, OCEAN_SPAWN_GAP = 0.35, OCEAN_BIG_T = 9.5, OCEAN_CROSS = 7, OCEAN_WINDOW = 10, OCEAN_RETURN = 2.5, OCEAN_FADE_IN = 3;
 function spawnOceanShadow(size) {
   const fromLeft = Math.random() < 0.5;
-  const s = { x: fromLeft ? -20 - Math.random() * 30 : W + 20 + Math.random() * 30, y: HY + 30 + Math.random() * (H - HY - 50), size, a: 1, fade: 0 };
+  const x = fromLeft ? -10 + Math.random() * W * 0.45 : W + 10 - Math.random() * W * 0.45; // already in the water, fading in
+  const s = { x, y: HY + 30 + Math.random() * (H - HY - 50), size, a: 0, fade: 0 };
   s.vx = (fromLeft ? 1 : -1) * (5 + Math.random() * 6); s.vy = -(1.5 + Math.random() * 2.5);
   s.dir = s.vx >= 0 ? 1 : -1;
   OCEAN.shad.push(s);
@@ -2397,7 +2443,7 @@ function spawnOceanShadow(size) {
 // The open sea (bible, The open sea): a few giant shapes keep passing beneath at a slow rate, all toward the
 // horizon, at every mood for the rest of the run. One that arrives comes back in at the bottom (or leaves for
 // good at the still-water dawn, with shoalOut).
-const SEA_SHOAL = 5, SEA_HURRY = 4;
+const SEA_SHOAL = 5, SEA_HURRY = 4, SHOAL_FADE_IN = 0.7;
 function seaShadow(s, y) {
   const x = Math.random() * W, vx = (WS.sunX - x) / 60;
   return Object.assign(s, { x, y, size: 2 + ((Math.random() * 3) | 0), a: 1, fade: 0, vx, vy: -(1 + Math.random() * 1.2), dir: vx >= 0 ? 1 : -1, sea: true });
@@ -2408,22 +2454,23 @@ function spawnSeaShoal() {
 }
 const bigRestY = () => HY + 16 + (H - HY) / 6; // its back just under the surface, the fins clear of the horizon
 const BIG_DEEP_PX = 12; // how many rows lower it swims while crossing, before it rises to rest
-// The big one (bible, section 8) does not rise from below: it enters from the left edge, deep (darker and a
-// few rows lower), crosses to the centre over OCEAN_CROSS seconds slowing all the way, rises a little as it
-// slows and settles under the boat. deep goes 1 to 0 with the rise; drawBigShadow reads it.
+// The big one (bible, section 8) does not rise from below: after the shoal has swum alone for a while it
+// enters at the left edge, faint and deep (a few rows lower, its presence a rising from 0 over OCEAN_FADE_IN
+// seconds), crosses to the centre over OCEAN_CROSS seconds slowing all the way, rises a little as it slows and
+// settles under the boat. drawBigShadow reads a.
 function bigEnter() {
   const h = (H - HY) / 3, restY = bigRestY();
-  OCEAN.big = { x: -W * 0.55, y: restY + BIG_DEEP_PX, w: W, h, deep: 1, crossing: true };
+  OCEAN.big = { x: -W * 0.55, y: restY + BIG_DEEP_PX, w: W, h, a: 0, crossing: true };
   tween(OCEAN.big, 'x', W / 2, OCEAN_CROSS, E.out2, () => { if (OCEAN.big) OCEAN.big.crossing = false; });
   tween(OCEAN.big, 'y', restY, OCEAN_CROSS, E.in);
-  tween(OCEAN.big, 'deep', 0, OCEAN_CROSS, E.in);
+  tween(OCEAN.big, 'a', 1, OCEAN_FADE_IN, E.io);
 }
 // For the shots: the big one already at rest under the boat.
 function bigRise() {
   bigEnter();
   const b = OCEAN.big;
-  untween(b, 'x'); untween(b, 'y'); untween(b, 'deep');
-  Object.assign(b, { x: W / 2, y: bigRestY(), deep: 0, crossing: false });
+  untween(b, 'x'); untween(b, 'y'); untween(b, 'a');
+  Object.assign(b, { x: W / 2, y: bigRestY(), a: 1, crossing: false });
 }
 // The smaller shapes scatter from the big one as its head reaches them, one by one, not all at once.
 const SCATTER_REACH = 0.55;
@@ -2459,7 +2506,7 @@ function updOcean(dt) {
     const s = OCEAN.shad[k];
     if (s.lead !== undefined) { steerLead(s, dt); continue; }
     s.x += s.vx * dt; s.y += s.vy * (s.sea ? hurry : 1) * dt;
-    if (s.fade > 0) { s.a -= dt / s.fade; if (s.a <= 0) { OCEAN.shad.splice(k, 1); continue; } }
+    if (s.fade > 0) { s.a -= dt / s.fade; if (s.a <= 0) { OCEAN.shad.splice(k, 1); continue; } } else if (s.a < 1) s.a = Math.min(1, s.a + dt * SHOAL_FADE_IN);
     if (s.y < HY + 4 + s.size * 2) {
       if (s.sea && WS.shoalOut) { OCEAN.shad.splice(k, 1); continue; }
       if (s.sea) seaShadow(s, H - 10); else { s.y = H - 10; s.x = Math.random() * W; }
@@ -2467,10 +2514,11 @@ function updOcean(dt) {
     if (s.x < -60 || s.x > W + 60) s.vx = -s.vx, s.dir = -s.dir;
   }
   if (OCEAN.big && OCEAN.big.crossing) scatterFrom(OCEAN.big);
+  if (G.phase === 'ocean' && !OCEAN.hint && G.pt >= OCEAN_GRACE) { OCEAN.hint = true; refreshPrompt(); } // the prompt after the grace
   if (G.phase === 'ocean' && G.pt >= OCEAN_WINDOW) oceanLeave();
 }
 const CINE_OCEAN = {
-  dur: 13.5,
+  dur: OCEAN_BIG_T + OCEAN_CROSS,
   init(s) {
     OCEAN.tr0 = WS.troubled; OCEAN.shad.length = 0; OCEAN.big = null;
     tween(WS, 'far', 1, camDur(OCEAN_FAR_DUR), E.io); tween(WS, 'sea', 1, OCEAN_FAR_DUR, E.io); tween(WS, 'troubled', 0.15, 2);
@@ -2478,13 +2526,30 @@ const CINE_OCEAN = {
   },
   update(t, dt, at, s) {
     at('snd', 0, () => SFX.swell());
-    if (s.n < 12 && t >= s.next) { s.next += OCEAN_SPAWN_GAP; s.n++; spawnOceanShadow(2 + Math.round((s.n / 12) * 4)); } // a dozen, all in before the big one
+    if (s.n < 12 && t >= s.next) { s.next += OCEAN_SPAWN_GAP; s.n++; spawnOceanShadow(2 + Math.round((s.n / 12) * 4)); } // a dozen, the shoal alone for a while
     at('big', OCEAN_BIG_T, () => { bigEnter(); SFX.weight(true); }); // no stinger: the swell rises with the crossing
   },
 };
-// The tap that dismisses the warning must not also cast: the first second of the window ignores taps.
-const OCEAN_GRACE = 1.0;
-function oceanTold() { dlgRun([fish('Here. I’d leave the big one. It’s been waiting longer than you have.')], () => setPhase('ocean')); }
+// The tap that dismisses the warning must not also cast: the first second of the window ignores taps. After
+// it the prompt comes back and a pale ring pulses on the big one's back below the speck, where the float
+// would land (oceanMark, drawOceanMarker).
+const OCEAN_GRACE = 1.0, MARK_UP = 0.2, SWIRL_DUR = 5;
+function oceanTold() {
+  dlgRun([fish('Here. I wouldn’t cast while it’s under you. It’s been waiting longer than you have.')], () => { OCEAN.hint = false; setPhase('ocean'); });
+}
+function oceanMark() {
+  const b = OCEAN.big;
+  return { x: Math.round(W / 2 + WS.farDrift), y: Math.round(b ? b.y - b.h * MARK_UP : bigRestY() - (H - HY) / 15) };
+}
+const MARK_RING = [[-1, -1], [0, -1], [1, -1], [-2, 0], [2, 0], [-1, 1], [0, 1], [1, 1]]; // 5 px wide, flat on the water
+function drawOceanMarker(t) {
+  if (G.phase !== 'ocean' || G.pt < OCEAN_GRACE || !OCEAN.big) return;
+  const m = oceanMark(), v = 9 + Math.round(1 + Math.sin(t * 2.2)); // 9 to 11, slowly
+  for (const [dx, dy] of MARK_RING) {
+    const x = m.x + dx, y = m.y + dy;
+    if (x >= 0 && x < W && y > HY && y < H) FRAME[y * W + x] = v;
+  }
+}
 // The choice is made by input: a cast while the big one is under the boat is the Swallowed ending; waiting the
 // window out lets it leave. Skip fish counts as a cast here.
 function oceanCast() {
@@ -2492,22 +2557,36 @@ function oceanCast() {
   SFX.weight(false);
   playCine(CINE_SWALLOW, () => showEnding('swallowed'));
 }
+// Swallowed (bible, section 8): the float lands on the marker, the water round the boat turns into a
+// whirlpool, the speck circles once and slips under at the centre, the water slows, and an eye opens where it
+// went down, looking up. Black, then the card.
+const SW = { fly: 0.7, open: 0.9, grow: 3, circle: 1.6, round: 3.4, still: 5.0, eye: 5.7, eyeOpen: 1.2, black: 8.4, spin: 2.2 };
+function swallowFloat(t, at, s) {
+  if (t < SW.fly) { const k = t / SW.fly; G.bob = { x: lerp(s.from.x, s.to.x, k), y: lerp(s.from.y, s.to.y, k) - Math.sin(k * Math.PI) * 14, fly: true }; }
+  at('land', SW.fly, () => { G.bob = { x: s.to.x, y: s.to.y, fly: false }; ring(s.to.x, s.to.y + 1); SFX.plop(); });
+  at('float', SW.open + SW.grow * 0.55, () => { G.bob = null; }); // the whirlpool has reached the float
+}
 const CINE_SWALLOW = {
-  dur: 7.6,
+  dur: SW.black + 0.4,
   init(s) {
-    const b = OCEAN.big;
-    s.from = { x: W / 2, y: WL - 2 }; s.to = { x: W / 2 + 16, y: b ? b.y - b.h * 0.1 : HY + 30 };
+    s.from = { x: G.tip ? G.tip.x : W / 2, y: WL - 2 }; s.to = oceanMark();
     G.bob = { x: s.from.x, y: s.from.y, fly: true };
+    WS.whirlPh = 0;
     SFX.whoosh();
   },
   update(t, dt, at, s) {
-    if (t < 0.7) { const k = t / 0.7; G.bob = { x: lerp(s.from.x, s.to.x, k), y: lerp(s.from.y, s.to.y, k) - Math.sin(k * Math.PI) * 14, fly: true }; }
-    at('land', 0.7, () => { G.bob = { x: s.to.x, y: s.to.y, fly: false }; ring(s.to.x, s.to.y + 1); SFX.plop(); });
+    swallowFloat(t, at, s);
+    WS.whirlPh += dt * SW.spin * WS.whirlSpin;
     at('cap', 1.1, () => cap('The float lands on something that is not water.', 3.2));
-    at('open', 1.6, () => { tween(WS, 'swallow', SWALLOW_R, 4, E.in); SFX.rumble(); });
-    at('float', 3.7, () => { G.bob = null; }); // the opening has reached the float
-    at('drop', 4.6, () => tween(WS, 'boatDrop', 24, 1.1, E.in));
-    at('black', 7.1, () => { SFX.crunch(); UI.fade(1, 0.25); });
+    at('open', SW.open, () => {
+      tween(WS, 'whirl', WHIRL_R, SW.grow, E.io); tween(WS, 'whirlSpin', 1, SW.grow * 0.7, E.io); tween(WS, 'whirlDark', 1, SW.grow, E.in);
+      if (OCEAN.big) tween(OCEAN.big, 'a', 0.4, SW.grow);
+      SFX.swirl();
+    });
+    at('circle', SW.circle, () => tween(WS, 'whirlBoat', 1 + WHIRL_SINK, SW.round, E.in));
+    at('still', SW.still, () => { tween(WS, 'whirlSpin', 0, 1.2, E.out); tween(WS, 'whirlDark', 0.85, 1.2); });
+    at('eye', SW.eye, () => { tween(WS, 'seaEye', 1, SW.eyeOpen, E.out); SFX.heartbeat(); });
+    at('black', SW.black, () => UI.fade(1, 0.25));
   },
 };
 // Waited out: the camera comes back, the shore does not. The rest of the run is played on the open sea.
@@ -2874,7 +2953,7 @@ function showEnding(id, variant) {
 // ---------------------------------------------------------------- fishing
 function promptFor(p) {
   if (p === 'ready') return 'Tap to cast';
-  // The ocean window has no prompt: casting into the big one is a choice made against his warning.
+  if (p === 'ocean') return G.pt >= OCEAN_GRACE ? 'Tap to cast' : ''; // the window, after its grace (phase 22)
   if (p === 'waiting' && G.tutorial < 2) return 'Wait for the float to go under';
   if (p === 'bite') return 'Tap now';
   if (p === 'reeling') return G.tutorial < 3 ? 'Hold to reel. Let go when it pulls hard.' : 'Hold to reel';
@@ -3685,6 +3764,7 @@ if (IS_BROWSER) {
     get H() { return H; }, W, HY,
     spawnShadows, SHAD, spawnBirds, BIRDS, RINGS, RUN, ENDING_COUNT,
     OCEAN, spawnOceanShadow, spawnSeaShoal, bigRise, bigEnter, bigRestY, untween, bubble, boatLeft, WL,
+    oceanCast, oceanTold, playCine, CINE_OCEAN,
     setCloudT(v) { cloudT = v; },
   };
 }

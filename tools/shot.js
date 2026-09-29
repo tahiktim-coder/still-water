@@ -48,17 +48,24 @@ if (which === 'all' || which === 'clouds_night') shot('out_clouds_night.png', (w
 if (which === 'all' || which === 'clouds_red') shot('out_clouds_red.png', (ws) => { ws.mood = 2; ws.sunKind = 1; ws.sunR = 16; ws.sunY = 178; ws.sunGlow = 1.25; ws.horizGlow = 1.3; ws.pupil = 1; ws.ash = 1; ws.troubled = 0.55; }, 20); // the cumulus in the red
 if (which === 'all' || which === 'title_far') shot('out_title_far.png', (ws) => { ws.farBoat = 1; }, 3.3);
 
-// Phase 3, the ocean. The big one at rest under the speck; the sea mid-swallow.
+// Phase 3, the ocean. The big one at rest under the speck.
 const ocean = ws => { ws.far = 1; ws.sea = 1; ws.troubled = 0.15; g.setPhase('ocean'); g.bigRise(); g.untween(g.OCEAN.big, 'y'); g.OCEAN.big.y = g.bigRestY(); };
 if (which === 'all' || which === 'ocean') shot('out_ocean.png', (ws) => { ocean(ws); }, 6);
 // Phase 10: the big one mid-crossing, deep, at the left third, the smaller shapes ahead of it not yet scattered.
-if (which === 'all' || which === 'ocean_enter') shot('out_ocean_enter.png', (ws) => { ws.far = 1; ws.sea = 1; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.x = 60 + k * 20; s.y = g.HY + 30 + ((k * 37) % 90); } g.bigEnter(); const b = g.OCEAN.big; g.untween(b, 'x'); g.untween(b, 'y'); g.untween(b, 'deep'); b.x = g.W / 3; b.y = g.bigRestY() + 10; b.deep = 0.8; }, 6);
+if (which === 'all' || which === 'ocean_enter') shot('out_ocean_enter.png', (ws) => { ws.far = 1; ws.sea = 1; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.a = 1; s.x = 60 + k * 20; s.y = g.HY + 30 + ((k * 37) % 90); } g.bigEnter(); const b = g.OCEAN.big; g.untween(b, 'x'); g.untween(b, 'y'); g.untween(b, 'a'); b.x = g.W / 3; b.y = g.bigRestY() + 10; b.a = 0.6; }, 6);
 // Phase 10, reworked in phase 15: act 0, the float in the water with the stranger's bait on the hook, one gold
 // pixel with a dark eye beside it; and the same lure in flight, mid-cast.
 if (which === 'all' || which === 'bait') shot('out_bait.png', (ws, G) => { g.setPhase('waiting'); G.wait = { t: 0, nib: [], bite: 99 }; G.bob = { x: 70, y: 280, fly: false }; }, 3.3);
 if (which === 'all' || which === 'bait_fly') shot('out_bait_fly.png', (ws, G) => { g.setPhase('casting'); G.cast = { t: 0.55, tx: 70, ty: 280, from: null }; }, 3.3);
-if (which === 'all' || which === 'ocean_mid') shot('out_ocean_mid.png', (ws) => { ws.far = 0.6; ws.sea = 0.6; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.x = 20 + k * 26; s.y = g.HY + 30 + ((k * 37) % 90); } }, 6);
-if (which === 'all' || which === 'swallow') shot('out_swallow.png', (ws, G) => { ocean(ws); ws.swallow = 60; G.bob = { x: g.W / 2 + 16, y: g.bigRestY() - 4, fly: false }; g.setPhase('cine'); }, 6.5);
+if (which === 'all' || which === 'ocean_mid') shot('out_ocean_mid.png', (ws) => { ws.far = 0.6; ws.sea = 0.6; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.a = 1; s.x = 20 + k * 26; s.y = g.HY + 30 + ((k * 37) % 90); } }, 6);
+// Phase 22: the shoal alone after the pull-back, before the big one; the big one settled under the speck with
+// the landing marker pulsing on its back; Swallowed mid whirlpool (the speck on the spiral); the eye open.
+const step = secs => { for (let i = 0; i < secs * 30; i++) g.update(1 / 30); };
+if (which === 'all' || which === 'ocean_shoal') shot('out_ocean_shoal.png', () => { g.playCine(g.CINE_OCEAN); step(8.5); }, 8.5);
+if (which === 'all' || which === 'ocean_marker') shot('out_ocean_marker.png', (ws, G) => { ocean(ws); G.pt = 2.2; }, 6);
+const swallowAt = secs => (ws, G) => { ocean(ws); G.pt = 2; G.tip = { x: g.W / 2, y: g.WL - 2 }; g.oceanCast(); step(secs); };
+if (which === 'all' || which === 'swallow_spin') shot('out_swallow_spin.png', swallowAt(3.3), 9);
+if (which === 'all' || which === 'swallow_eye') shot('out_swallow_eye.png', swallowAt(7.4), 12);
 // Phase 14, Stay: the companion standing at his seat under the red sun, the eye snapped toward him, the line
 // still taut, before the leap.
 const redSky = ws => { ws.mood = 2; ws.sunKind = 1; ws.sunR = 16; ws.sunY = 178; ws.sunGlow = 1.25; ws.horizGlow = 1.3; ws.pupil = 1; ws.stalk = 1; ws.ash = 1; ws.lantern = 1; ws.troubled = 0.55; };
@@ -120,7 +127,7 @@ function fishSheet() {
 if (which === 'all' || which === 'cards') fishSheet();
 // Phase 19: the review panel's visual calls. The golden fish surfacing at the left with its reflection at
 // about 40%; the sunset mid-drop (the disc reads solid); the tension bar mid-reel with the red zone; Home's
-// jaws half closed (the pixel teeth); the Swallowed circle with the boat falling in front of it; the night
+// jaws half closed (the pixel teeth); the night
 // silhouettes with the lantern-side rim; the Deep descent with the gold glints below.
 if (which === 'all' || which === 'gold_enter') shot('out_gold_enter.png', (ws) => { ws.goldFish = { x: 26, y: 240, a: 1, surf: 263 }; }, 3.3);
 if (which === 'all' || which === 'sunset') shot('out_sunset.png', (ws) => { ws.sunY = 220; ws.mood = 0.43; ws.sunGlow = 0.93; ws.horizGlow = 0.95; ws.troubled = 0.28; }, 4);
@@ -128,6 +135,5 @@ if (which === 'all' || which === 'sunset_low') shot('out_sunset_low.png', (ws) =
 if (which === 'all' || which === 'tension') shot('out_tension.png', (ws, G) => { g.setPhase('reeling'); G.bob = { x: 70, y: 280, fly: false }; G.reel = { p: 0.45, T: 0.62, d: 1, surge: 0, sAge: 0, next: 9, x0: 70, y0: 280, golden: false, spec: null, tick: 0 }; G.holding = true; }, 3.3);
 if (which === 'all' || which === 'tension_hi') shot('out_tension_hi.png', (ws, G) => { g.setPhase('reeling'); G.bob = { x: 70, y: 280, fly: false }; G.reel = { p: 0.7, T: 0.9, d: 1, surge: 0, sAge: 0, next: 9, x0: 70, y0: 280, golden: false, spec: null, tick: 0 }; G.holding = true; }, 3.3);
 if (which === 'all' || which === 'jaws') shot('out_jaws.png', (ws) => { redSky(ws); ws.companion = 1; ws.companionTurn = 1; ws.jaw = 0.55; g.setPhase('cine'); }, 7);
-if (which === 'all' || which === 'swallow_fall') shot('out_swallow_fall.png', (ws, G) => { ocean(ws); ws.swallow = 110; ws.boatDrop = 12; G.bob = null; g.setPhase('cine'); }, 7);
 if (which === 'all' || which === 'night_rim') shot('out_night_rim.png', (ws) => { night(ws); ws.companion = 1; }, 5);
 if (which === 'all' || which === 'deep_glint') shot('out_deep_glint.png', (ws, G) => { redSky(ws); ws.lantern = 0; ws.ash = 0; ws.sunGlow = 0; ws.horizGlow = 0; ws.gold = 1; ws.boatSunk = 1; ws.dive = 0.95; ws.dim = 5; ws.starA = 0.9; ws.troubled = 0.15; g.setPhase('cine'); }, 9);
