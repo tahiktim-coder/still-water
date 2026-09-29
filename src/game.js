@@ -636,9 +636,9 @@ function fishOpts(sp, a, seed) {
 const DESC = {
   perch: ['You can see its heart beating through it.', 'There is an old hook inside it. Not yours.', 'No eyes. It still turns toward the lantern.'],
   char: ['Its scales show you the sky. You check. It matches.', 'Its scales show you a red sky.', 'Its scales show your boat from underneath.'],
-  smelt: ['Small and cold. Not afraid of you at all.', 'It has teeth. They look like yours.', 'It is dry. It came out of the water dry.'],
+  smelt: ['Small and cold. It holds still for the knife.', 'It has teeth. They look like yours.', 'It is dry. It came out of the water dry.'],
   trout: ['It fought like it had somewhere to be.', 'It keeps looking at the sun.', 'It drowned. It is a fish. It drowned.'],
-  eel: ['Longer than it has any right to be.', 'It knotted itself so you couldn\u2019t keep it.', 'It is still coming out of the water.'],
+  eel: ['Longer than the boat. It weighs nothing.', 'It knotted itself so you couldn\u2019t keep it.', 'It is still coming out of the water.'],
   grayling: ['It smells of snow.', 'It smells of smoke.', 'It smells like you.'],
 };
 // The act 2 card voice, only if the player asked to hear the fish, keyed to the first wish.
@@ -656,9 +656,9 @@ const ENDINGS = {
 // The ending card's BASE (bible, section 4 Ending cards: twenty situations), keyed by ending (the silent
 // variant as 'silent'), then by lake or sea (WS.sea past 0.5), then by boat or sunk (WS.boatSunk at 1); Still
 // water at sea splits once more on whether he heard the fish. The number after each line is the bible's.
-const NEXT_SUN = ' Somewhere, a new sun is rising for the next fisherman.';
+const NEXT_SUN = ' Somewhere a sun is coming up. Someone is rowing out.';
 const NO_BOTTOM = 'The water is warmer than you thought, and full of light, and ';
-const STAY_END = 'He took the sun down with him and did not come back up. ';
+const STAY_END = 'He took the sun down with him. ';
 const STAY_DARK = 'It does not get light, and after a while you stop minding.';
 const KNOW_WAY = 'You cut it. The fish you can hear know the way. They ';
 const NEW_SHORE = ' you to a shore nobody from home has seen, and you start again there.';
@@ -740,7 +740,7 @@ const END_EXTRA = {
       company: 'Someone breathes behind you all night. You do not turn around.',
       forever: 'The day never ends. It never begins either.',
       cabin: 'The light on the shore stays on. Nobody comes down.',
-      refused2: 'You asked for nothing twice. This is what it looks like.',
+      refused2: 'You asked for nothing twice. Here it is.',
     },
   },
   cut: {
@@ -749,7 +749,7 @@ const END_EXTRA = {
       company: { boat: 'There is someone in the stern. You do not ask. You row.', sunk: 'Someone swims behind you. You do not ask.' },
       cabin: 'The cabin is dark. You do not check whether anyone left.',
       kept: { boat: 'You lifted it over the side. It let you.', sunk: 'You let it go. It let you.' },
-      forever: { lake: 'Dawn comes anyway. You had forgotten it could.', sea: 'Dawn comes anyway, over nothing.' },
+      forever: { lake: 'Dawn comes anyway. You did not ask for it.', sea: 'Dawn comes anyway, over nothing.' },
       heard: { lake: 'You can still hear them from the shore. You stop listening.' },
       refused1: 'You asked once for nothing. It kept count.',
       refused2: 'Twice you said nothing. The knife said it a third time.',
@@ -771,7 +771,7 @@ const END_EXTRA = {
     },
   },
   silent: { order: ['kept'], lines: { kept: 'You lifted it over the side. It let you.' } },
-  swallowed: { order: ['kept'], lines: { kept: 'The golden fish went in with you. It did not seem surprised.' } },
+  swallowed: { order: ['kept'], lines: { kept: 'The golden fish went in with you. It had been in before.' } },
 };
 // The wish button labels, read back on the ending card.
 const WISH_LABELS = {
@@ -1867,6 +1867,8 @@ function cineUpdate(dt) {
 }
 // The sunset. After a refusal the caption changes. If the day was wished to last forever the stars
 // never come up and the glow under the horizon never fully dies.
+// The lantern caption: on the lake with no cabin wished, the far shore stays dark (bible, Wish 2 grants).
+const lanternLine = () => placeWord() === 'lake' && !has('home') ? 'You light the lantern. The shore does not.' : 'You light the lantern.';
 const sunsetCine = refused => ({
   dur: 10,
   init(s) { s.y0 = WS.sunY; s.tr0 = WS.troubled; },
@@ -1880,7 +1882,7 @@ const sunsetCine = refused => ({
     WS.horizGlow = lerp(1, 0.3, clamp((t - 4) / 5, 0, 1));
     WS.starA = WS.frozen ? 0 : clamp((t - 5) / 4, 0, 1);
     WS.troubled = lerp(s.tr0, 0.35, k);
-    at('lan', 7.8, () => { tween(WS, 'lantern', 1, 0.7); cap('You light the lantern.', 2.6); SFX.match(); });
+    at('lan', 7.8, () => { tween(WS, 'lantern', 1, 0.7); cap(lanternLine(), 2.6); SFX.match(); });
   },
 });
 // The red sun. The companion turns at the pupil beat, before anyone speaks. The pupil slides toward
@@ -2097,7 +2099,9 @@ function startAct(act) { STORY.act = act; STORY.actCatches = 0; }
 // The fish's first line changes on a later run (bible, sections 4 and 7).
 function greeting1() {
   if (!isLaterRun()) return 'Wait. Don’t gut me, fisherman.';
-  return RUN.last === 'home' ? 'Back out already? It doesn’t usually let go.' : 'You again. Or someone wearing you.';
+  if (RUN.last === 'home') return 'Back out already? It doesn’t usually let go.';
+  if (RUN.last === 'cut') return 'You cut the line last time. It’s the same line.';
+  return 'You again. Or someone wearing you.';
 }
 function wish1() {
   dlgRun([
@@ -2153,7 +2157,7 @@ const costLines = () => [
 function afterGrant1() { startAct(1); setPhase('ready'); }
 function grant1(w) {
   STORY.wishes.push(w); STORY.firstAsk = w;
-  if (w === 'fish') { dlgRun([fish('Where the fish are. I know a spot. Hold on.')], () => playCine(CINE_OCEAN, oceanTold)); return; }
+  if (w === 'fish') { dlgRun([fish('Where the fish are. I know a spot. Hold on to something.')], () => playCine(CINE_OCEAN, oceanTold)); return; }
   dlgRun(GRANT1[w]().concat(costLines()), afterGrant1);
 }
 
@@ -2313,15 +2317,14 @@ function refuse1() {
 // Greeting by priority: kept and refused once > kept > refused once > default (bible, Golden scene 2).
 function greeting2() {
   if (STORY.kept && STORY.refused === 1) return 'You cast anyway. Habit. Still wanting nothing?';
-  if (STORY.kept) return 'You cast anyway. Habit.';
+  if (STORY.kept) return 'You cast anyway. Habit. And this time?';
   if (STORY.refused === 1) return 'Back again. Still wanting nothing?';
-  return 'Back so soon? The ' + placeWord() + ' keeps count.';
+  return 'Back so soon? I’d only just got down. And this time?';
 }
 function wish2() {
   dlgRun([
     { pause: 0.9 },
-    fish(greeting2()),
-    { who: FISHN, text: 'And this time?', choices: [
+    { who: FISHN, text: greeting2(), choices: [
       { label: 'Make this day last forever', pick: () => grant2('forever') },
       { label: 'Let me hear the fish', pick: () => grant2('hear') },
       { label: 'Gold. A boat full of it', pick: () => grant2('gold') },
@@ -2392,7 +2395,7 @@ function refuse2() {
     fish('Twice. Nobody asks for nothing twice. What are you?'),
   ] : [fish('Full already? It’s a little late for that.')];
   dlgRun(L.concat([
-    fish('Then the sun keeps its own hours. You’ll miss it. I’ll bring you another.'),
+    fish('Then the sun sets for free. You’ll miss it. I’ll bring you another.'),
     { act: () => { goldenDive(); keptDim(2); } },
     { pause: 0.6 },
   ]), () => playCine(sunsetCine(true), afterSunset));
@@ -2484,7 +2487,7 @@ function endHome() {
   dlgRun(L, () => playCine(CINE_JAWS, () => showEnding('home')));
 }
 function endDark() {
-  const L = [red('As you wish. Without light you won’t see the teeth.')];
+  const L = [red('As you wish. Without light you won’t have to see the teeth.')];
   if (STORY.kept) L.push(whisperFish(swimming() ? 'Don’t leave me out here.' : 'Don’t leave me in the boat.'));
   dlgRun(L, () => playCine(CINE_DARK, () => showEnding('dark')));
 }
@@ -2505,7 +2508,7 @@ function endStay() {
 // mirror fills the frame, the palette dims, stars show below, the boat hangs from the surface as a dark
 // shape seen from beneath, the gold glints once, then black. There is no bottom.
 function endDeep() {
-  dlgRun([red('It’s still down there. All of it. Mind the waterline.')], () => playCine(CINE_DEEP, () => showEnding('deep')));
+  dlgRun([red('It’s all still down there. Nobody comes back up with it.')], () => playCine(CINE_DEEP, () => showEnding('deep')));
 }
 const CINE_DEEP = {
   dur: 14,
@@ -2608,7 +2611,7 @@ function showEnding(id, variant) {
   if (sessionEndings.indexOf(id) < 0) sessionEndings.push(id);
   const saved = saveEnding(id);
   const n = Math.max(saved.length, sessionEndings.length);
-  saveRun(id);
+  saveRun(variant ? id + ':' + variant : id);
   UI.ending(composeEnding(id, variant), n);
 }
 

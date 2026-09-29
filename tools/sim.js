@@ -82,6 +82,7 @@ function play(plan, label, opts) {
   // that reach them ({ says }: each must appear among the dialogue lines, captions or panel labels).
   const said = lines.concat(caps, UI.log.filter(l => l[0] === 'dlgShow').map(l => l[1]));
   for (const s of opts.says || []) if (!said.some(x => x.indexOf(s) >= 0)) { ok = false; console.log('   missing line or caption: ' + s); }
+  for (const s of opts.saysNot || []) if (said.some(x => x.indexOf(s) >= 0)) { ok = false; console.log('   unexpected line or caption: ' + s); }
   if (S.wishes.indexOf('forever') >= 0 && !ringGrew) { ok = false; console.log('   no ring grew while frozen'); }
   return { ok, id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '', asked: card ? card.asked : '' };
 }
@@ -91,7 +92,7 @@ function play(plan, label, opts) {
 // with the boat sunk), and no other ending's card carries it. Situation 14 (sea, sunk, heard) is in the table
 // but has no path: hear and gold are both wish 2.
 const BAIT_END = 'The bait is still in your pocket.';
-const NEXT_SUN = ' Somewhere, a new sun is rising for the next fisherman.';
+const NEXT_SUN = ' Somewhere a sun is coming up. Someone is rowing out.';
 const BASES = {
   1: 'The lake is quiet again. The fish are hungry.' + NEXT_SUN,
   2: 'The lake is quiet again. The boat is on the bottom and so is the gold.' + NEXT_SUN,
@@ -106,8 +107,8 @@ const BASES = {
   11: 'You cut it. The red sun goes down for everyone. There is no shore in any direction. You row anyway, for a while.',
   12: 'You cut it. The fish you can hear know the way. They bring you to a shore nobody from home has seen, and you start again there.',
   13: 'You cut it. The red sun goes down for everyone. You swim for a while.',
-  15: 'You stay. He took the sun down with him and did not come back up. The seat behind you is empty again. It does not get light, and after a while you stop minding.',
-  16: 'You stay, in the water. He took the sun down with him and did not come back up. It does not get light, and after a while you stop minding.',
+  15: 'You stay. He took the sun down with him. The seat behind you is empty again. It does not get light, and after a while you stop minding.',
+  16: 'You stay, in the water. He took the sun down with him. It does not get light, and after a while you stop minding.',
   17: 'The gold is where you left it. So is everything else. The water is warmer than you thought, and full of light, and there is no bottom.',
   18: 'The gold is somewhere below. The water is warmer than you thought, and full of light, and the big ones let you pass. There is no bottom.',
   19: 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.',
@@ -126,13 +127,13 @@ const plans = [
   [[1, 1, 1, 1], 'keep, fish (wait), hear -> dark (sea)', 'The golden fish dries in the bottom of the boat. It stops asking before you do.', { wait: true, base: 7 }],
   [[0, 1], 'let go, fish, cast into the big one -> swallowed', null, { base: 20 }],
   [[0, 2, 2, 2], 'let go, home, gold -> cut (lake, sunk: no pocket line)', 'The cabin is dark. You do not check whether anyone left.', { base: 10, noPocket: true, says: ['You reach for the knife in your belt.'] }],
-  [[1, 0, 0, 1, 1, 2], 'keep, company (someone), hear, say nothing -> cut', 'There is someone in the stern. You do not ask. You row. ' + BAIT_END, { base: 9 }],
+  [[1, 0, 0, 1, 1, 2], 'keep, company (someone), hear, say nothing -> cut', 'There is someone in the stern. You do not ask. You row. ' + BAIT_END, { base: 9, says: ['You cut the line last time. It’s the same line.', 'You cast anyway. Habit. And this time?', 'You light the lantern. The shore does not.'] }],
   [[0, 3, 3, 3], 'let go, nothing, nothing, nothing -> silent', 'Some evenings, the sunset looks back. ' + BAIT_END, { base: 19 }],
-  [[0, 3, 0, 0], 'let go, nothing, forever -> home', 'The day does not end. You aren’t in it.', { base: 1 }],
-  [[1, 2, 3, 2], 'keep, home, nothing -> cut', 'The cabin is dark. You do not check whether anyone left. ' + BAIT_END, { base: 9 }],
+  [[0, 3, 0, 0], 'let go, nothing, forever -> home', 'The day does not end. You aren’t in it.', { base: 1, says: ['You again. Or someone wearing you.'] }],
+  [[1, 2, 3, 2], 'keep, home, nothing -> cut', 'The cabin is dark. You do not check whether anyone left. ' + BAIT_END, { base: 9, says: ['You light the lantern.'], saysNot: ['The shore does not.'] }],
   [[0, 3, 3, 0], 'let go, nothing, nothing -> home', 'You asked for nothing, and then for home. Home was the only thing it had.', { base: 1 }],
   [[1, 1, 2, 1], 'keep, fish (wait), gold -> dark (sea, sunk)', 'The golden fish circles you all night, glowing less each time.', { wait: true, base: 8, says: ['The sun slips into the sea like a coin into a well.', 'Don’t leave me out here.'] }],
-  [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'Dawn comes anyway. You had forgotten it could. ' + BAIT_END, { base: 9 }],
+  [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'Dawn comes anyway. You did not ask for it. ' + BAIT_END, { base: 9 }],
   [[0, 3, 2, 2], 'let go, nothing, gold -> cut (lake, sunk, the one-refusal line)', 'You asked once for nothing. It kept count.', { base: 10, noPocket: true }],
   [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'The day did not end. Now it will not begin.', { tap: true, base: 15 }],
   [[0, 0, 0, 2, 0, 3], 'let go, company (someone), gold, yes -> stay (sunk)', 'after a while you stop minding.', { base: 16 }],
@@ -151,7 +152,7 @@ const plans = [
   // Phase 9, the open sea: the fish wish waited out continues on the open sea (no shore) to every ending
   // but Stay; the gold sink leaves the fisherman in the water.
   [[0, 1, 0, 0], 'let go, fish (wait), forever -> home (sea)', 'The day does not end. You aren’t in it.', { wait: true, base: 3 }],
-  [[0, 1, 1, 2], 'let go, fish (wait), hear -> cut (sea, heard)', 'and you start again there. ' + BAIT_END, { wait: true, base: 12, says: ['Back so soon? The sea keeps count.', 'The sea'] }],
+  [[0, 1, 1, 2], 'let go, fish (wait), hear -> cut (sea, heard)', 'and you start again there. ' + BAIT_END, { wait: true, base: 12, says: ['Back so soon? I’d only just got down. And this time?', 'The sea', 'You light the lantern.'], saysNot: ['The shore does not.'] }],
   [[0, 1, 0, 2], 'let go, fish (wait), forever -> cut (sea, not heard)', 'Dawn comes anyway, over nothing. ' + BAIT_END, { wait: true, base: 11 }],
   [[0, 1, 2, 2], 'let go, fish (wait), gold -> cut (sea, sunk)', BAIT_END, { wait: true, base: 13 }],
   [[0, 1, 2, 1], 'let go, fish (wait), gold -> dark (sea, sunk)', null, { wait: true, base: 8, has: 'You hang in the water beside the lantern until it gutters out.', says: ['Something gold circles you. It has time.'] }],
