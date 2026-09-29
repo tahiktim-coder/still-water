@@ -35,7 +35,7 @@ if (!(g.G.t < g.G.thinkUntil)) fail('a waiting bubble must not time out');
 g.press(); g.release(); tick(1);
 if (g.phase !== 'ready' || g.G.cast || g.G.t < g.G.thinkUntil) fail('the dismissing press must only dismiss the bubble, phase=' + g.phase);
 // 2b. Three skips land three fish and the fourth reaches the golden dialogue; the bubbles after the first two
-// cards ('Look at that sun.', 'I could watch that sun forever.') are dismissed by the skip itself.
+// cards ('First time out here. Look at that sun.', 'I could watch that sun forever.') are dismissed by the skip itself.
 while (!(g.phase === 'dialog' && g.STORY.catches === 3) && t < 60) {
   const p = g.phase;
   if (p === 'ready' || p === 'card' || p === 'lost' || p === 'landing') { g.testCatch(); if (p === 'ready' && g.G.arrived) skips++; }

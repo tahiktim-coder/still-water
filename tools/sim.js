@@ -2,7 +2,7 @@
 // order at every choice menu. Menus in order: scene 1 (Let it go / Keep it), wish 1 (company /
 // fish / home / Nothing), the ocean window after the fish wish (no menu: a press casts, { wait } does not), Who? (company only, one option), wish 2 (forever / hear / gold /
 // Nothing), the companion's question (company only: Yes / Say nothing), wish 3 (home / dark /
-// cut / Stay with them if answered / Let me get my gold if gold / Nothing if refused twice). { tap: true } taps the companion once
+// cut / Stay with him if answered / Let me get my gold if gold / Nothing if refused twice). { tap: true } taps the companion once
 // per act during play, so his lines show up in the captions.
 const g = require('../src/game.js');
 g.init();
@@ -110,7 +110,7 @@ function play(plan, label, opts) {
 // exact text; a Still water card ends with the bait sentence unless { noPocket } (situation 10, the lake
 // with the boat sunk), and no other ending's card carries it. Situation 14 (sea, sunk, heard) is in the table
 // but has no path: hear and gold are both wish 2.
-const BAIT_END = 'The bait is still in your pocket.';
+const BAIT_END = 'There is a bait in your pocket. It has an eye.';
 const NEXT_SUN = ' Somewhere a sun is coming up. Someone is rowing out.';
 const BASES = {
   1: 'The lake is quiet again. The fish are hungry.' + NEXT_SUN,
@@ -131,8 +131,8 @@ const BASES = {
   16: 'You stay, in the water. He took the sun down with him. It does not get light, and after a while you stop minding.',
   17: 'The gold is where you left it. So is everything else. The water is warmer than you thought, and full of light, and there is no bottom.',
   18: 'The gold is somewhere below. The water is warmer than you thought, and full of light, and the big ones let you pass. There is no bottom.',
-  19: 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.',
-  20: 'You asked to be taken where the fish are. Somewhere far above, the sun is still shining on a lake with no boat on it.',
+  19: 'You wanted nothing. It showed you anyway. You row until the water is only water. Some evenings, the sunset looks back.',
+  20: 'Somewhere far above, the sun is still shining on the sea. There is no boat on it.',
 };
 function baitOk(r, opts) {
   if (!r.id.startsWith('cut')) return r.text.indexOf(BAIT_END) < 0;
@@ -143,19 +143,19 @@ function baitOk(r, opts) {
 // hand through the ocean window so the big one leaves; { tap } taps the companion once per act; { has } is a
 // sentence the card must contain; { base } the situation number; { noPocket } as above.
 const plans = [
-  [[0, 0, 0, 0, 0, 0], 'let go, company (someone), forever, yes -> home', 'The seat behind you is empty now. It was your turn.', { base: 1 }],
+  [[0, 0, 0, 0, 0, 0], 'let go, company (someone), forever, yes -> home', 'The seat behind you is empty now. It was your turn.', { base: 1, says: ['Someone. You didn’t ask who.', 'ay that never ends. And forever. Your words, not mine.', 'First time out here. Look at that sun.'] }],
   [[1, 1, 1, 1], 'keep, fish (wait), hear -> dark (sea)', 'The golden fish dries in the bottom of the boat. It stops asking before you do.', { wait: true, base: 7 }],
   [[0, 1], 'let go, fish, cast into the big one -> swallowed', null, { base: 20 }],
   [[0, 2, 2, 2], 'let go, home, gold -> cut (lake, sunk: no pocket line)', 'The cabin is dark. You do not check whether anyone left.', { base: 10, noPocket: true, says: ['You reach for the knife in your belt.'] }],
   [[1, 0, 0, 1, 1, 2], 'keep, company (someone), hear, say nothing -> cut', 'There is someone in the stern. You do not ask. You row. ' + BAIT_END, { base: 9, says: ['You cut the line last time. It’s the same line.', 'You cast anyway. Habit. And this time?', 'You light the lantern. The shore does not.'] }],
-  [[0, 3, 3, 3], 'let go, nothing, nothing, nothing -> silent', 'Some evenings, the sunset looks back. ' + BAIT_END, { base: 19 }],
+  [[0, 3, 3, 3], 'let go, nothing, nothing, nothing -> silent', 'Some evenings, the sunset looks back. ' + BAIT_END, { base: 19, says: ['You said you could stay out here forever. There’s time.'] }],
   [[0, 3, 0, 0], 'let go, nothing, forever -> home', 'The day does not end. You aren’t in it.', { base: 1, says: ['You again. Or someone wearing you.'] }],
   [[1, 2, 3, 2], 'keep, home, nothing -> cut', 'The cabin is dark. You do not check whether anyone left. ' + BAIT_END, { base: 9, says: ['You light the lantern.'], saysNot: ['The shore does not.'] }],
   [[0, 3, 3, 0], 'let go, nothing, nothing -> home', 'You asked for nothing, and then for home. Home was the only thing it had.', { base: 1 }],
   [[1, 1, 2, 1], 'keep, fish (wait), gold -> dark (sea, sunk)', 'The golden fish circles you all night, glowing less each time.', { wait: true, base: 8, says: ['The sun slips into the sea like a coin into a well.', 'Don’t leave me out here.'] }],
   [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'Dawn comes anyway. You did not ask for it. ' + BAIT_END, { base: 9 }],
   [[0, 3, 2, 2], 'let go, nothing, gold -> cut (lake, sunk, the one-refusal line)', 'You asked once for nothing. It kept count.', { base: 10, noPocket: true }],
-  [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'The day did not end. Now it will not begin.', { tap: true, base: '15f' }],
+  [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'The day did not end. Now it will not begin.', { tap: true, base: '15f', says: ['Stay with him', 'Stay with him. Two wishes, one seat.'] }],
   [[0, 0, 0, 2, 0, 3], 'let go, company (someone), gold, yes -> stay (sunk)', 'after a while you stop minding.', { base: 16 }],
   // Phase 5, the kept fish: act 1 is a normal hook (one more catch), the fish speaks from the boat, and
   // the ending card carries the kept sentence where nothing outranks it.
@@ -164,7 +164,7 @@ const plans = [
   [[1, 3, 3, 3], 'keep, nothing, nothing, nothing -> silent (kept)', 'It went over the side on its own. You let it. ' + BAIT_END, { base: 19, says: ['It waits. Then it goes dark in the bottom of the boat.'] }],
   [[1, 2, 2, 1], 'keep, home, gold -> dark (lake, sunk)', 'The golden fish circles you all night, glowing less each time.', { base: 6, says: ['The water goes very still. The flame leans toward the fish.', 'Don’t leave me out here.'] }],
   // Phase 6, the gold sink and Deep: gold at wish 2 sinks the boat; 'Let me get my gold' sits after Cut the
-  // line (no Stay) or after Stay with them.
+  // line (no Stay) or after Stay with him.
   [[0, 2, 2, 3], 'let go, home, gold -> deep', 'and there is no bottom.', { base: 17 }],
   [[1, 0, 0, 2, 0, 4], 'keep, company (someone), gold, yes -> deep (kept)', 'The golden fish goes down with you. It knows the way.', { base: 17 }],
   [[0, 2, 2, 0], 'let go, home, gold -> home (lake, sunk)', 'The light on the shore goes out. Nobody was inside.', { base: 2 }],

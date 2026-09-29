@@ -648,7 +648,7 @@ const DESC = {
 // The act 2 card voice, only if the player asked to hear the fish, keyed to the first wish.
 const VOICE = {
   company: 'I wished for company too. Now I have plenty.',
-  fish: 'I wished for more fish too. Here I am.',
+  fish: 'I wished to go where the fish are too. Here I am.',
   home: 'I wished for a home too. This is it.',
   nothing: 'I wanted nothing too. It waited.',
 };
@@ -715,10 +715,10 @@ const END_BASES = {
     sea: { sunk: 'The gold is somewhere below. ' + NO_BOTTOM + 'the big ones let you pass. There is no bottom.' }, // 18
   },
   silent: { // lake, boat: Silent needs two refusals, so no gold and no sea
-    lake: { boat: 'You wanted nothing. It had nothing to show you. You row until the water is only water. Some evenings, the sunset looks back.' }, // 19
+    lake: { boat: 'You wanted nothing. It showed you anyway. You row until the water is only water. Some evenings, the sunset looks back.' }, // 19
   },
   swallowed: { // act 0, the sea
-    sea: { boat: 'You asked to be taken where the fish are. Somewhere far above, the sun is still shining on a lake with no boat on it.' }, // 20
+    sea: { boat: 'Somewhere far above, the sun is still shining on the sea. There is no boat on it.' }, // 20
   },
 };
 // ONE extra sentence after the base: the first true state in each ending's priority order. A line is a
@@ -785,7 +785,7 @@ const WISH_LABELS = {
 // The recount at wish 3: the player's own labels shifted to the second person, one clause per granted wish, in order.
 const RECOUNT = {
   company: 'someone to sit with you', fish: 'where the fish are', home: 'a home on the shore',
-  forever: 'a day that lasts forever', hear: 'to hear the fish', gold: 'a boat full of gold',
+  forever: 'a day that never ends', hear: 'to hear the fish', gold: 'a boat full of gold',
 };
 
 // ---------------------------------------------------------------- state
@@ -2240,7 +2240,7 @@ const GRANT1 = {
   company: () => [
     { who: FISHN, text: 'Who?', choices: [{ label: 'Doesn’t matter. Someone', pick() { /* the list continues */ } }] },
     { act: () => { tween(WS, 'companion', 1, 2.2); SFX.chime(); } },
-    fish('Someone. Nobody asks who.'),
+    fish('Someone. You didn’t ask who.'),
     fish('If they ask you anything, don’t answer.'),
   ],
   home: () => [
@@ -2344,7 +2344,7 @@ const CINE_OCEAN = {
 };
 // The tap that dismisses the warning must not also cast: the first second of the window ignores taps.
 const OCEAN_GRACE = 1.0;
-function oceanTold() { dlgRun([fish('Where the fish are. I’d leave the big one. It’s been waiting longer than you have.')], () => setPhase('ocean')); }
+function oceanTold() { dlgRun([fish('Here. I’d leave the big one. It’s been waiting longer than you have.')], () => setPhase('ocean')); }
 // The choice is made by input: a cast while the big one is under the boat is the Swallowed ending; waiting the
 // window out lets it leave. Skip fish counts as a cast here.
 function oceanCast() {
@@ -2409,6 +2409,7 @@ function refuse1() {
   dlgRun([
     { pause: 1.2 },
     fish('Nothing. Nobody asks for nothing. I’ll ask again.'),
+    fish('You said you could stay out here forever. There’s time.'),
     { act: goldenDive },
     { pause: 0.8 },
   ], () => {
@@ -2563,7 +2564,7 @@ function wish3Choices() {
     { label: 'Take the light away', pick: endDark },
     { label: 'Cut the line', pick: endCut },
   ];
-  if (STORY.answered === true) c.push({ label: 'Stay with them', pick: endStay });
+  if (STORY.answered === true) c.push({ label: 'Stay with him', pick: endStay });
   if (has('gold')) c.push({ label: 'Let me get my gold', pick: endDeep });
   if (STORY.refused === 2) c.push({ label: 'Nothing', pick: endSilent });
   return c;
@@ -2604,7 +2605,7 @@ function endCut() {
 }
 function endStay() {
   dlgRun([
-    red('Stay with them. Two wishes, one seat.'),
+    red('Stay with him. Two wishes, one seat.'),
     comp('He said he’d stay with me.'),
     red('He said a lot of things.'),
   ], () => playCine(CINE_STAY, () => showEnding('stay')));
@@ -2709,7 +2710,7 @@ function askedLine(refusalSaid) {
 const stayBase = (key, base) => key === 'stay' && has('forever') ? base.replace(' ' + STAY_DARK, '') : base;
 // Every Still water card (the silent variant too) ends with the bait still in his pocket: he will be the
 // stranger for the next one. The exception is situation 10, the lake with the boat sunk. No other ending gets it.
-const BAIT_END = 'The bait is still in your pocket.';
+const BAIT_END = 'There is a bait in your pocket. It has an eye.';
 const hasPocket = (id, place, boat) => id === 'cut' && !(place === 'lake' && boat === 'sunk');
 function composeEnding(id, variant) {
   const place = endingPlace(), boat = endingBoat(), key = variant === 'silent' ? 'silent' : id;
@@ -2935,7 +2936,7 @@ function closeCard() { UI.cardHide(); afterCatch(); }
 // The fisherman's four act 0 lines (bible, Opening): the bait once the boat has arrived (BAIT_LINE), the
 // throwaway wish when the first cast lands (0), then one after each of the first two cards close (1, 2).
 const BAIT_LINE = 'The stranger’s bait. Cursed or blessed, he said. It has an eye.';
-const OPENING_CAPS = { 0: 'Something interesting, for once.', 1: 'Look at that sun.', 2: 'I could stay out here forever.' };
+const OPENING_CAPS = { 0: 'Something interesting, for once.', 1: 'First time out here. Look at that sun.', 2: 'I could stay out here forever.' };
 function stillCaption() {
   if (STORY.act === 0) return 'The water goes very still.';
   if (STORY.act === 1) return STORY.kept ? 'The water goes very still. The fish in the boat does not.' : 'The water goes very still again.';
