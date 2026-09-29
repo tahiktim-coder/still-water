@@ -43,7 +43,7 @@ async function run(plan, label, useKeys) {
       if (useKeys) win.dispatchEvent(new win.KeyboardEvent('keydown', { code: 'Digit' + (k + 1), bubbles: true }));
       else choices[k].dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
     } else if ($('dialog').classList.contains('on') || $('think').classList.contains('on') || $('card').classList.contains('on') || $('title').classList.contains('on') || prompt === 'Tap to cast') { tap(); taps++; } // a waiting bubble is tapped through too
-    else if (prompt === 'Tap now!' || prompt.startsWith('Hold to reel')) { if (frame >= restUntil) { down(); holdUntil = frame + 5; } }
+    else if (prompt === 'Tap now' || prompt.startsWith('Hold to reel')) { if (frame >= restUntil) { down(); holdUntil = frame + 5; } }
   }
   console.log(`[${label}] ending="${$('endTitle').textContent}" found="${$('endFound').textContent}" count="${$('count').textContent}" frames=${frame} choices=${trace.join(' | ')}`);
 }

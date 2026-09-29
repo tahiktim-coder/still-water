@@ -61,7 +61,7 @@ body {
 #hud {
   position: absolute; z-index: 5; top: calc(var(--u) * 3); left: calc(var(--u) * 4); right: calc(var(--u) * 4);
   display: flex; justify-content: space-between; align-items: center;
-  font-size: calc(var(--u) * 3.3); pointer-events: none;
+  font-size: max(10px, calc(var(--u) * 3.3)); pointer-events: none;
 }
 #count { color: var(--ui-ink); opacity: 0.85; }
 #mute, #skip {
@@ -97,7 +97,7 @@ body {
   pointer-events: none;
 }
 #dialog.on { opacity: 1; transform: none; pointer-events: auto; }
-#who { flex: 0 0 auto; font-weight: 600; font-size: calc(var(--u) * 3.4); color: var(--ui-accent); margin-bottom: calc(var(--u) * 1.2); }
+#who { flex: 0 0 auto; font-weight: 600; font-size: max(10px, calc(var(--u) * 3.4)); color: var(--ui-accent); margin-bottom: calc(var(--u) * 1.2); }
 #text { flex: 0 1 auto; min-height: 2.7em; overflow-y: auto; max-width: 34em; }
 #dialog.narr #text, #dialog.whisper #text { color: var(--ui-dim); }
 #dialog.whisper #text { letter-spacing: 0.08em; }
@@ -129,7 +129,7 @@ body {
 #think {
   position: absolute; z-index: 6; width: 40%; color: var(--ui-ink);
   padding: calc(var(--u) * 2.4) calc(var(--u) * 2.8) calc(var(--u) * 2.2);
-  font-size: calc(var(--u) * 3.1); line-height: 1.3; text-align: center;
+  font-size: max(12px, calc(var(--u) * 3.1)); line-height: 1.3; text-align: center;
   opacity: 0; transition: opacity 0.35s ease; pointer-events: none;
 }
 #think.on { opacity: 1; }
@@ -137,7 +137,7 @@ body {
 #thinkSvg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: var(--ui-solid); fill-opacity: 0.55; stroke: currentColor; stroke-width: 1px; }
 #thinkWho {
   position: absolute; top: calc(var(--u) * -1.3); left: calc(var(--u) * 4);
-  padding: 0 calc(var(--u) * 0.7); font-size: calc(var(--u) * 2.4); line-height: 1.1; color: var(--ui-dim);
+  padding: 0 calc(var(--u) * 0.7); font-size: max(10px, calc(var(--u) * 2.4)); line-height: 1.1; color: var(--ui-dim);
   background: var(--ui-solid);
 }
 #thinkWho[hidden] { display: none; }
@@ -162,10 +162,10 @@ body {
 #card.on { opacity: 1; transform: none; }
 #cardFish { display: block; margin: 0 auto calc(var(--u) * 3); image-rendering: crisp-edges; image-rendering: pixelated; }
 #cardName { font-weight: 600; font-size: calc(var(--u) * 5.2); }
-#cardMeta { color: var(--ui-dim); font-size: calc(var(--u) * 3.4); margin-top: calc(var(--u) * 0.6); }
+#cardMeta { color: var(--ui-dim); font-size: max(10px, calc(var(--u) * 3.4)); margin-top: calc(var(--u) * 0.6); }
 #cardDesc { margin: calc(var(--u) * 2.4) 0 0; }
 #cardVoice { margin: calc(var(--u) * 2) 0 0; color: var(--ui-accent); }
-#card .hint { margin-top: calc(var(--u) * 3); font-size: calc(var(--u) * 3.1); color: var(--ui-dim); opacity: 0; transition: opacity 0.3s ease; }
+#card .hint { margin-top: calc(var(--u) * 3); font-size: max(10px, calc(var(--u) * 3.1)); color: var(--ui-dim); opacity: 0; transition: opacity 0.3s ease; }
 #card.ready .hint { opacity: 1; }
 
 #title {
@@ -177,10 +177,14 @@ body {
   margin: 20% 0 0; font-size: calc(var(--u) * 13.5); font-weight: 600; line-height: 1; letter-spacing: 0.01em;
   color: var(--ui-ink);
 }
-#title .sub { margin: calc(var(--u) * 2.6) 0 0; font-size: calc(var(--u) * 4.2); color: var(--ui-dim); }
-#title .begin { position: absolute; bottom: 21%; left: 0; right: 0; margin: 0; font-size: calc(var(--u) * 4.6); animation: breathe 2.6s ease-in-out infinite; }
-#title .how { position: absolute; bottom: 13%; left: 10%; right: 10%; margin: 0; font-size: calc(var(--u) * 3.3); color: var(--ui-dim); }
-#title .found { position: absolute; bottom: 7%; left: 0; right: 0; margin: 0; font-size: calc(var(--u) * 3.1); color: var(--ui-accent); }
+#title .sub { margin: calc(var(--u) * 2.6) 0 0; font-size: max(10px, calc(var(--u) * 4.2)); color: var(--ui-dim); }
+#title .begin { position: absolute; bottom: 21%; left: 0; right: 0; margin: 0; font-size: max(10px, calc(var(--u) * 4.6)); animation: breathe 2.6s ease-in-out infinite; }
+#title .how { position: absolute; bottom: 15%; left: 10%; right: 10%; margin: 0; font-size: max(10px, calc(var(--u) * 3.3)); color: var(--ui-dim); }
+#title .found { position: absolute; bottom: 8.5%; left: 0; right: 0; margin: 0; font-size: max(10px, calc(var(--u) * 3.1)); color: var(--ui-accent); }
+/* The six ending titles in order under the counter, a dash for each one not found yet. */
+.endlist { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 calc(var(--u) * 2.6); margin: 0; font-size: max(10px, calc(var(--u) * 2.9)); }
+.endlist:empty { display: none; }
+#title .endlist { position: absolute; bottom: 3%; left: 8%; right: 8%; color: var(--ui-dim); }
 
 #fade { position: absolute; z-index: 8; inset: 0; background: #000; opacity: 1; pointer-events: none; transition: opacity 0.6s ease; }
 
@@ -193,8 +197,9 @@ body {
 #ending.on { opacity: 1; pointer-events: auto; }
 #ending h2 { margin: 0; font-size: calc(var(--u) * 10); font-weight: 600; line-height: 1.05; color: #fff; }
 #endText { margin: calc(var(--u) * 4) 0 0; color: #f3ece4; max-width: 30em; }
-#endAsked { margin: calc(var(--u) * 2.4) 0 0; color: #f3ece4; max-width: 30em; }
-#endFound { margin: calc(var(--u) * 4) 0 0; font-size: calc(var(--u) * 3.2); color: #c9b9a8; }
+#endAsked { margin: calc(var(--u) * 2.4) 0 0; color: #f3ece4; max-width: 30em; white-space: pre-line; }
+#endFound { margin: calc(var(--u) * 4) 0 0; font-size: max(10px, calc(var(--u) * 3.2)); color: #c9b9a8; }
+#endList { margin-top: calc(var(--u) * 1.2); color: #a8998a; }
 #again {
   margin-top: calc(var(--u) * 5); font: inherit; color: #fff; background: transparent; cursor: pointer;
   min-height: max(44px, calc(var(--u) * 11));
@@ -214,7 +219,7 @@ body {
 </head>
 <body>
 <div id="wrap">
-  <div id="stage" aria-label="Still Water, a short fishing game">
+  <div id="stage" aria-label="Still Water, a short fishing tale">
     <canvas id="c" width="216" height="384"></canvas>
     <div id="hud"><span id="count" class="shade" aria-live="polite"></span><span><button id="mute" type="button">Mute</button><button id="skip" type="button" hidden>Skip fish</button></span></div>
     <div id="caption" class="shade" aria-live="polite"></div>
@@ -242,10 +247,11 @@ body {
     </div>
     <div id="title" class="shade">
       <h1>Still Water</h1>
-      <p class="sub">A short fishing tale</p>
+      <p class="sub shade">A short fishing tale</p>
       <p class="begin">Tap to begin</p>
-      <p class="how">Tap to cast. Tap when the float goes under. Hold to reel.</p>
+      <p class="how shade">Tap to cast. Tap when the float goes under. Hold to reel.</p>
       <p class="found" id="found"></p>
+      <p class="endlist" id="foundList"></p>
     </div>
     <div id="fade"></div>
     <div id="ending" aria-live="polite">
@@ -253,6 +259,7 @@ body {
       <p id="endText"></p>
       <p id="endAsked"></p>
       <p id="endFound"></p>
+      <p class="endlist" id="endList"></p>
       <button id="again" type="button" disabled tabindex="-1">Cast again</button>
     </div>
   </div>

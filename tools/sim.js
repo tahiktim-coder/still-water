@@ -97,6 +97,11 @@ function play(plan, label, opts) {
   const said = lines.concat(caps, UI.log.filter(l => l[0] === 'dlgShow').map(l => l[1]));
   for (const s of opts.says || []) if (!said.some(x => x.indexOf(s) >= 0)) { ok = false; console.log('   missing line or caption: ' + s); }
   for (const s of opts.saysNot || []) if (said.some(x => x.indexOf(s) >= 0)) { ok = false; console.log('   unexpected line or caption: ' + s); }
+  // Phase 19: a later run has two act 0 catches, and all four of his act 0 thoughts still show before the
+  // still caption.
+  const stillAt = caps.findIndex(c => c.startsWith('The water goes very still'));
+  const thoughts = caps.slice(0, stillAt).filter(c => c.startsWith('(fisherman)')).length;
+  if (stillAt < 0 || thoughts !== 4) { ok = false; console.log('   ' + thoughts + ' act 0 thoughts before the still caption, not 4'); }
   if (S.wishes.indexOf('forever') >= 0 && !ringGrew) { ok = false; console.log('   no ring grew while frozen'); }
   return { ok, snaps, t, id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '', asked: card ? card.asked : '' };
 }
@@ -122,6 +127,7 @@ const BASES = {
   12: 'You cut it. The fish you can hear know the way. They bring you to a shore nobody from home has seen, and you start again there.',
   13: 'You cut it. The red sun goes down for everyone. You swim for a while.',
   15: 'You stay. He took the sun down with him. The seat behind you is empty again. It does not get light, and after a while you stop minding.',
+  '15f': 'You stay. He took the sun down with him. The seat behind you is empty again. The day did not end.', // forever: no STAY_DARK before its own line
   16: 'You stay, in the water. He took the sun down with him. It does not get light, and after a while you stop minding.',
   17: 'The gold is where you left it. So is everything else. The water is warmer than you thought, and full of light, and there is no bottom.',
   18: 'The gold is somewhere below. The water is warmer than you thought, and full of light, and the big ones let you pass. There is no bottom.',
@@ -149,7 +155,7 @@ const plans = [
   [[1, 1, 2, 1], 'keep, fish (wait), gold -> dark (sea, sunk)', 'The golden fish circles you all night, glowing less each time.', { wait: true, base: 8, says: ['The sun slips into the sea like a coin into a well.', 'Don’t leave me out here.'] }],
   [[0, 3, 0, 2], 'let go, nothing, forever -> cut', 'Dawn comes anyway. You did not ask for it. ' + BAIT_END, { base: 9 }],
   [[0, 3, 2, 2], 'let go, nothing, gold -> cut (lake, sunk, the one-refusal line)', 'You asked once for nothing. It kept count.', { base: 10, noPocket: true }],
-  [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'The day did not end. Now it will not begin.', { tap: true, base: 15 }],
+  [[0, 0, 0, 0, 0, 3], 'let go, company (someone), forever, yes, tap him each act -> stay', 'The day did not end. Now it will not begin.', { tap: true, base: '15f' }],
   [[0, 0, 0, 2, 0, 3], 'let go, company (someone), gold, yes -> stay (sunk)', 'after a while you stop minding.', { base: 16 }],
   // Phase 5, the kept fish: act 1 is a normal hook (one more catch), the fish speaks from the boat, and
   // the ending card carries the kept sentence where nothing outranks it.

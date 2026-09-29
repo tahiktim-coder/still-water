@@ -118,3 +118,16 @@ function fishSheet() {
   fs.writeFileSync(path.join(OUT_DIR, 'out_cards.png'), PNG.sync.write(sheet));
 }
 if (which === 'all' || which === 'cards') fishSheet();
+// Phase 19: the review panel's visual calls. The golden fish surfacing at the left with its reflection at
+// about 40%; the sunset mid-drop (the disc reads solid); the tension bar mid-reel with the red zone; Home's
+// jaws half closed (the pixel teeth); the Swallowed circle with the boat falling in front of it; the night
+// silhouettes with the lantern-side rim; the Deep descent with the gold glints below.
+if (which === 'all' || which === 'gold_enter') shot('out_gold_enter.png', (ws) => { ws.goldFish = { x: 26, y: 240, a: 1, surf: 263 }; }, 3.3);
+if (which === 'all' || which === 'sunset') shot('out_sunset.png', (ws) => { ws.sunY = 220; ws.mood = 0.43; ws.sunGlow = 0.93; ws.horizGlow = 0.95; ws.troubled = 0.28; }, 4);
+if (which === 'all' || which === 'sunset_low') shot('out_sunset_low.png', (ws) => { ws.sunY = 233; ws.mood = 0.7; ws.sunGlow = 0.5; ws.horizGlow = 0.7; ws.troubled = 0.32; ws.starA = 0.3; }, 4);
+if (which === 'all' || which === 'tension') shot('out_tension.png', (ws, G) => { g.setPhase('reeling'); G.bob = { x: 70, y: 280, fly: false }; G.reel = { p: 0.45, T: 0.62, d: 1, surge: 0, sAge: 0, next: 9, x0: 70, y0: 280, golden: false, spec: null, tick: 0 }; G.holding = true; }, 3.3);
+if (which === 'all' || which === 'tension_hi') shot('out_tension_hi.png', (ws, G) => { g.setPhase('reeling'); G.bob = { x: 70, y: 280, fly: false }; G.reel = { p: 0.7, T: 0.9, d: 1, surge: 0, sAge: 0, next: 9, x0: 70, y0: 280, golden: false, spec: null, tick: 0 }; G.holding = true; }, 3.3);
+if (which === 'all' || which === 'jaws') shot('out_jaws.png', (ws) => { redSky(ws); ws.companion = 1; ws.companionTurn = 1; ws.jaw = 0.55; g.setPhase('cine'); }, 7);
+if (which === 'all' || which === 'swallow_fall') shot('out_swallow_fall.png', (ws, G) => { ocean(ws); ws.swallow = 110; ws.boatDrop = 12; G.bob = null; g.setPhase('cine'); }, 7);
+if (which === 'all' || which === 'night_rim') shot('out_night_rim.png', (ws) => { night(ws); ws.companion = 1; }, 5);
+if (which === 'all' || which === 'deep_glint') shot('out_deep_glint.png', (ws, G) => { redSky(ws); ws.lantern = 0; ws.ash = 0; ws.sunGlow = 0; ws.horizGlow = 0; ws.gold = 1; ws.boatSunk = 1; ws.dive = 0.95; ws.dim = 5; ws.starA = 0.9; ws.troubled = 0.15; g.setPhase('cine'); }, 9);

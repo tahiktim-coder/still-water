@@ -439,8 +439,11 @@ const KEPT = sprite(['..wyyw..d.', 'dywwwwygdd', '.gyyyyygd.', '..dgg...d.']);
 const KEPT_OPEN = sprite(['..wyyw..d.', '.ywwwwygdd', 'dgyyyyygd.', '..dgg...d.']);
 const KEPT_DX = 40, KEPT_DY = -10;   // from the boat's corner and the waterline
 const KEPT_LADDER = [1, 0.7, 0.45];  // its alpha per act (bible, 8c); 0.05 after the silent ending
-const FARBOAT = sprite(['....0', '00000']); // the far boat on the title, at the horizon: a hull and a curled prow
-const FAR_X = 206; // the horizon is only open in the centre, so it sits on the lit foot of the right mountain, clear of the prow curl and of the screen edge
+// The far boat on the title, at the horizon: 8 px, a hull with both ends raised, in hazy mid tones (6, with
+// a 5 keel) so it reads as a boat far off on the bright water, not a speck of dirt. It sits in
+// the open stretch of horizon under the sun, clear of the far mountain foot and of the rod.
+const FARBOAT = sprite(['6......6', '.666666.', '..5555..']);
+const FAR_X = 97;
 const HB_GAP = 1.7;               // seconds between heartbeats in the red; Stay stretches it until it stops
 const COMP_DX = 50, COMP_DY = -17; // the companion's seat, from the boat's corner and the waterline
 const KNIFE_X = 12;               // hull column of the knife, beside the lantern pole
@@ -813,7 +816,7 @@ const G = {
   rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 },
   lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0, hbGap: HB_GAP,
   capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [],
-  arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0,
+  arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0,
 };
 // wishes holds granted wishes only, in order. kept, firstAsk, refused, answered, ocean, said and usedRepl follow
 // the bible, section 3: said counts the fisherman's four act 0 lines that have shown (0 to 4), usedRepl the card replacements fired.
@@ -824,6 +827,9 @@ const freshStory = () => ({
   keptNext: false, // kept, act 1: the next normal card closes into golden scene 2 from the boat
   actSeen: [], // species whose card showed this act, so a card never repeats within one act
   tap: 0, tapPool: '', // the companion's lines: how many of the current pool have shown, and which pool it was
+  compSpoke: false, // the companion's one unprompted line this run (after the first act 1 card)
+  openQ: [], // which of the act 0 thoughts (OPENING_CAPS keys) have been queued, so each shows once
+  snaps: 0, // lines snapped this run: the first one teaches
 });
 const STORY = freshStory();
 const has = w => STORY.wishes.indexOf(w) >= 0;
@@ -833,6 +839,11 @@ const isLaterRun = () => RUN.count > 0;
 
 // ---------------------------------------------------------------- UI (DOM in browser, stub elsewhere)
 let UI = null;
+// prefers-reduced-motion, read in boot: no glow flash at the Stay impact, no boat rock, and the camera moves
+// (the ocean pull-back and return, the Deep descent) take CAM_SOFT times as long.
+let REDUCED_MOTION = false;
+const CAM_SOFT = 1.5;
+const camDur = d => (REDUCED_MOTION ? d * CAM_SOFT : d);
 function stubUI() {
   const log = [];
   const f = name => (...a) => log.push([name, ...a]);
@@ -1032,9 +1043,16 @@ function renderTop(t) {
   }
 }
 
+// The white sun: a bright disc with a rim a shade darker. Once the sky starts to darken (the sunset and the
+// still-water dawn) its halo reaches the top of the ramp, and a darker rim read as a hollow ring; there the
+// disc takes the star white (index 20, above the ramp) with an index 11 rim, so it reads as a solid coin.
+const SUN_SOLID_MOOD = 0.04;
 function sunPix(dx, dy, d2) {
   const r = WS.sunR;
-  if (WS.sunKind === 0) return d2 > (r - 1) * (r - 1) ? 10 : 11;
+  if (WS.sunKind === 0) {
+    const rim = d2 > (r - 1) * (r - 1);
+    return WS.mood > SUN_SOLID_MOOD ? (rim ? 11 : 20) : (rim ? 10 : 11);
+  }
   let v = d2 > (r - 1.6) * (r - 1.6) ? 8 : d2 < (r * 0.5) * (r * 0.5) ? 10 : 9;
   if (WS.pupil > 0.01) {
     const ph = r * 0.84, px = dx - WS.pupilDx;
@@ -1230,9 +1248,38 @@ function drawSwallow(t) {
       if (d > r + 3) continue;
       const edge = r + Math.sin(Math.atan2(dy, dx) * 9 + t * 6) * 1.6 + (hash2(x, y, (t * 8) | 0) - 0.5) * 1.5;
       const i = row + x;
-      if (d < edge - 1.5) FRAME[i] = 0;
-      else if (d < edge && FRAME[i] < 12) FRAME[i] = Math.min(FRAME[i], 2);
+      if (d < edge - 2.5) FRAME[i] = 0;
+      else if (d < edge && FRAME[i] < 12) FRAME[i] = SWALLOW_LIP; // a paler lip, so the edge reads as a rim
     }
+  }
+  swallowTeeth(r, cx, cy, ry);
+}
+// Small bone teeth (22 lit, 23 shade) around the opening: a row hanging from the horizon where the circle
+// meets it, and a row rising from its lower arc, each pointing into the dark. They grow with the circle.
+const SWALLOW_LIP = 7, SWALLOW_TOOTH_GAP = 10;
+function swallowTooth(x, y, hb, len, dir) {
+  for (let k = 0; k < len; k++) {
+    const yy = y + dir * k, half = Math.round(hb * (1 - k / len));
+    if (yy <= HY || yy >= H) continue;
+    for (let dx = -half; dx <= half; dx++) {
+      const xx = x + dx;
+      if (xx >= 0 && xx < W) FRAME[yy * W + xx] = dx < 0 || (dx === 0 && k === len - 1) ? 22 : 23;
+    }
+  }
+}
+const toothJag = k => (hash2(k, 5, 3) > 0.6 ? 1 : hash2(k, 9, 3) > 0.7 ? -1 : 0); // not every tooth the same
+function swallowTeeth(r, cx, cy, ry) {
+  if (r < 14) return;
+  const hb = r < 50 ? 1 : 2, len = Math.round(clamp(r / 16, 2, 6));
+  const top = HY + 1, dyTop = (top - cy) / ry; // where the circle meets the horizon
+  if (Math.abs(dyTop) < 1) {
+    const half = r * Math.sqrt(1 - dyTop * dyTop) - 3;
+    for (let x = Math.ceil((cx - half) / SWALLOW_TOOTH_GAP) * SWALLOW_TOOTH_GAP; x <= cx + half; x += SWALLOW_TOOTH_GAP) swallowTooth(x, top, hb, len + toothJag(x), 1);
+  }
+  const n = Math.floor((Math.PI * r) / SWALLOW_TOOTH_GAP);
+  for (let k = 1; k < n; k++) {
+    const a = (k / n) * Math.PI, x = Math.round(cx + Math.cos(a) * (r - 1.5)), y = Math.round(cy + Math.sin(a) * (ry - 1));
+    if (y > top + len + 1) swallowTooth(x, y, hb, len + toothJag(k), -1);
   }
 }
 // The eyes in the water (bible, section 8): about eight pairs of red pixels on the surface rows under
@@ -1266,14 +1313,17 @@ function plot(x, y, v) {
   SPR[y * W + x] = v;
 }
 const refl = v => (v >= 12 ? v : v <= 2 ? v + 1 : v - 1);
-function plotR(x, y, v, wl) {
+// noRefl: plot the pixel but not its reflection (stampR's thinner reflections).
+function plotR(x, y, v, wl, noRefl) {
   x = Math.round(x); y = Math.round(y);
   if (y >= wl) return;
   plot(x, y, v);
+  if (noRefl) return;
   const yr = 2 * wl - 1 - y;
   if (yr >= HY && yr < H) plot(x + RIPX[yr], yr, refl(v));
 }
-function stampR(s, x0, y0, wl, alpha, flip) {
+// ra, when given, dithers the reflection to about that fraction of its pixels (the golden fish's is faint).
+function stampR(s, x0, y0, wl, alpha, flip, ra) {
   for (let j = 0; j < s.h; j++) {
     const y = y0 + j;
     if (y >= wl) break;
@@ -1281,7 +1331,7 @@ function stampR(s, x0, y0, wl, alpha, flip) {
       const v = s.data[j * s.w + (flip ? s.w - 1 - i : i)];
       if (v === 255) continue;
       if (alpha !== undefined && alpha < 1 && hash2(i, j, 7) > alpha) continue;
-      plotR(x0 + i, y, v, wl);
+      plotR(x0 + i, y, v, wl, ra !== undefined && hash2(i, j, 13) > ra);
     }
   }
 }
@@ -1308,10 +1358,11 @@ function drawRod(hx, hy, wl) {
 // (half, quarter, then a speck) with the rod, line, float and lantern hidden (bible, Ocean).
 const boatCentreX = far => lerp(BOAT_X + WS.boatX + BOAT.w / 2, W / 2, far);
 function farBoatSprite(far) { return far <= 0.75 ? BOAT_FAR2 : far <= 0.92 ? BOAT_FAR4 : BOAT_SPECK; }
+// Over the Swallowed circle, and falling into it, it is drawn in front of the dark, unmasked, with a pale rim.
 function drawFarBoat(t, far) {
   const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2), dy = bob + Math.round(WS.boatDrop);
   const s = farBoatSprite(far), x0 = Math.round(boatCentreX(far) - s.w / 2), y0 = WL - s.wl + dy;
-  stampR(s, x0, y0, WL);
+  if (WS.swallow > 0.5) { stamp(s, x0, y0); rimBox(x0 - 1, y0 - 1, s.w + 2, s.h + 2); } else stampR(s, x0, y0, WL);
   G.tip = { x: x0 + s.w / 2, y: y0 }; // a cast from out here leaves from the silhouette itself
 }
 // Facing the horizon, turned (the red), or standing (Stay).
@@ -1371,17 +1422,45 @@ function rimBox(x0, y0, w, h) {
 }
 // Deep: the swimmer as a dark shape hanging from the surface near the top of the screen, seen from beneath
 // (the boat is already on the bottom), the companion and the kept fish beside him, one gold glint below.
+// Once the surface has risen past DEEP_SWIM_Y he no longer hangs from it: he sinks with the view and stays in
+// the upper third, with the gold far below him, drifting and glinting (drawDeepGold), so the frame is full of light.
+const DEEP_SWIM_Y = 84, DEEP_GOLD_GLOW = 16;
+// The glints use the accents that stay bright in the red (16, and the pale 12 and 20), since the dim darkens only the ramp.
+const DEEP_GOLD = [[0, 0, 16], [3, -2, 12], [-3, 1, 16], [5, 2, 20], [-1, 4, 16], [2, 5, 12], [-5, -1, 20], [7, -1, 16], [-2, -4, 12], [-7, 3, 16], [9, 3, 12]];
+function drawDeepGold(t, x0, y0) {
+  const cx = Math.round(x0 + Math.sin(t * 0.45) * 5), cy = Math.round(y0 + Math.sin(t * 0.3 + 1) * 3), f = (t * 6) | 0;
+  G.deepGold = { x: cx, y: cy }; // applyGlows lights the water around it
+  for (let k = 0; k < DEEP_GOLD.length; k++) {
+    const p = DEEP_GOLD[k];
+    if (WS.glint > 0 || hash2(k, f, 21) > 0.3) plot(cx + p[0], cy + p[1], WS.glint > 0 ? 12 : p[2]);
+  }
+}
 function drawSwimmerBeneath() {
-  const hy = Math.max(waterTop(), 4), bx = boatLeft(), fx = bx + 18;
+  const hy = Math.max(waterTop(), DEEP_SWIM_Y), bx = boatLeft(), fx = bx + 18;
   stampBeneath(FISHER, fx, hy, FISHER_FLOAT);
   if (WS.companion > 0) stampBeneath(compSprite(), bx + COMP_DX, hy, COMP_FLOAT);
   rimBox(fx - 2, hy, COMP_DX + COMP.w - 14, FISHER_FLOAT + 2);
   if (STORY.kept && WS.goldKept > 0.01) stampBeneath(KEPT, bx + KEPT_DX, hy, KEPT.h);
-  if (WS.glint > 0) { const gx = bx + 35, gy = hy + 42; plot(gx, gy, 16); plot(gx + 2, gy + 1, 15); plot(gx + 1, gy + 2, 16); }
+  drawDeepGold(G.t, bx + 34, hy + 70);
+}
+// From night on the people are dark on a dark shore, so each gets a 1 px rim of RIM_IDX on its left edge,
+// the side the lantern is on. The rimmed copy is made once per sprite and kept on it.
+const RIM_IDX = 5, RIM_MOOD = 0.999;
+function lanternRim(s) {
+  if (WS.mood < RIM_MOOD) return s;
+  if (!s.rim) {
+    const d = s.data.slice();
+    for (let j = 0; j < s.h; j++) for (let i = 0; i < s.w; i++) {
+      const k = j * s.w + i;
+      if (s.data[k] !== 255 && (i === 0 || s.data[k - 1] === 255)) d[k] = RIM_IDX;
+    }
+    s.rim = { w: s.w, h: s.h, data: d, wl: s.wl };
+  }
+  return s.rim;
 }
 function drawFisherman(t, bx, dy) {
   const fx = bx + 18, fy = fisherY(dy) + swimBob(t, 1.2);
-  stampR(FISHER, fx, fy, WL);
+  stampR(lanternRim(FISHER), fx, fy, WL);
   G.hand = { x: fx, y: fy + 9 };
   drawRod(G.hand.x, G.hand.y, WL);
 }
@@ -1400,14 +1479,14 @@ function drawBoatGroup(t) {
   drawFisherman(t, bx, dy);
 }
 // The push-off (Stay): a small rock of the whole boat that dies out as WS.rock tweens back to 0.
-const rockPx = t => Math.round(Math.sin(t * 15) * WS.rock * 1.6);
+const rockPx = t => REDUCED_MOTION ? 0 : Math.round(Math.sin(t * 15) * WS.rock * 1.6);
 // A taller frame keeps his feet where the seated frame's are.
 const seatTop = (s, dy) => compY(dy) - (s.h - COMP.h);
 // At his seat, or (Stay) in the air: the leaping frame follows a parabola from the seat to the red disc,
 // then rides the disc down at leap 1. It is a reflecting sprite whose mirror line slides from the boat's
 // waterline to the horizon, where the disc's own reflection is, so the two go under together.
 function drawCompanion(t, bx, dy) {
-  if (WS.leap <= 0) { stampR(compSprite(), bx + COMP_DX, seatTop(compSprite(), dy) + swimBob(t, 2.6), WL, WS.companion); return; }
+  if (WS.leap <= 0) { stampR(lanternRim(compSprite()), bx + COMP_DX, seatTop(compSprite(), dy) + swimBob(t, 2.6), WL, WS.companion); return; }
   const p = WS.leap, s = COMP_LEAP;
   const x0 = bx + COMP_DX - 2, y0 = seatTop(s, dy);
   const x1 = WS.sunX - s.w / 2, y1 = WS.sunY - s.h / 2 + 1;
@@ -1478,6 +1557,7 @@ function drawKeptFish(t, bx, dy) {
   stampR(speaking && mouthOpen(t) ? KEPT_OPEN : KEPT, x0, y0, WL, a);
   if (speaking && Math.random() < 0.12) sparkle(x0 + Math.random() * KEPT.w, y0 + Math.random() * KEPT.h);
 }
+const GOLD_REFL_A = 0.4;
 function drawGoldFish(t) {
   const g = WS.goldFish;
   const a = g ? g.a * clamp(1 - (WS.far - 0.3) / 0.3, 0, 1) : 0; // out on the ocean it is out of sight too
@@ -1485,7 +1565,7 @@ function drawGoldFish(t) {
   const talking = fishSpeaking() && mouthOpen(t);
   const s = talking ? GOLD_OPEN : GOLD;
   const x0 = Math.round(g.x), y0 = Math.round(g.y + Math.sin(t * 2.1) * 1.5);
-  stampR(s, x0, y0, g.surf, a);
+  stampR(s, x0, y0, g.surf, a, false, GOLD_REFL_A); // a faint reflection, so it reads as one fish, not two
   if (a > 0.6 && Math.random() < 0.25) sparkle(x0 + Math.random() * s.w, y0 + Math.random() * s.h);
 }
 function drawLanding() {
@@ -1532,25 +1612,32 @@ function composite() {
 }
 const FANGS_UP = [[50, 9, 118], [77, 12, 150], [104, 14, 172], [131, 12, 150], [158, 9, 118]];
 const FANGS_DN = [[37, 8, 96], [63, 11, 124], [90, 13, 142], [118, 13, 142], [145, 11, 124], [171, 8, 96]];
+// One of Home's teeth as pixel art: a stepped, slightly hooked silhouette with a 1 px black outline (19), lit
+// from the left in hard bands (one highlight column of 11, bone 22, bone shade 23, a ramp 7 core shadow on the
+// right) and a gum band of ramp tones at the root.
+const FANG_GUM = 0.88;
+function fangShade(xi, n, t) {
+  if (t > FANG_GUM) return xi === 0 ? 8 : 6;
+  if (xi === 0) return 11;
+  const rel = xi / Math.max(1, n);
+  return rel < 0.55 ? 22 : rel < 0.86 || n < 4 ? 23 : 7;
+}
+function fangRow(y, c, half, t) {
+  const x0 = c - half, n = 2 * half, row = y * W;
+  for (let xi = 0; xi <= n; xi++) { const x = x0 + xi; if (x >= 0 && x < W) IDX[row + x] = fangShade(xi, n, t); }
+  if (x0 - 1 >= 0) IDX[row + x0 - 1] = 19;
+  if (x0 + n + 1 < W) IDX[row + x0 + n + 1] = 19;
+}
 function drawFang(cx, hb, len, tip, dir) {
-  // dir = 1: hangs from above, tip pointing down. dir = -1: rises from below.
+  const yTip = Math.round(tip + dir);
+  if (yTip >= 0 && yTip < H && cx >= 0 && cx < W) IDX[yTip * W + cx] = 19; // the outline closes over the point
   for (let k = 0; k <= len; k++) {
     const y = Math.round(tip - dir * k);
     if (y < 0 || y >= H) continue;
     const t = k / len;
-    const half = hb * Math.pow(t, 0.75);
-    const shift = Math.sin(t * Math.PI * 0.5) * hb * 0.35 * dir;
-    const x0 = Math.floor(cx + shift - half), x1 = Math.ceil(cx + shift + half);
-    for (let x = x0; x <= x1; x++) {
-      if (x < 0 || x >= W) continue;
-      const dx = x - (cx + shift);
-      let v;
-      if (Math.abs(dx) > half - 1 || k === 0) v = 1;
-      else if (dx < -half * 0.35) v = 22;
-      else if (dx < half * 0.2) v = (k > 3 && Math.abs(dx + half * 0.1) < 0.6) ? 11 : 22;
-      else v = 23;
-      IDX[y * W + x] = v;
-    }
+    const half = Math.floor(hb * Math.pow(t, 0.8)); // whole-pixel steps, so the flanks stair-step
+    const c = cx + Math.round(Math.sin(t * Math.PI * 0.5) * hb * 0.35 * dir);
+    fangRow(y, c, half, t);
   }
 }
 function drawFangs() {
@@ -1575,18 +1662,22 @@ function stampIdx(s, x0, y0) {
     if (x >= 0 && x < W && y >= 0 && y < H) IDX[y * W + x] = v;
   }
 }
+// The tension bar: BAR_H px of fill in a dark trough, the snap zone from BAR_DANGER to the end shaded dim red
+// (index 24) all the time, so it reads as the place to stay out of rather than a goal.
+const BAR_W = 116, BAR_H = 5, BAR_DANGER = 0.78;
+function drawTensionBar(t, r) {
+  const bx = (W - BAR_W) >> 1, by = H - 28, zx = bx + Math.round(BAR_W * BAR_DANGER);
+  rectI(bx - 2, by - 2, BAR_W + 4, BAR_H + 4, 0);
+  rectI(bx - 1, by - 1, BAR_W + 2, BAR_H + 2, 2);
+  rectI(zx, by - 1, bx + BAR_W + 1 - zx, BAR_H + 2, 24);
+  const danger = r.T > BAR_DANGER;
+  const col = danger ? (((t * 10) | 0) & 1 ? 21 : 11) : r.T > 0.55 ? 9 : 7;
+  rectI(bx, by, Math.round(clamp(r.T, 0, 1) * BAR_W), BAR_H, col);
+  stampIdx(ICON, bx + Math.round(r.p * (BAR_W - ICON.w)), by - 7);
+}
 function drawUIPix(t) {
   if (G.phase === 'bite' && G.bob && ((t * 8) | 0) & 1) stampIdx(EXCL, Math.round(G.bob.x) - 1, Math.round(G.bob.y) - 13);
-  if (G.phase === 'reeling' && G.reel) {
-    const r = G.reel, bw = 116, bx = (W - bw) >> 1, by = H - 26;
-    rectI(bx - 2, by - 2, bw + 4, 7, 0);
-    rectI(bx - 1, by - 1, bw + 2, 5, 2);
-    const danger = r.T > 0.78;
-    const col = danger ? (((t * 10) | 0) & 1 ? 12 : 11) : r.T > 0.55 ? 9 : 7;
-    rectI(bx, by, Math.round(clamp(r.T, 0, 1) * bw), 3, col);
-    rectI(bx + Math.round(bw * 0.8), by - 1, 1, 5, 11);
-    stampIdx(ICON, bx + Math.round(r.p * (bw - ICON.w)), by - 7);
-  }
+  if (G.phase === 'reeling' && G.reel) drawTensionBar(t, G.reel);
 }
 function glowTint(cx, cy, r, acc, str) {
   const cr = PALRGB[acc * 3], cg = PALRGB[acc * 3 + 1], cb = PALRGB[acc * 3 + 2];
@@ -1617,6 +1708,7 @@ function applyGlows(t) {
     glowTint(lx, ly - s, 18 + 12 * warm, 17, (0.8 + 0.25 * warm) * fl);
     glowTint(lx, 2 * WL - 1 - ly - s, 12 + 8 * warm, 17, (0.45 + 0.15 * warm) * fl);
   }
+  if (WS.dive > DIVE_SWITCH && G.deepGold) glowTint(G.deepGold.x, G.deepGold.y, DEEP_GOLD_GLOW, 16, WS.glint > 0 ? 0.9 : 0.55);
   const cab = WS.cabin * WS.cabinLit * (1 - WS.sea) * (1 - WS.dive); // the window's glow is fixed to the shore, which the dive leaves
   if (cab > 0.4) {
     const wx = CABIN_X + 2.5, wy = CABIN_Y + 7;
@@ -1910,7 +2002,7 @@ const CINE_RED = {
     WS.ash = clamp((t - 6) / 4, 0, 1);
     WS.stalk = clamp((t - 9.2) / 2.3, 0, 1);
     at('lake', 9.2, () => { if (STORY.heard) lakeWhisper('i could stay out here forever. i could stay out here forever.'); });
-    at('lakeOff', 12.4, () => { if (STORY.heard) UI.dlgHide(); });
+    at('lakeOff', 13.4, () => { if (STORY.heard) UI.dlgHide(); });
     WS.pupil = clamp((t - 12) / 1.3, 0, 1);
     WS.pupilDx = s.asked ? clamp((t - 13.6) / 1.0, 0, 1) * 4 : 0;
     at('turn', 13.6, () => { if (WS.companion > 0) tween(WS, 'companionTurn', 1, 0.4); });
@@ -1959,7 +2051,11 @@ function stayPushOff() {
   const x = boatLeft() + COMP_DX + 4;
   ring(x, WL + 1); ring(x + 3, WL + 2); SFX.plop();
 }
-function stayImpact() { WS.sunGlow = 2.4; WS.pupil = 0; SFX.crunch(); goldFishFade(STAY_DROP); } // the sky fish goes under with the sun
+// The glow spike is skipped for a player who asked for less motion; the sky fish goes under with the sun.
+function stayImpact() {
+  if (!REDUCED_MOTION) WS.sunGlow = 2.4;
+  WS.pupil = 0; SFX.crunch(); goldFishFade(STAY_DROP);
+}
 function stayDiscHitsWater() { SFX.hiss(2.2); ring(SUNX, HY + 3, true); ring(SUNX, HY + 3); splash(SUNX, HY + 2, 10); SFX.drone(false); }
 function stayGoneUnder() { WS.companion = 0; WS.leap = 0; }
 const CINE_STAY = {
@@ -2069,10 +2165,13 @@ function goldenScene() {
   if (STORY.act === 0) wish1(); else wish2();
 }
 // Kept, act 1: the fish speaks from the boat with no surfacing splash (bible, Act 1).
+// Its still caption shows here, right before the greeting, not a whole catch earlier.
+const KEPT_STILL_HOLD = 2.4;
 function keptScene() {
   G.bob = null;
   tween(WS, 'goldKept', 1, 0.8);
-  wish2();
+  cap(stillCaption(), 3.2);
+  dlgRun([{ pause: KEPT_STILL_HOLD }], wish2);
 }
 function goldenDive() {
   const g = WS.goldFish;
@@ -2167,7 +2266,7 @@ function grant1(w) {
 
 // -- the ocean (bible, sections 4 and 8). The shore sinks into the sky for good, the boat shrinks to a speck
 // on a vast lit sea, huge shadows drift to the horizon, and one the width of the screen stops under the boat.
-const OCEAN_FAR_DUR = 6, OCEAN_SPAWN_T = 1.4, OCEAN_SPAWN_GAP = 0.35, OCEAN_BIG_T = 5.5, OCEAN_CROSS = 8, OCEAN_WINDOW = 10, OCEAN_RETURN = 4, SWALLOW_R = 130;
+const OCEAN_FAR_DUR = 6, OCEAN_SPAWN_T = 1.4, OCEAN_SPAWN_GAP = 0.35, OCEAN_BIG_T = 5.5, OCEAN_CROSS = 8, OCEAN_WINDOW = 10, OCEAN_RETURN = 2.5, SWALLOW_R = 130;
 function spawnOceanShadow(size) {
   const fromLeft = Math.random() < 0.5;
   const s = { x: fromLeft ? -20 - Math.random() * 30 : W + 20 + Math.random() * 30, y: HY + 30 + Math.random() * (H - HY - 50), size, a: 1, fade: 0 };
@@ -2234,7 +2333,7 @@ const CINE_OCEAN = {
   dur: 13.5,
   init(s) {
     OCEAN.tr0 = WS.troubled; OCEAN.shad.length = 0; OCEAN.big = null;
-    tween(WS, 'far', 1, OCEAN_FAR_DUR, E.io); tween(WS, 'sea', 1, OCEAN_FAR_DUR, E.io); tween(WS, 'troubled', 0.15, 2);
+    tween(WS, 'far', 1, camDur(OCEAN_FAR_DUR), E.io); tween(WS, 'sea', 1, OCEAN_FAR_DUR, E.io); tween(WS, 'troubled', 0.15, 2);
     s.next = OCEAN_SPAWN_T; s.n = 0;
   },
   update(t, dt, at, s) {
@@ -2291,7 +2390,7 @@ const CINE_OCEAN_BACK = {
   update(t, dt, at) {
     at('back', OCEAN_RETURN, () => {
       spawnSeaShoal();
-      tween(WS, 'far', 0, OCEAN_RETURN, E.io); tween(WS, 'troubled', OCEAN.tr0, OCEAN_RETURN);
+      tween(WS, 'far', 0, camDur(OCEAN_RETURN), E.io); tween(WS, 'troubled', OCEAN.tr0, OCEAN_RETURN);
       WS.fishShadows = 1; spawnShadows();
     });
   },
@@ -2500,7 +2599,7 @@ function endDark() {
 function endCut() {
   dlgRun([
     narr(swimming() ? 'You reach for the knife in your belt.' : 'You reach for the knife on the gunwale.'),
-    red('No. Nobody cuts the'),
+    red('No. Nobody cuts the—'),
   ], () => playCine(cutCine(false), () => showEnding('cut')));
 }
 function endStay() {
@@ -2526,7 +2625,7 @@ const CINE_DEEP = {
     SFX.splash(); SFX.swell();
   },
   update(t, dt, at, s) {
-    const k = E.io(clamp((t - 0.4) / 6, 0, 1));
+    const k = E.io(clamp((t - 0.4) / camDur(6), 0, 1));
     WS.dive = k;
     if (k > DIVE_SWITCH && WS.lantern > 0) { untween(WS, 'lantern'); WS.lantern = 0; } // the lantern goes with the surface view, not after it
     WS.dim = 6 * clamp((t - 1) / 7, 0, 1);
@@ -2598,12 +2697,16 @@ function endingExtra(key, place, boat) {
 }
 // refusalSaid: the extra sentence already told the refusal, so the list drops its "nothing" part (and is
 // left out entirely when nothing was granted).
+// The labels are his own words, so they are listed one per line under the head rather than run into a sentence.
+const ASKED_SEP = '\n'; // #endAsked keeps the line breaks (white-space: pre-line)
 function askedLine(refusalSaid) {
   const labels = STORY.wishes.map(w => WISH_LABELS[w]);
   if (!labels.length) return refusalSaid ? '' : 'You asked for nothing.';
-  const head = STORY.refused === 1 && !refusalSaid ? 'You asked for nothing, once. And for: ' : 'You asked for: ';
-  return head + labels.join('. ') + '.';
+  const head = STORY.refused === 1 && !refusalSaid ? 'You asked for nothing, once. And for:' : 'You asked for:';
+  return [head].concat(labels).join(ASKED_SEP);
 }
+// Stay after the forever wish: its extra line already says it will not get light, so the base drops STAY_DARK.
+const stayBase = (key, base) => key === 'stay' && has('forever') ? base.replace(' ' + STAY_DARK, '') : base;
 // Every Still water card (the silent variant too) ends with the bait still in his pocket: he will be the
 // stranger for the next one. The exception is situation 10, the lake with the boat sunk. No other ending gets it.
 const BAIT_END = 'The bait is still in your pocket.';
@@ -2611,27 +2714,28 @@ const hasPocket = (id, place, boat) => id === 'cut' && !(place === 'lake' && boa
 function composeEnding(id, variant) {
   const place = endingPlace(), boat = endingBoat(), key = variant === 'silent' ? 'silent' : id;
   const extra = endingExtra(key, place, boat);
-  const parts = [endingBase(key, place, boat), extra.line];
+  const parts = [stayBase(key, endingBase(key, place, boat)), extra.line];
   if (hasPocket(id, place, boat)) parts.push(BAIT_END);
   const refusalSaid = extra.state === 'refused1' || extra.state === 'refused2';
   return { id, variant: variant || '', title: ENDINGS[id].title, text: parts.filter(Boolean).join(' '), asked: askedLine(refusalSaid) };
 }
 let sessionEndings = [];
+// The endings found, from storage and this session (the silent variant is saved as cut, so it counts as Still water).
+const foundEndings = () => loadEndings().concat(sessionEndings).filter((id, i, a) => ENDINGS[id] && a.indexOf(id) === i);
 function showEnding(id, variant) {
   setPhase('end');
   if (sessionEndings.indexOf(id) < 0) sessionEndings.push(id);
-  const saved = saveEnding(id);
-  const n = Math.max(saved.length, sessionEndings.length);
+  saveEnding(id);
   saveRun(variant ? id + ':' + variant : id);
-  UI.ending(composeEnding(id, variant), n);
+  UI.ending(composeEnding(id, variant), foundEndings());
 }
 
 // ---------------------------------------------------------------- fishing
 function promptFor(p) {
   if (p === 'ready') return 'Tap to cast';
-  if (p === 'ocean') return G.pt < OCEAN_GRACE ? '' : 'Tap to cast'; // no prompt in the first second after his warning
+  // The ocean window has no prompt: casting into the big one is a choice made against his warning.
   if (p === 'waiting' && G.tutorial < 2) return 'Wait for the float to go under';
-  if (p === 'bite') return 'Tap now!';
+  if (p === 'bite') return 'Tap now';
   if (p === 'reeling') return G.tutorial < 3 ? 'Hold to reel. Let go when it pulls hard.' : 'Hold to reel';
   return '';
 }
@@ -2688,32 +2792,28 @@ function cast() {
   const tx = 34 + Math.random() * 58, ty = 262 + Math.random() * 36;
   G.cast = { t: 0, tx, ty, from: null };
   STORY.casts++;
-  eyesCast();
   setPhase('casting');
   SFX.whoosh();
 }
-// The eyes (bible, Act 2 play), once per run, between casts: on the first ready phase that lasts six
-// seconds without a cast, on the second ordinary act 2 cast if the player is quick, or, once the act 2
-// catch has made the next cast golden, half a second after the card closes (under "The water goes very
-// still"). A player who casts even faster than that gets them on the golden cast itself; at 2 s they are
-// over well before the earliest bite (3.7 s). The lantern dips for a second while they show.
-const EYES_WAIT = 6, EYES_WAIT_STILL = 0.5;
+// The eyes (bible, Act 2 play), once per run: EYES_AFTER_LAND seconds after the act 2 golden cast lands,
+// never under a caption (they wait for it to clear). They last EYES_DUR, and the line does not go taut
+// until EYES_CLEAR after they close, so the red sequence never starts on top of them. The lantern dips
+// for a second while they show.
+const EYES_AFTER_LAND = 1.5, EYES_DUR = 2, EYES_CLEAR = 0.4;
 function eyesLook() {
   if (G.eyesDone) return;
-  G.eyesDone = true;
+  G.eyesDone = true; G.eyesAt = G.t;
   WS.lanternFlicker = 0.1;
   tween(WS, 'eyes', 1, 1, E.io, () => { tween(WS, 'eyes', 0, 1, E.io); tween(WS, 'lanternFlicker', 1, 0.6, E.out); });
 }
-function eyesCast() {
-  if (STORY.act !== 2) return;
-  if (STORY.goldenNext || ++G.act2Casts === 2) eyesLook(); // the golden cast is the last chance this run
-}
+const redCast = () => STORY.act === 2 && STORY.goldenNext;
 function eyesUpdate() {
-  if (G.eyesDone || STORY.act !== 2 || G.phase !== 'ready' || G.pt < (STORY.goldenNext ? EYES_WAIT_STILL : EYES_WAIT)) return;
+  if (G.eyesDone || !redCast() || G.phase !== 'waiting' || G.wait.t < EYES_AFTER_LAND || G.t < G.capUntil) return;
   eyesLook();
 }
+const eyesOver = () => G.eyesDone && G.t - G.eyesAt >= EYES_DUR + EYES_CLEAR;
 // In act 2 the golden cast has nothing bite for slightly too long.
-const RED_BITE_DELAY = 1.8;
+const RED_BITE_DELAY = 1.8, FIRST_BITE_WIN = 1.3;
 function startWaiting() {
   const golden = STORY.goldenNext;
   const bite = golden ? (1.6 + Math.random() * 0.8) * (STORY.act === 2 ? RED_BITE_DELAY : 1) : 1.6 + Math.random() * 3.2 * (WS.fishShadows ? 0.4 : 1);
@@ -2776,14 +2876,16 @@ function hook() {
   if (STORY.goldenNext && STORY.act === 2) { redSequence(); return; }
   const golden = STORY.goldenNext;
   const spec = golden ? null : pickSpecies();
-  G.reel = { p: 0, T: 0.15, d: golden ? 0.4 : spec.d, surge: 0, sAge: 0, next: 0.6 + Math.random(), x0: G.bob.x, y0: G.bob.y, golden, spec, tick: 0 };
+  G.reel = { p: 0, T: 0.15, d: golden ? GOLD_REEL_D : spec.d, surge: 0, sAge: 0, next: 0.6 + Math.random(), x0: G.bob.x, y0: G.bob.y, golden, spec, tick: 0 };
   G.holding = true;
   G.bobDip = 0;
   setPhase('reeling');
   SFX.hook();
 }
 // A surge is cued (ring, sound, jitter) SURGE_WARN seconds before it pulls, so a player can react and let go.
-const SURGE_WARN = 0.25;
+// Letting go costs RELEASE_LOSS of progress a second. The golden fish is heavy (GOLD_REEL_D) but its tension
+// is capped at GOLD_T_CAP, so it can never snap.
+const SURGE_WARN = 0.25, RELEASE_LOSS = 0.15, GOLD_REEL_D = 1.0, GOLD_T_CAP = 0.62;
 function reelUpdate(dt) {
   const r = G.reel;
   if (G.holding) {
@@ -2791,7 +2893,7 @@ function reelUpdate(dt) {
     r.T += dt * (0.4 + (r.surge > 0 && r.sAge > SURGE_WARN ? 1.3 : 0)) * r.d;
     r.tick -= dt;
     if (r.tick <= 0) { r.tick = 0.07; SFX.tick(); }
-  } else { r.p -= dt * 0.05; r.T -= dt * 0.85; }
+  } else { r.p -= dt * RELEASE_LOSS; r.T -= dt * 0.85; }
   if (!r.golden) {
     if (r.surge > 0) {
       r.surge -= dt; r.sAge += dt;
@@ -2802,22 +2904,22 @@ function reelUpdate(dt) {
       r.next -= dt;
       if (r.next <= 0) { r.surge = 0.45 + Math.random() * 0.55 + SURGE_WARN; r.sAge = 0; r.next = 0.8 + Math.random() * 1.6; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
     }
-  } else r.T = Math.min(r.T, 0.62);
+  } else r.T = Math.min(r.T, GOLD_T_CAP);
   r.T = clamp(r.T, 0, 1.05); r.p = clamp(r.p, 0, 1);
   G.rodA = lerp(G.rodA, AIM_A + 0.2 + r.T * 0.35, Math.min(1, dt * 10));
   G.rodBend = lerp(G.rodBend, 1 + r.T * 6, Math.min(1, dt * 10));
   const jx = r.surge > 0 ? (Math.random() - 0.5) * 2 : 0, end = reelEnd();
   G.bob = { x: lerp(r.x0, end.x, E.io(r.p)) + jx, y: lerp(r.y0, end.y, r.p), fly: false };
-  if (r.T >= 1) { SFX.snap(); lose('The line snapped.'); return; }
+  if (r.T >= 1) { SFX.snap(); lose(STORY.snaps++ ? 'The line snapped.' : 'The line snapped. Let go when it pulls.'); return; } // the first snap of a run teaches
   if (r.p >= 1) land();
 }
 function land() {
   const r = G.reel;
   G.reel = null; G.holding = false;
   const end = reelEnd(), bx = G.bob ? G.bob.x : end.x, by = G.bob ? G.bob.y : end.y;
+  if (r.golden) { STORY.goldenNext = false; goldenScene(); return; } // no splash here: it surfaces at the left with its own
   splash(bx, by, 10); ring(bx, by + 1);
   SFX.splash();
-  if (r.golden) { STORY.goldenNext = false; goldenScene(); return; }
   G.land = { t: 0, x0: bx, y0: by, fish: makeCatch(r.spec) };
   G.bob = null;
   setPhase('landing');
@@ -2839,21 +2941,33 @@ function stillCaption() {
 }
 // Kept, act 1: the cast after the second catch is a normal hook with a normal card, and when that card
 // closes the fish speaks from the boat (STORY.keptNext marks the wait; bible, Act 1).
+// A later run has two act 0 catches instead of three (the replay is shorter), so its fourth thought moves
+// from the second card onto the second cast landing, and all four still show before the still caption.
+const actNeed = act => [isLaterRun() ? 2 : 3, 2, 1][act];
+const shortAct0 = () => actNeed(0) < 3;
+// Each act 0 thought (an OPENING_CAPS key) is queued once; null once it has been, or outside act 0.
+function openingThought(i) {
+  if (STORY.act !== 0 || !OPENING_CAPS[i] || STORY.openQ.indexOf(i) >= 0) return null;
+  STORY.openQ.push(i);
+  return OPENING_CAPS[i];
+}
+// The thought for a cast that has just landed: the first cast's, or, on a short act 0, the last one once
+// the first card has closed.
+const castThought = () => openingThought(STORY.casts === 1 ? 0 : shortAct0() && STORY.catches >= 1 ? 2 : -1);
 function afterCatch() {
   STORY.catches++; STORY.actCatches++; G.tutorial++;
   UI.count(STORY.catches);
   if (STORY.keptNext) { STORY.keptNext = false; keptScene(); return; }
-  const need = [3, 2, 1][STORY.act];
-  if (STORY.actCatches >= need && !STORY.goldenNext) {
-    if (STORY.kept && STORY.act === 1) STORY.keptNext = true; else STORY.goldenNext = true;
-    cap(stillCaption(), 3.2);
-  } else thinkBeat(STORY.act === 0 ? OPENING_CAPS[STORY.catches] : null);
+  if (STORY.actCatches >= actNeed(STORY.act) && !STORY.goldenNext) {
+    if (STORY.kept && STORY.act === 1) STORY.keptNext = true; // its still caption shows in keptScene
+    else { STORY.goldenNext = true; cap(stillCaption(), 3.2); }
+  } else if (STORY.act === 0) thinkBeat(openingThought(STORY.catches));
+  else if (STORY.act === 1 && STORY.actCatches === 1) companionSpeaks();
   setPhase('ready');
 }
 function fishUpdate(dt) {
   const ph = G.phase;
   if (ph === 'card' && G.pt >= CARD_GRACE && !G.cardReady) { G.cardReady = true; UI.cardReady(); }
-  if (ph === 'ocean' && G.pt >= OCEAN_GRACE && G.pt - dt < OCEAN_GRACE) refreshPrompt();
   if (ph === 'ready' || ph === 'title' || ph === 'lost' || ph === 'card') {
     G.rodA = lerp(G.rodA, REST_A, Math.min(1, dt * 4));
     G.rodBend = lerp(G.rodBend, 0, Math.min(1, dt * 6));
@@ -2874,7 +2988,7 @@ function fishUpdate(dt) {
         G.bob = { x: c.tx, y: c.ty, fly: false };
         ring(c.tx, c.ty + 1); splash(c.tx, c.ty, 4);
         SFX.plop();
-        thinkBeat(STORY.casts === 1 ? OPENING_CAPS[0] : null);
+        thinkBeat(castThought());
         startWaiting();
       }
     }
@@ -2885,9 +2999,9 @@ function fishUpdate(dt) {
     if (w.nib.length && w.t >= w.nib[0]) { w.nib.shift(); G.bobDip = 0.16; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
     const glitter = STORY.goldenNext && !STORY.kept; // kept: no sparkles and no chime; the fish is in the boat
     if (glitter && Math.random() < dt * 6) sparkle(G.bob.x + (Math.random() - 0.5) * 10, G.bob.y - Math.random() * 4);
-    if (w.t >= w.bite && STORY.goldenNext && STORY.act === 2) { redSequence(); return; } // no bite: the line just goes taut
+    if (w.t >= w.bite && redCast()) { if (eyesOver()) redSequence(); return; } // no bite: the line goes taut once the eyes have closed
     if (w.t >= w.bite) {
-      G.biteWin = STORY.goldenNext ? 3.2 : 0.95;
+      G.biteWin = STORY.goldenNext ? 3.2 : G.tutorial < 1 ? FIRST_BITE_WIN : 0.95; // the first bite is a little longer
       setPhase('bite');
       G.bobDip = 999;
       ring(G.bob.x, G.bob.y + 1); ring(G.bob.x, G.bob.y + 1, true); splash(G.bob.x, G.bob.y, 3);
@@ -2931,19 +3045,30 @@ function companionLine() {
   STORY.tap++;
   return text;
 }
+// Once per run he speaks unprompted, after the first act 1 card closes: one line from his pool in his
+// bubble, so the player learns he is there to be tapped. Under a caption or a bubble it is skipped.
+function companionSpeaks() {
+  if (STORY.compSpoke || WS.companion <= 0.5 || G.t < G.capUntil || G.t < G.thinkUntil) return;
+  STORY.compSpoke = true;
+  thinkLine(companionLine(), 'companion');
+}
 // One line in his bubble instead of a cast. He never turns for it.
 function companionTap() {
   SFX.init(); SFX.resume();
   if (WS.companion <= 0.5) return;
   thinkLine(companionLine(), 'companion');
 }
-// His sprite box padded by 3 px, only while he is there and the stage is his to answer: during play, or in
+// His sprite box padded by 6 px, only while he is there and the stage is his to answer: during play, or in
 // the red once he has turned and the last choices are showing.
-const COMP_PAD = 3;
+const COMP_PAD = 6;
+// Whether he can be tapped at all (the C key asks only this): a tap on a waiting bubble only dismisses it,
+// and under a caption it is a plain tap.
+function companionOpen() {
+  if (WS.companion <= 0.5 || WS.far > 0.5 || G.t < G.thinkUntil || G.t < G.capUntil) return false;
+  return G.phase === 'ready' || (G.phase === 'dialog' && !!UI.choices && WS.companionTurn > 0.5);
+}
 function companionHit(x, y) {
-  if (WS.companion <= 0.5 || WS.far > 0.5 || G.t < G.thinkUntil || G.t < G.capUntil) return false; // a tap on a waiting bubble only dismisses it; under a caption it is a plain tap
-  const open = G.phase === 'ready' || (G.phase === 'dialog' && !!UI.choices && WS.companionTurn > 0.5);
-  if (!open) return false;
+  if (!companionOpen()) return false;
   const x0 = boatLeft() + COMP_DX - COMP_PAD, y0 = compY(boatSinkPx()) - COMP_PAD;
   return x >= x0 && x < x0 + COMP.w + 2 * COMP_PAD && y >= y0 && y < y0 + COMP.h + 2 * COMP_PAD;
 }
@@ -2989,7 +3114,7 @@ function testCatch() {
   if (p !== 'ready' && p !== 'casting' && p !== 'waiting' && p !== 'bite' && p !== 'reeling' && p !== 'lost') return;
   G.cast = null; G.wait = null; G.holding = false; G.bobDip = 0;
   G.bob = { x: SKIP_BOB.x, y: SKIP_BOB.y, fly: false };
-  eyesCast(); // a skip counts as a cast for the eyes
+  if (redCast()) eyesLook(); // the skipped red cast still shows them once
   hook();
   if (G.phase === 'reeling' && G.reel) { G.reel.p = 1; land(); }
 }
@@ -3028,7 +3153,7 @@ function resetAll() {
   resetWS();
   Object.assign(STORY, freshStory());
   loadRun();
-  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 } });
+  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 } });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
   OCEAN.shad.length = 0; OCEAN.big = null; OCEAN.tr0 = 0;
   cloudT = 0; genEyes();
@@ -3038,7 +3163,7 @@ function resetAll() {
   SFX.drone(false); SFX.weight(false);
   UI.count(0); UI.dlgHide(); UI.thinkHide(); UI.cardHide(); UI.endingHide();
   setPhase('title');
-  UI.title(true, Math.max(loadEndings().length, sessionEndings.length));
+  UI.title(true, foundEndings());
 }
 function restart() {
   UI.fade(1, 0.6);
@@ -3087,7 +3212,14 @@ function cloudPath(w, h, u) {
 // Where each bubble sits, in internal pixels: its left edge, the y of its bottom edge, the x where the tail
 // leaves it, and which way the tail leans (-1 toward the fisherman's head, +1 toward the companion's).
 // The companion's question sits 18 px higher (yAsk) so its two 44 px buttons clear the fisherman's hat (y 218).
-const THINK_AT = { fisherman: { left: 122, y: 186, tail: 150, dir: -1 }, companion: { left: 100, y: 190, yAsk: 172, tail: 160, dir: 1 } };
+// In the red (mood past 1) the eye hangs where his bubble would sit, so his bubble moves down to y 205 and
+// right of the disc (companionRed), clear of the eye and still above both heads.
+const THINK_AT = {
+  fisherman: { left: 122, y: 186, tail: 150, dir: -1 },
+  companion: { left: 100, y: 190, yAsk: 172, tail: 160, dir: 1 },
+  companionRed: { left: 124, y: 205, tail: 168, dir: 1 },
+};
+const thinkAnchor = side => (WS.mood > 1 && THINK_AT[side + 'Red']) || THINK_AT[side];
 // The catch card's sprite scale: the largest integer factor that keeps the fish inside CARD_FISH_W of the
 // panel's width and CARD_FISH_H percent of the stage's width tall, between CARD_FISH_MIN and CARD_FISH_MAX,
 // so the species signatures read on a phone (bible, section 5).
@@ -3103,7 +3235,7 @@ function makeUI() {
     think: $('think'), thinkPath: $('thinkPath'), thinkTail1: $('thinkTail1'), thinkTail2: $('thinkTail2'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'), thinkMore: $('thinkMore'),
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
-    title: $('title'), found: $('found'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endFound: $('endFound'),
+    title: $('title'), found: $('found'), foundList: $('foundList'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endFound: $('endFound'), endList: $('endList'),
     again: $('again'), fade: $('fade'), mute: $('mute'), skip: $('skip'),
   };
   let capTimer = null;
@@ -3142,6 +3274,17 @@ function makeUI() {
     if (el.choices.hidden || !el.choices.classList.contains('many')) return;
     if (el.text.scrollHeight > el.text.clientHeight + 1 || el.dlg.scrollHeight > el.dlg.clientHeight + 1) el.choices.classList.add('grid');
   };
+  const endingList = (box, found) => {
+    box.innerHTML = '';
+    if (!found) return;
+    Object.keys(ENDINGS).forEach(id => {
+      const s = document.createElement('span');
+      const got = found.indexOf(id) >= 0;
+      s.textContent = got ? ENDINGS[id].title : '—';
+      if (!got) s.setAttribute('aria-label', 'not found');
+      box.appendChild(s);
+    });
+  };
   let againTimer = null, cardSize = null;
   const cardScale = () => {
     if (!cardSize) return;
@@ -3152,7 +3295,7 @@ function makeUI() {
   // The bubble's place and outline from the live stage size: W is fixed, so x turns into a constant
   // percentage; H is not, so the bottom edge is recomputed from it.
   const thinkLayout = side => {
-    const a = THINK_AT[side], u = el.stage.clientWidth / 100;
+    const a = thinkAnchor(side), u = el.stage.clientWidth / 100;
     const y = el.think.classList.contains('ask') && a.yAsk ? a.yAsk : a.y;
     el.think.style.left = (a.left / W * 100).toFixed(2) + '%';
     el.think.style.bottom = ((H - y) / H * 100).toFixed(2) + '%';
@@ -3204,7 +3347,7 @@ function makeUI() {
       if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; }
     },
     thinkRelayout() { if (this.thinkSide) thinkLayout(this.thinkSide); },
-    prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === 'Tap now!'); },
+    prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === 'Tap now'); },
     caption(t, dur, style) {
       el.caption.textContent = t; el.caption.className = 'shade on' + (style ? ' ' + style : '');
       clearTimeout(capTimer);
@@ -3244,10 +3387,17 @@ function makeUI() {
     },
     dlgMore(on) { el.more.classList.toggle('on', !!on); },
     dlgHide() { el.dlg.classList.remove('on', 'choosing'); el.dlg.removeAttribute('aria-busy'); el.choices.innerHTML = ''; el.choices.hidden = true; this.choices = null; },
-    title(on, found) { el.title.classList.toggle('on', !!on); el.found.textContent = found ? 'Endings found: ' + found + ' of ' + ENDING_COUNT : ''; },
-    ending(e, n) {
+    // found: the ids of the endings found so far. The counter, then the six titles in order, a dash for each unfound one.
+    title(on, found) {
+      el.title.classList.toggle('on', !!on);
+      const n = found ? found.length : 0;
+      el.found.textContent = n ? 'Endings found: ' + n + ' of ' + ENDING_COUNT : '';
+      endingList(el.foundList, n ? found : null);
+    },
+    ending(e, found) {
       el.endTitle.textContent = e.title; el.endText.textContent = e.text; el.endAsked.textContent = e.asked || '';
-      el.endFound.textContent = 'Endings found: ' + n + ' of ' + ENDING_COUNT;
+      el.endFound.textContent = 'Endings found: ' + found.length + ' of ' + ENDING_COUNT;
+      endingList(el.endList, found);
       el.ending.classList.add('on');
       // Cast again wakes only once the card has faded in (AGAIN_DELAY), so a stray tap from the finale cannot
       // restart before the ending is read; until then it is disabled and out of the tab order.
@@ -3277,6 +3427,7 @@ function makeUI() {
 }
 const CHOICE_GRACE = 0.4, AGAIN_DELAY = 1600;
 function boot() {
+  try { REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (err) { REDUCED_MOTION = false; }
   UI = makeUI();
   init();
   const canvas = document.getElementById('c');
@@ -3331,6 +3482,7 @@ function boot() {
       if (c) { e.preventDefault(); c.cb(); }
       return;
     }
+    if (e.code === 'KeyC') { if (companionOpen()) companionTap(); return; } // the keyboard's way to tap him
     if (TEST_BUILD && e.code === 'KeyT') { setTestMode(!TEST); return; }
     if (TEST_BUILD && e.code === 'KeyS' && TEST) { testCatch(); return; }
     if (e.code === 'Space' || e.code === 'Enter') {
