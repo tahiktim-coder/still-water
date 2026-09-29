@@ -2,6 +2,8 @@
 
 A short fishing tale. **Play it here: https://tahiktim-coder.github.io/still-water/** (best on a phone in portrait). You can also open `dist/index.html` in a browser.
 
+Testing the story? **https://tahiktim-coder.github.io/still-water/test.html** is the same game with a Skip fish button: each tap lands the next fish, so you can reach any wish and ending in a couple of minutes.
+
 Controls: tap to cast, then tap when the float goes under. Hold to reel, and let go before the line snaps. When the golden fish speaks, tap to read on and pick an answer. Someone in the boat can be tapped too.
 
 A run takes about four minutes and ends one of six ways (Home, Dark, Still water, Stay, Deep, Swallowed), depending on what you ask for and what you keep. The endings you have found are counted on the title.

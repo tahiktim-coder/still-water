@@ -1,4 +1,6 @@
-# Publishes the built game (dist/index.html) to GitHub Pages on every push to main.
+# Publishes the game to GitHub Pages on every push to main:
+#   /             the release build (dist/index.html, no test mode)
+#   /test.html    the test build, with the Skip fish button on, for friends testing the story
 name: Deploy to GitHub Pages
 
 on:
@@ -23,9 +25,18 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the site (release page and test page)
+        run: |
+          node build.js --test
+          mkdir -p site
+          cp dist/index.html site/index.html
+          cp tools/out/test.html site/test.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v4
