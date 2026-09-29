@@ -605,23 +605,24 @@ function buildSprites() {
 // pal2 for the act 2 name, greyer and darker. Keys are makeFish's o b m l s f e plus the marks: bar (the
 // perch's dark bars), spot, heart (the perch's one dark pixel), tooth (the grinning smelt, bone). The
 // warm accents (13 dark brown, 14 ochre, 22-23 bone, 24 red-brown) stand in for olive and grey, since the
-// ramp itself is blue; the night ramp greys the act 2 cards further on its own.
+// ramp itself is blue; the night ramp greys the act 2 cards further on its own. Every pal2 outline and body
+// index is 3 or above, so the act 2 fish reads on the night panel (index 0, nearly black).
 const SPECIES = [
   { id: 'perch', names: ['Glass perch', 'Glass perch', 'Eyeless perch'], len: 12, ht: 7, tail: 4, dorsalH: 2, stripes: 2, fork: true, wt: [0.2, 0.6], d: 0.9,
     pal: { o: 7, b: 10, m: 10, l: 11, s: 11, f: 9, e: 18, bar: 4, heart: 24 },
     pal2: { o: 4, b: 23, m: 23, l: 22, s: 22, f: 9, e: 18, bar: 2, heart: 24 } },
   { id: 'char', names: ['Mirror char', 'Mirror char', 'Hollow char'], len: 15, ht: 6, tail: 4, dorsalH: 1, spots: true, fork: true, wt: [0.5, 1.4], d: 1.0,
     pal: { o: 3, b: 7, m: 9, l: 10, s: 9, f: 6, e: 18, spot: 11 },
-    pal2: { o: 1, b: 5, m: 7, l: 9, s: 9, f: 4, e: 18 } },
+    pal2: { o: 3, b: 6, m: 7, l: 9, s: 9, f: 5, e: 18 } },
   { id: 'smelt', names: ['Blue smelt', 'Grinning smelt', 'Grinning smelt'], len: 9, ht: 4, tail: 3, dorsalH: 1, fork: true, wt: [0.05, 0.2], d: 0.7,
     pal: { o: 3, b: 6, m: 8, l: 10, s: 11, f: 6, e: 20, tooth: 22 },
     pal2: { o: 1, b: 4, m: 6, l: 8, s: 9, f: 4, e: 20, tooth: 22 } },
   { id: 'trout', names: ['Fjord trout', 'Fjord trout', 'Drowned trout'], len: 17, ht: 8, tail: 5, dorsalH: 1, spots: true, fork: false, wt: [0.8, 2.2], d: 1.25,
     pal: { o: 18, b: 13, m: 23, l: 22, s: 14, f: 13, e: 18, spot: 24 },
-    pal2: { o: 0, b: 1, m: 3, l: 23, s: 4, f: 1, e: 18, spot: 24 } },
+    pal2: { o: 3, b: 5, m: 6, l: 23, s: 7, f: 4, e: 18, spot: 24 } },
   { id: 'eel', names: ['Needle eel', 'Knot eel', 'Endless eel'], len: 24, ht: 3, tail: 2, eel: true, wt: [0.3, 0.9], d: 1.1,
     pal: { o: 19, b: 18, m: 13, l: 14, s: 15, f: 13, e: 22 },
-    pal2: { o: 19, b: 0, m: 1, l: 23, s: 3, f: 0, e: 22 } },
+    pal2: { o: 3, b: 5, m: 6, l: 23, s: 7, f: 4, e: 22 } },
   { id: 'grayling', names: ['Pale grayling', 'Pale grayling', 'Ash grayling'], len: 14, ht: 6, tail: 4, dorsalH: 5, fork: true, wt: [0.3, 0.8], d: 1.0,
     pal: { o: 4, b: 23, m: 22, l: 11, s: 11, f: 7, e: 18 },
     pal2: { o: 1, b: 3, m: 23, l: 22, s: 22, f: 4, e: 18 } },
@@ -770,13 +771,13 @@ const END_EXTRA = {
       company: 'Someone comes down after you. You do not look back.',
     },
   },
-  silent: { order: ['kept'], lines: { kept: 'You lifted it over the side. It let you.' } },
+  silent: { order: ['kept'], lines: { kept: 'It went over the side on its own. You let it.' } },
   swallowed: { order: ['kept'], lines: { kept: 'The golden fish went in with you. It had been in before.' } },
 };
-// The wish button labels, read back on the ending card.
+// The wish button labels, read back on the ending card (gold as one phrase, so the list reads as one wish each).
 const WISH_LABELS = {
   company: 'Someone to sit with me', fish: 'Take me where the fish are', home: 'A home on the shore',
-  forever: 'Make this day last forever', hear: 'Let me hear the fish', gold: 'Gold. A boat full of it',
+  forever: 'Make this day last forever', hear: 'Let me hear the fish', gold: 'A boat full of gold',
 };
 // The recount at wish 3: the player's own labels shifted to the second person, one clause per granted wish, in order.
 const RECOUNT = {
@@ -811,7 +812,7 @@ const G = {
   phase: 'title', t: 0, pt: 0, holding: false, bob: null, cast: null, wait: null, reel: null, land: null,
   rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 },
   lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0, hbGap: HB_GAP,
-  capUntil: 0, thinkUntil: 0, thinkPending: [],
+  capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [],
   arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0,
 };
 // wishes holds granted wishes only, in order. kept, firstAsk, refused, answered, ocean, said and usedRepl follow
@@ -821,6 +822,7 @@ const freshStory = () => ({
   act: 0, catches: 0, actCatches: 0, wishes: [], heard: false, goldenNext: false, lastSpecies: null,
   kept: false, firstAsk: null, refused: 0, answered: null, ocean: 'none', said: 0, usedRepl: [], casts: 0, shown1: [],
   keptNext: false, // kept, act 1: the next normal card closes into golden scene 2 from the boat
+  actSeen: [], // species whose card showed this act, so a card never repeats within one act
   tap: 0, tapPool: '', // the companion's lines: how many of the current pool have shown, and which pool it was
 });
 const STORY = freshStory();
@@ -839,7 +841,7 @@ function stubUI() {
     prompt: f('prompt'), caption: f('caption'), count: f('count'),
     card: f('card'), cardHide: f('cardHide'),
     dlgShow: f('dlgShow'), dlgText() {}, dlgChoices(list) { this.choices = list; },
-    dlgMore() {}, dlgHide: f('dlgHide'),
+    dlgMore() {}, dlgBusy() {}, dlgHide: f('dlgHide'), thinkMore() {}, cardReady() {},
     // The thought bubble: logged as 'think' entries; its choices (the companion's question) go in choices.
     think(text, opts) { log.push(['think', text, opts && opts.side || 'fisherman']); if (opts && opts.choices) { this.choices = opts.choices; this.thinkOwns = true; } },
     thinkHide() { if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; } },
@@ -1517,8 +1519,8 @@ function composite() {
       const ta = hasA && mountIdx(x, ya) !== 255; // the jaws close from the shifted shore (bible, 8c)
       const tb = hasB && msrc >= 0 && msrc < HY && mountIdx(x, msrc) !== 255;
       const sp = yb >= 0 && yb < H ? SPR[yb * W + x] : 255;
-      if (ta) { v = FRAME[ya * W + x]; tooth = true; }
-      else if (sp !== 255) v = sp;
+      if (sp !== 255) v = sp; // sprites ride the lower jaw and stay in front, so the boat never blinks out behind the shore
+      else if (ta) { v = FRAME[ya * W + x]; tooth = true; }
       else if (tb) { v = FRAME[yb * W + x]; tooth = true; }
       else if (hasA && hasB) v = Math.min(FRAME[ya * W + x], FRAME[yb * W + x]);
       else if (hasA) v = FRAME[ya * W + x];
@@ -1657,7 +1659,8 @@ const SFX = {
       const c = new AC();
       this.ctx = c;
       this.out = c.createGain();
-      this.out.gain.value = this.muted ? 0 : 0.6;
+      this.out.gain.value = 0; // silent until unmuted, so a mute before the first tap never lets a burst through
+      if (!this.muted) this.out.gain.setTargetAtTime(0.6, c.currentTime, 0.05);
       this.out.connect(c.destination);
       const len = c.sampleRate * 2, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -1826,6 +1829,7 @@ function choiceList(L) {
 function dlgFull() {
   const L = DLG.cur;
   DLG.n = L.text.length;
+  UI.dlgBusy(false);
   UI.dlgText(L.text, L.mark);
   if (L.choices) UI.dlgChoices(choiceList(L));
   else UI.dlgMore(true);
@@ -2093,7 +2097,7 @@ function keptOver(withCaption) {
   tween(WS, 'goldKept', 0, 0.3, E.lin);
   if (withCaption) cap(swimming() ? 'You let the golden fish go.' : 'You lift the golden fish over the side.', 3);
 }
-function startAct(act) { STORY.act = act; STORY.actCatches = 0; }
+function startAct(act) { STORY.act = act; STORY.actCatches = 0; STORY.actSeen = []; }
 
 // -- golden scene 1 and wish 1
 // The fish's first line changes on a later run (bible, sections 4 and 7).
@@ -2124,7 +2128,7 @@ function wish1b(kept) {
     fish('Keep me, then. The wish comes anyway.'),
   ] : [fish('Kind. Nobody kind comes out this far alone.')];
   dlgRun(L.concat([
-    fish('First time here, you said. Nobody comes here twice.'),
+    fish(isLaterRun() ? 'First time here, you said. You said that last time too.' : 'First time here, you said. Nobody comes here twice.'),
     { who: FISHN, text: 'What would you like, fisherman?', choices: [
       { label: 'Someone to sit with me', pick: () => grant1('company') },
       { label: 'Take me where the fish are', pick: () => grant1('fish') },
@@ -2135,7 +2139,7 @@ function wish1b(kept) {
 }
 const GRANT1 = {
   company: () => [
-    { who: FISHN, text: 'Who?', choices: [{ label: 'Doesn’t matter. Someone.', pick() { /* the list continues */ } }] },
+    { who: FISHN, text: 'Who?', choices: [{ label: 'Doesn’t matter. Someone', pick() { /* the list continues */ } }] },
     { act: () => { tween(WS, 'companion', 1, 2.2); SFX.chime(); } },
     fish('Someone. Nobody asks who.'),
     fish('If they ask you anything, don’t answer.'),
@@ -2239,6 +2243,8 @@ const CINE_OCEAN = {
     at('big', OCEAN_BIG_T, () => { bigEnter(); SFX.weight(true); }); // no stinger: the swell rises with the crossing
   },
 };
+// The tap that dismisses the warning must not also cast: the first second of the window ignores taps.
+const OCEAN_GRACE = 1.0;
 function oceanTold() { dlgRun([fish('Where the fish are. I’d leave the big one. It’s been waiting longer than you have.')], () => setPhase('ocean')); }
 // The choice is made by input: a cast while the big one is under the boat is the Swallowed ending; waiting the
 // window out lets it leave. Skip fish counts as a cast here.
@@ -2536,7 +2542,7 @@ const CINE_DEEP = {
 };
 // Silent: nothing, asked a third time. Counts as Still water. Kept: the boat fish dims with no caption.
 function endSilent() {
-  const L = [narr('You say nothing.'), { pause: 3 }, narr('It waits. Then it splashes its tail once and goes down.')];
+  const L = [narr('You say nothing.'), { pause: 3 }, narr(STORY.kept ? 'It waits. Then it goes dark in the bottom of the boat.' : 'It waits. Then it splashes its tail once and goes down.')];
   if (STORY.kept) L.push({ act: () => tween(WS, 'goldKept', 0.05, 1.5) });
   dlgRun(L, () => playCine(cutCine(true), () => showEnding('cut', 'silent')));
 }
@@ -2560,7 +2566,7 @@ function loadRun() {
 }
 function saveRun(id) {
   sessionRuns++; sessionLast = id;
-  saveJSON('stillwater-runs', Math.max(sessionRuns, +loadJSON('stillwater-runs', 0) || 0));
+  saveJSON('stillwater-runs', (+loadJSON('stillwater-runs', 0) || 0) + 1);
   saveJSON('stillwater-last', id);
 }
 // The ending card (bible, Ending cards): the base for the situation, one extra sentence, the pocket line on
@@ -2580,19 +2586,22 @@ function endingBase(key, place, boat) {
   const cell = byPlace[boat] || byPlace.boat || byPlace.sunk;
   return typeof cell === 'string' ? cell : cell[STORY.heard ? 'heard' : 'quiet'];
 }
+// Returns the sentence and the state it came from, so the asked-for line can avoid repeating a refusal.
 function endingExtra(key, place, boat) {
   const x = END_EXTRA[key];
   for (const st of x.order) {
     if (!END_STATES[st]()) continue;
     const line = altLine(x.lines[st], place, boat);
-    if (line) return line;
+    if (line) return { line, state: st };
   }
-  return '';
+  return { line: '', state: null };
 }
-function askedLine() {
+// refusalSaid: the extra sentence already told the refusal, so the list drops its "nothing" part (and is
+// left out entirely when nothing was granted).
+function askedLine(refusalSaid) {
   const labels = STORY.wishes.map(w => WISH_LABELS[w]);
-  if (!labels.length) return 'You asked for nothing.';
-  const head = STORY.refused === 1 ? 'You asked for nothing, once. And for: ' : 'You asked for: ';
+  if (!labels.length) return refusalSaid ? '' : 'You asked for nothing.';
+  const head = STORY.refused === 1 && !refusalSaid ? 'You asked for nothing, once. And for: ' : 'You asked for: ';
   return head + labels.join('. ') + '.';
 }
 // Every Still water card (the silent variant too) ends with the bait still in his pocket: he will be the
@@ -2601,9 +2610,11 @@ const BAIT_END = 'The bait is still in your pocket.';
 const hasPocket = (id, place, boat) => id === 'cut' && !(place === 'lake' && boat === 'sunk');
 function composeEnding(id, variant) {
   const place = endingPlace(), boat = endingBoat(), key = variant === 'silent' ? 'silent' : id;
-  const parts = [endingBase(key, place, boat), endingExtra(key, place, boat)];
+  const extra = endingExtra(key, place, boat);
+  const parts = [endingBase(key, place, boat), extra.line];
   if (hasPocket(id, place, boat)) parts.push(BAIT_END);
-  return { id, variant: variant || '', title: ENDINGS[id].title, text: parts.filter(Boolean).join(' '), asked: askedLine() };
+  const refusalSaid = extra.state === 'refused1' || extra.state === 'refused2';
+  return { id, variant: variant || '', title: ENDINGS[id].title, text: parts.filter(Boolean).join(' '), asked: askedLine(refusalSaid) };
 }
 let sessionEndings = [];
 function showEnding(id, variant) {
@@ -2617,8 +2628,9 @@ function showEnding(id, variant) {
 
 // ---------------------------------------------------------------- fishing
 function promptFor(p) {
-  if (p === 'ready' || p === 'ocean') return 'Tap to cast';
-  if (p === 'waiting' && G.tutorial < 2) return 'Wait for the float to dip';
+  if (p === 'ready') return 'Tap to cast';
+  if (p === 'ocean') return G.pt < OCEAN_GRACE ? '' : 'Tap to cast'; // no prompt in the first second after his warning
+  if (p === 'waiting' && G.tutorial < 2) return 'Wait for the float to go under';
   if (p === 'bite') return 'Tap now!';
   if (p === 'reeling') return G.tutorial < 3 ? 'Hold to reel. Let go when it pulls hard.' : 'Hold to reel';
   return '';
@@ -2646,11 +2658,15 @@ function thinkBeat(text) {
 // up until a tap and never on a timer (bible, 4b), the prompt hidden meanwhile. G.thinkUntil is Infinity
 // while it waits, so the same `G.t < G.thinkUntil` gate hides the prompt, holds bites and makes the next
 // tap a dismissal only (press, companionHit).
+// The tap that brought the bubble up (a card closing) is often followed by a reflex tap, so a dismissal is
+// ignored for THINK_GRACE seconds and the ▾ marker lights only after that.
+const THINK_GRACE = 0.8;
 function thinkLine(text, side) {
-  UI.think(text, { who: side === 'fisherman' ? 'Fisherman' : '', side, more: true });
-  G.thinkUntil = Infinity;
+  UI.think(text, { who: side === 'fisherman' ? 'Fisherman' : '', side, more: false });
+  G.thinkUntil = Infinity; G.thinkAt = G.t; G.thinkMore = false;
   refreshPrompt();
 }
+const thinkCold = () => G.t - G.thinkAt < THINK_GRACE;
 function thinkHide() {
   G.thinkUntil = 0;
   UI.thinkHide();
@@ -2660,6 +2676,7 @@ function thinkHide() {
 // cascade past the third catch (the fish quotes them right after).
 const THINK_PHASES = ['ready', 'casting', 'waiting'];
 function thinkUpdate() {
+  if (G.thinkUntil === Infinity && !G.thinkMore && !thinkCold()) { G.thinkMore = true; UI.thinkMore(true); }
   if (G.thinkPending.length && G.t >= G.capUntil && THINK_PHASES.indexOf(G.phase) >= 0) thinkBeat(null);
 }
 function lose(msg) {
@@ -2711,10 +2728,13 @@ function startWaiting() {
 }
 // The act 2 species is chosen from those whose act 1 line was not shown this run. After the later-run
 // hook line, the perch is excluded from the act 1 picks so the two hook lines never both show.
+// A species whose card already showed this act (STORY.actSeen) is left out too, unless nothing else is left.
 function pickSpecies() {
-  let pool = SPECIES.filter(s => s.id !== STORY.lastSpecies);
-  if (STORY.act === 1 && usedRepl('lip')) pool = pool.filter(s => s.id !== 'perch');
-  if (STORY.act === 2) { const unseen = pool.filter(s => STORY.shown1.indexOf(s.id) < 0); if (unseen.length) pool = unseen; }
+  const lip = STORY.act === 1 && usedRepl('lip');
+  const narrow = (pool, keep) => { const p = pool.filter(keep); return p.length ? p : pool; };
+  let pool = SPECIES.filter(s => s.id !== STORY.lastSpecies && !(lip && s.id === 'perch'));
+  pool = narrow(pool, s => STORY.actSeen.indexOf(s.id) < 0);
+  if (STORY.act === 2) pool = narrow(pool, s => STORY.shown1.indexOf(s.id) < 0);
   const s = pool[(Math.random() * pool.length) | 0];
   STORY.lastSpecies = s.id;
   return s;
@@ -2744,6 +2764,7 @@ function makeCatch(sp) {
   const spr = makeFish(fishOpts(sp, a, (Math.random() * 1000) | 0));
   const desc = cardLine(sp.id, a);
   if (a === 1) STORY.shown1.push(sp.id);
+  STORY.actSeen.push(sp.id);
   const voice = STORY.heard && a === 2 ? VOICE[STORY.firstAsk] || '' : '';
   return { name: sp.names[a], weight: lerp(sp.wt[0], sp.wt[1], Math.random()), desc, spr, voice };
 }
@@ -2755,29 +2776,31 @@ function hook() {
   if (STORY.goldenNext && STORY.act === 2) { redSequence(); return; }
   const golden = STORY.goldenNext;
   const spec = golden ? null : pickSpecies();
-  G.reel = { p: 0, T: 0.15, d: golden ? 0.4 : spec.d, surge: 0, next: 0.6 + Math.random(), x0: G.bob.x, y0: G.bob.y, golden, spec, tick: 0 };
+  G.reel = { p: 0, T: 0.15, d: golden ? 0.4 : spec.d, surge: 0, sAge: 0, next: 0.6 + Math.random(), x0: G.bob.x, y0: G.bob.y, golden, spec, tick: 0 };
   G.holding = true;
   G.bobDip = 0;
   setPhase('reeling');
   SFX.hook();
 }
+// A surge is cued (ring, sound, jitter) SURGE_WARN seconds before it pulls, so a player can react and let go.
+const SURGE_WARN = 0.25;
 function reelUpdate(dt) {
   const r = G.reel;
   if (G.holding) {
     r.p += (dt * 0.3) / r.d;
-    r.T += dt * (0.4 + (r.surge > 0 ? 1.3 : 0)) * r.d;
+    r.T += dt * (0.4 + (r.surge > 0 && r.sAge > SURGE_WARN ? 1.3 : 0)) * r.d;
     r.tick -= dt;
     if (r.tick <= 0) { r.tick = 0.07; SFX.tick(); }
   } else { r.p -= dt * 0.05; r.T -= dt * 0.85; }
   if (!r.golden) {
     if (r.surge > 0) {
-      r.surge -= dt;
+      r.surge -= dt; r.sAge += dt;
       if (!G.holding) r.T += dt * 0.12 * r.d;
       G.bobDip = 0.05;
       if (Math.random() < dt * 14) splash(G.bob.x, G.bob.y, 1);
     } else {
       r.next -= dt;
-      if (r.next <= 0) { r.surge = 0.45 + Math.random() * 0.55; r.next = 0.8 + Math.random() * 1.6; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
+      if (r.next <= 0) { r.surge = 0.45 + Math.random() * 0.55 + SURGE_WARN; r.sAge = 0; r.next = 0.8 + Math.random() * 1.6; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
     }
   } else r.T = Math.min(r.T, 0.62);
   r.T = clamp(r.T, 0, 1.05); r.p = clamp(r.p, 0, 1);
@@ -2799,7 +2822,10 @@ function land() {
   G.bob = null;
   setPhase('landing');
 }
-function showCard(f) { thinkHide(); setPhase('card'); UI.card(f); SFX.caught(); }
+function showCard(f) { thinkHide(); setPhase('card'); G.cardReady = false; UI.card(f); SFX.caught(); }
+// The first half second of a card ignores taps (a reflex tap from the reel would close it unread); the
+// "Tap to continue" hint fades in once it can be closed.
+const CARD_GRACE = 0.5;
 function closeCard() { UI.cardHide(); afterCatch(); }
 // The fisherman's four act 0 lines (bible, Opening): the bait once the boat has arrived (BAIT_LINE), the
 // throwaway wish when the first cast lands (0), then one after each of the first two cards close (1, 2).
@@ -2808,8 +2834,8 @@ const OPENING_CAPS = { 0: 'Something interesting, for once.', 1: 'Look at that s
 function stillCaption() {
   if (STORY.act === 0) return 'The water goes very still.';
   if (STORY.act === 1) return STORY.kept ? 'The water goes very still. The fish in the boat does not.' : 'The water goes very still again.';
-  if (!STORY.kept) return 'The water goes very still. The lantern flame leans toward it.';
-  return swimming() ? 'The water goes very still. The flame leans toward the fish beside you.' : 'The water goes very still. The flame leans toward your feet.';
+  if (!STORY.kept) return 'The water goes very still. The flame leans toward it.';
+  return swimming() ? 'The water goes very still. The flame leans toward the fish.' : 'The water goes very still. The flame leans to your feet.';
 }
 // Kept, act 1: the cast after the second catch is a normal hook with a normal card, and when that card
 // closes the fish speaks from the boat (STORY.keptNext marks the wait; bible, Act 1).
@@ -2826,6 +2852,8 @@ function afterCatch() {
 }
 function fishUpdate(dt) {
   const ph = G.phase;
+  if (ph === 'card' && G.pt >= CARD_GRACE && !G.cardReady) { G.cardReady = true; UI.cardReady(); }
+  if (ph === 'ocean' && G.pt >= OCEAN_GRACE && G.pt - dt < OCEAN_GRACE) refreshPrompt();
   if (ph === 'ready' || ph === 'title' || ph === 'lost' || ph === 'card') {
     G.rodA = lerp(G.rodA, REST_A, Math.min(1, dt * 4));
     G.rodBend = lerp(G.rodBend, 0, Math.min(1, dt * 6));
@@ -2857,6 +2885,7 @@ function fishUpdate(dt) {
     if (w.nib.length && w.t >= w.nib[0]) { w.nib.shift(); G.bobDip = 0.16; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
     const glitter = STORY.goldenNext && !STORY.kept; // kept: no sparkles and no chime; the fish is in the boat
     if (glitter && Math.random() < dt * 6) sparkle(G.bob.x + (Math.random() - 0.5) * 10, G.bob.y - Math.random() * 4);
+    if (w.t >= w.bite && STORY.goldenNext && STORY.act === 2) { redSequence(); return; } // no bite: the line just goes taut
     if (w.t >= w.bite) {
       G.biteWin = STORY.goldenNext ? 3.2 : 0.95;
       setPhase('bite');
@@ -2923,22 +2952,25 @@ function companionHit(x, y) {
 function press() {
   SFX.init(); SFX.resume();
   const p = G.phase;
-  if (G.t < G.thinkUntil) { thinkHide(); return; } // a tap dismisses a bubble over play instead of acting
+  if (G.t < G.thinkUntil) { if (!thinkCold()) thinkHide(); return; } // a tap dismisses a bubble over play instead of acting
   if (p === 'title') startGame();
   else if (p === 'ready') { if (G.arrived) cast(); } // no cast until the boat has rowed in
-  else if (p === 'ocean') oceanCast();
+  else if (p === 'ocean') { if (G.pt >= OCEAN_GRACE) oceanCast(); }
   else if (p === 'waiting') lose(STORY.goldenNext ? 'Too early.' : 'Too early. Nothing was biting yet.');
   else if (p === 'bite') hook();
   else if (p === 'reeling') G.holding = true;
-  else if (p === 'card') closeCard();
+  else if (p === 'card') { if (G.pt >= CARD_GRACE) closeCard(); }
   else if (p === 'dialog') dlgTap();
 }
 function release() { G.holding = false; }
 
 // ---------------------------------------------------------------- test mode (temporary)
 // Skips the fishing minigame: one call lands the next fish, or triggers the golden
-// scene or the red sequence, exactly as a real catch would. Enable with ?test in the
+// scene or the red sequence, exactly as a real catch would. In the test build, enable with ?test in the
 // URL or the T key. The S key or the Skip button performs a skip.
+// TEST_BUILD gates the T and S keys, the Skip fish button and the ?test flag in the browser. It is false in
+// the shipping build; npm run build:test flips it (build.js). Node tools call setTestMode directly.
+const TEST_BUILD = false;
 let TEST = false;
 function setTestMode(on) {
   TEST = !!on;
@@ -2996,7 +3028,7 @@ function resetAll() {
   resetWS();
   Object.assign(STORY, freshStory());
   loadRun();
-  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkPending: [], arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 } });
+  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], arrived: true, open: null, eyesDone: false, act2Casts: 0, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 } });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
   OCEAN.shad.length = 0; OCEAN.big = null; OCEAN.tr0 = 0;
   cloudT = 0; genEyes();
@@ -3054,8 +3086,8 @@ function cloudPath(w, h, u) {
 }
 // Where each bubble sits, in internal pixels: its left edge, the y of its bottom edge, the x where the tail
 // leaves it, and which way the tail leans (-1 toward the fisherman's head, +1 toward the companion's).
-// The companion's question sits 6 px higher (yAsk) so its two buttons clear the fisherman's hat.
-const THINK_AT = { fisherman: { left: 122, y: 186, tail: 150, dir: -1 }, companion: { left: 100, y: 190, yAsk: 184, tail: 160, dir: 1 } };
+// The companion's question sits 18 px higher (yAsk) so its two 44 px buttons clear the fisherman's hat (y 218).
+const THINK_AT = { fisherman: { left: 122, y: 186, tail: 150, dir: -1 }, companion: { left: 100, y: 190, yAsk: 172, tail: 160, dir: 1 } };
 // The catch card's sprite scale: the largest integer factor that keeps the fish inside CARD_FISH_W of the
 // panel's width and CARD_FISH_H percent of the stage's width tall, between CARD_FISH_MIN and CARD_FISH_MAX,
 // so the species signatures read on a phone (bible, section 5).
@@ -3086,16 +3118,35 @@ function makeUI() {
     s.className = 'mark'; s.textContent = '?';
     node.appendChild(s);
   };
+  // New buttons are cold for CHOICE_GRACE seconds of game time: the tap that finished the line often comes
+  // twice, and the second must not pick an ending. The cold class blocks pointer events; the check in the
+  // click handler and the digit keys (choicesCold) covers the rest.
   const buttons = (box, list) => {
     box.innerHTML = '';
     box.hidden = !list;
+    box.classList.remove('cold');
     if (!list) return;
+    ui.choicesAt = G.t;
+    box.classList.add('cold');
     list.forEach(c => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'choice'; b.textContent = c.label;
-      b.addEventListener('click', ev => { ev.stopPropagation(); b.blur(); c.cb(); });
+      b.addEventListener('click', ev => { ev.stopPropagation(); b.blur(); if (!ui.choicesCold()) c.cb(); });
       box.appendChild(b);
     });
+  };
+  // On a short stage the buttons may not fit under the question at a comfortable size: when the question has
+  // to scroll to make room for them, four or more go into two columns.
+  const fitChoices = () => {
+    el.choices.classList.remove('grid');
+    if (el.choices.hidden || !el.choices.classList.contains('many')) return;
+    if (el.text.scrollHeight > el.text.clientHeight + 1 || el.dlg.scrollHeight > el.dlg.clientHeight + 1) el.choices.classList.add('grid');
+  };
+  let againTimer = null, cardSize = null;
+  const cardScale = () => {
+    if (!cardSize) return;
+    const sc = cardFishScale(cardSize.w, cardSize.h, el.stage.clientWidth, el.card.clientWidth);
+    el.cardFish.style.width = cardSize.w * sc + 'px'; el.cardFish.style.height = cardSize.h * sc + 'px';
   };
   const circle = (c, x, y, r) => { c.setAttribute('cx', x.toFixed(1)); c.setAttribute('cy', y.toFixed(1)); c.setAttribute('r', r.toFixed(1)); };
   // The bubble's place and outline from the live stage size: W is fixed, so x turns into a constant
@@ -3110,8 +3161,25 @@ function makeUI() {
     circle(el.thinkTail1, tx, h + 1.7 * u, 1.3 * u);
     circle(el.thinkTail2, tx + a.dir * 2.8 * u, h + 5.6 * u, 0.75 * u);
   };
-  return {
-    el, choices: null, thinkOwns: false, thinkSide: null,
+  const ui = {
+    el, choices: null, thinkOwns: false, thinkSide: null, choicesAt: -9,
+    choicesCold() { return G.t - this.choicesAt < CHOICE_GRACE; },
+    // Called every frame: warms the buttons once the grace has passed.
+    tick() {
+      if (this.choicesCold()) return;
+      el.choices.classList.remove('cold'); el.thinkChoices.classList.remove('cold');
+    },
+    thinkMore(on) { el.thinkMore.classList.toggle('on', !!on); },
+    cardReady() { el.card.classList.add('ready'); },
+    dlgBusy(on) { if (on) el.dlg.setAttribute('aria-busy', 'true'); else el.dlg.removeAttribute('aria-busy'); },
+    fitChoices,
+    // The dialogue panel never reaches the companion: its cap is the stage below his head (at his seat, or
+    // floating once the boat has sunk), less the panel's bottom margin (4u). Set on resize and with every menu.
+    dlgCap() {
+      const top = compY(boatSinkPx()) - 4;
+      el.stage.style.setProperty('--dlg-max', 'min(46%, calc(' + ((H - top) / H * 100).toFixed(2) + '% - var(--u) * 4))');
+    },
+    inDialog(t) { return !!(t && t.closest && t.closest('#dialog.on')); },
     // The thought bubble (bible, 4b): opts.side 'fisherman' (default) or 'companion', opts.who the tiny label,
     // opts.mark the wrong question mark, opts.choices buttons under it (the companion's question), opts.more
     // the ▾ marker in the lower right for a bubble that waits for a tap (every bubble does).
@@ -3145,14 +3213,15 @@ function makeUI() {
     count(n) { el.count.textContent = n > 0 ? (n === 1 ? '1 fish' : n + ' fish') : ''; },
     card(f) {
       const s = f.spr, cv = el.cardFish;
+      el.card.classList.remove('ready');
       cv.width = s.w + 2; cv.height = s.h + 2;
       const cx = cv.getContext('2d');
       const im = cx.createImageData(cv.width, cv.height);
       const o = new Uint32Array(im.data.buffer);
       for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) { const v = s.data[y * s.w + x]; if (v !== 255) o[(y + 1) * cv.width + x + 1] = PAL[v]; }
       cx.putImageData(im, 0, 0);
-      const sc = cardFishScale(cv.width, cv.height, el.stage.clientWidth, el.card.clientWidth);
-      cv.style.width = cv.width * sc + 'px'; cv.style.height = cv.height * sc + 'px';
+      cardSize = { w: cv.width, h: cv.height };
+      cardScale();
       el.cardName.textContent = f.name;
       el.cardMeta.textContent = f.weight.toFixed(2) + ' kg';
       el.cardDesc.textContent = f.desc;
@@ -3160,24 +3229,38 @@ function makeUI() {
       el.cardVoice.hidden = !f.voice;
       el.card.classList.add('on');
     },
-    cardHide() { el.card.classList.remove('on'); },
-    dlgShow(who, style) { el.dlg.className = 'panel on ' + (style || ''); el.who.textContent = who || ''; el.who.hidden = !who; el.more.classList.remove('on'); },
+    cardHide() { el.card.classList.remove('on', 'ready'); },
+    // After a resize or rotation, the open card's fish is rescaled to the new card.
+    cardRelayout() { if (el.card.classList.contains('on')) cardScale(); },
+    dlgShow(who, style) { el.dlg.className = 'panel on ' + (style || ''); el.who.textContent = who || ''; el.who.hidden = !who; el.more.classList.remove('on'); this.dlgBusy(true); },
     dlgText(t, mark) { setText(el.text, t, mark); },
     dlgChoices(list) {
       buttons(el.choices, list);
       this.choices = list; this.thinkOwns = false;
+      el.dlg.classList.toggle('choosing', !!list);
       if (list) el.choices.classList.toggle('many', list.length > 3);
+      this.dlgCap();
+      fitChoices();
     },
     dlgMore(on) { el.more.classList.toggle('on', !!on); },
-    dlgHide() { el.dlg.classList.remove('on'); el.choices.innerHTML = ''; el.choices.hidden = true; this.choices = null; },
+    dlgHide() { el.dlg.classList.remove('on', 'choosing'); el.dlg.removeAttribute('aria-busy'); el.choices.innerHTML = ''; el.choices.hidden = true; this.choices = null; },
     title(on, found) { el.title.classList.toggle('on', !!on); el.found.textContent = found ? 'Endings found: ' + found + ' of ' + ENDING_COUNT : ''; },
     ending(e, n) {
       el.endTitle.textContent = e.title; el.endText.textContent = e.text; el.endAsked.textContent = e.asked || '';
       el.endFound.textContent = 'Endings found: ' + n + ' of ' + ENDING_COUNT;
       el.ending.classList.add('on');
-      setTimeout(() => { try { el.again.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }, 60);
+      // Cast again wakes only once the card has faded in (AGAIN_DELAY), so a stray tap from the finale cannot
+      // restart before the ending is read; until then it is disabled and out of the tab order.
+      this.againOff();
+      againTimer = setTimeout(() => {
+        againTimer = null;
+        if (!el.ending.classList.contains('on')) return;
+        el.again.disabled = false; el.again.tabIndex = 0;
+        try { el.again.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+      }, AGAIN_DELAY);
     },
-    endingHide() { el.ending.classList.remove('on'); },
+    againOff() { clearTimeout(againTimer); againTimer = null; el.again.disabled = true; el.again.tabIndex = -1; },
+    endingHide() { el.ending.classList.remove('on'); this.againOff(); },
     fade(v, dur) { el.fade.style.transitionDuration = (dur || 0.6) + 's'; el.fade.style.opacity = v; },
     colors() {
       const s = document.documentElement.style;
@@ -3186,11 +3269,13 @@ function makeUI() {
       s.setProperty('--ui-edge', rgb(6));
       s.setProperty('--ui-ink', mixWhite(11, WS.mood > 1 ? 0.25 : 0.4));
       s.setProperty('--ui-dim', mixWhite(9, 0.2));
-      s.setProperty('--ui-accent', rgb(15));
+      s.setProperty('--ui-accent', WS.mood > 1 ? mixWhite(15, 0.45) : rgb(15)); // the ▾ and labels stay visible on the red panel
       document.body.style.background = rgb(0);
     },
   };
+  return ui;
 }
+const CHOICE_GRACE = 0.4, AGAIN_DELAY = 1600;
 function boot() {
   UI = makeUI();
   init();
@@ -3215,7 +3300,10 @@ function boot() {
     stage.style.width = sw + 'px'; stage.style.height = sh + 'px';
     document.documentElement.style.setProperty('--u', sw / 100 + 'px');
     document.getElementById('prompt').style.bottom = ((34 / H) * 100).toFixed(2) + '%';
+    UI.dlgCap();
     UI.thinkRelayout();
+    UI.fitChoices();
+    UI.cardRelayout();
   }
   window.addEventListener('resize', resize);
   resize();
@@ -3227,10 +3315,10 @@ function boot() {
     e.preventDefault();
     const r = stage.getBoundingClientRect(); // the stage is scaled uniformly, so internal pixels map by ratio
     const ix = (e.clientX - r.left) / Math.max(1, r.width) * W, iy = (e.clientY - r.top) / Math.max(1, r.height) * H;
-    if (companionHit(ix, iy)) companionTap(); else press();
+    if (!UI.inDialog(e.target) && companionHit(ix, iy)) companionTap(); else press();
   });
   window.addEventListener('pointerup', release);
-  const unlockAudio = () => { SFX.init(); SFX.resume(); };
+  const unlockAudio = e => { if (e && e.target && e.target.id === 'mute') return; SFX.init(); SFX.resume(); };
   ['pointerup', 'touchend', 'click', 'keydown'].forEach(t => window.addEventListener(t, unlockAudio, { passive: true }));
   window.addEventListener('pointercancel', release);
   window.addEventListener('blur', release);
@@ -3238,12 +3326,13 @@ function boot() {
   window.addEventListener('keydown', e => {
     if (e.repeat) return;
     if (/^Digit[1-6]$/.test(e.code) && UI.choices) {
+      if (UI.choicesCold()) return;
       const c = UI.choices[+e.code.slice(5) - 1];
       if (c) { e.preventDefault(); c.cb(); }
       return;
     }
-    if (e.code === 'KeyT') { setTestMode(!TEST); return; }
-    if (e.code === 'KeyS' && TEST) { testCatch(); return; }
+    if (TEST_BUILD && e.code === 'KeyT') { setTestMode(!TEST); return; }
+    if (TEST_BUILD && e.code === 'KeyS' && TEST) { testCatch(); return; }
     if (e.code === 'Space' || e.code === 'Enter') {
       if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
       e.preventDefault();
@@ -3257,15 +3346,17 @@ function boot() {
   });
   UI.el.mute.addEventListener('click', e => {
     e.stopPropagation();
-    SFX.init();
-    SFX.setMuted(!SFX.muted);
-    UI.el.mute.textContent = SFX.muted ? 'Sound off' : 'Sound on';
-    UI.el.mute.setAttribute('aria-pressed', SFX.muted ? 'true' : 'false');
+    SFX.setMuted(!SFX.muted); // before init, so a mute before the first tap starts the audio silent
+    SFX.init(); SFX.resume();
+    UI.el.mute.textContent = SFX.muted ? 'Unmute' : 'Mute'; // the label is the action
     UI.el.mute.blur();
   });
-  UI.el.again.addEventListener('click', e => { e.stopPropagation(); UI.el.again.blur(); restart(); });
-  UI.el.skip.addEventListener('click', e => { e.stopPropagation(); UI.el.skip.blur(); testCatch(); });
-  if (new URLSearchParams(window.location.search).has('test') || window.location.hash === '#test') setTestMode(true);
+  UI.el.again.addEventListener('click', e => { e.stopPropagation(); if (UI.el.again.disabled) return; UI.el.again.blur(); UI.againOff(); restart(); });
+  UI.againOff();
+  if (TEST_BUILD) {
+    UI.el.skip.addEventListener('click', e => { e.stopPropagation(); UI.el.skip.blur(); testCatch(); });
+    if (new URLSearchParams(window.location.search).has('test') || window.location.hash === '#test') setTestMode(true);
+  }
 
   let last = 0, lastMood = -1, lastDim = -1;
   function frame(ts) {
@@ -3274,6 +3365,7 @@ function boot() {
     last = now;
     dt = clamp(dt, 0, 0.1);
     update(dt);
+    UI.tick();
     render(G.t);
     ctx.putImageData(IMG, 0, 0);
     if (Math.abs(WS.mood - lastMood) > 0.004 || Math.abs(WS.dim - lastDim) > 0.05) { lastMood = WS.mood; lastDim = WS.dim; UI.colors(); }

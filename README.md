@@ -13,7 +13,7 @@ npm run build
 ```
 To work on it with Claude Code, run `claude` in this folder. `CLAUDE.md` explains how the engine works.
 
-While developing, open `dist/index.html?test` or press T in the game to turn on test mode. A "Skip fish" button then lands each fish with one click so you can reach any part of the story quickly.
+While developing, run `npm run build:test` and open `tools/out/test.html?test`, or press T in that build, to turn on test mode (the shipping `dist/index.html` has none). A "Skip fish" button then lands each fish with one click so you can reach any part of the story quickly.
 
 ## Publish on itch.io
 1. Run `npm run build`.

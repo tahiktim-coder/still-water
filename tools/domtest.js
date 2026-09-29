@@ -35,6 +35,8 @@ async function run(plan, label, useKeys) {
     if (frame % 3) continue;
     const choices = [...$('choices').querySelectorAll('button'), ...$('thinkChoices').querySelectorAll('button')]; // the companion's question sits under his bubble
     const prompt = $('prompt').textContent;
+    const cold = $('choices').classList.contains('cold') || $('thinkChoices').classList.contains('cold'); // fresh buttons ignore taps briefly
+    if (choices.length && cold) continue;
     if (choices.length) {
       const k = plan[ci++] || 0;
       trace.push(choices[k].textContent);
@@ -52,6 +54,9 @@ async function run(plan, label, useKeys) {
   $('mute').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
   console.log('mute label after click:', $('mute').textContent);
   await run([0, 0, 0, 0, 0, 2], 'mouse, company+forever, yes -> cut', false);
+  console.log('Cast again disabled at the ending:', $('again').disabled);
+  await new Promise(r => setTimeout(r, 1700)); // Cast again wakes 1.6 s after the card
+  console.log('Cast again disabled after 1.7 s:', $('again').disabled);
   $('again').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
   await new Promise(r => setTimeout(r, 800));
   pump(5);

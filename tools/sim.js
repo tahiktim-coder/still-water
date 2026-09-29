@@ -14,7 +14,10 @@ function play(plan, label, opts) {
   g.resetAll();
   const UI = g.UI;
   UI.log.length = 0;
-  let t = 0, ci = 0, lastAct = 0, holding = false, frames = 0, lastLine = null, stalled = '', tapped = -1, keptMax = 0;
+  let t = 0, ci = 0, lastAct = 0, holding = false, frames = 0, lastLine = null, stalled = '', tapped = -1, keptMax = 0, snaps = 0;
+  // The reel bot sees the line REACT seconds late, like a person: it lets go when it sees a surge (or the
+  // tension high) and holds again once it sees the surge over and the tension low. A snap costs a recast.
+  const REACT = 0.35, seen = [];
   // Phase 17: after the forever wish a ring in flight still spreads (only the jump spawn is frozen), so on a
   // forever plan some ring's radius must be seen growing while WS.frozen is 1.
   let ringGrew = false, ringSeen = null;
@@ -46,10 +49,21 @@ function play(plan, label, opts) {
       }
     }
     if (p === 'reeling' && g.G.reel) {
-      if (holding && g.G.reel.T > 0.7) { g.release(); holding = false; }
-      else if (!holding && g.G.reel.T < 0.3) { g.press(); holding = true; }
-    } else if (holding && p !== 'reeling') { g.release(); holding = false; }
+      const r = g.G.reel;
+      seen.push({ t, T: r.T, surge: r.surge > 0 });
+      while (seen.length > 1 && seen[1].t <= t - REACT) seen.shift();
+      const v = seen[0].t <= t - REACT ? seen[0] : null; // nothing seen yet in the first REACT seconds
+      if (v) {
+        if (holding && (v.surge || v.T > 0.7)) { g.release(); holding = false; }
+        else if (!holding && !v.surge && v.T < 0.3) { g.press(); holding = true; }
+      }
+    } else {
+      seen.length = 0;
+      if (holding && p !== 'reeling') { g.release(); holding = false; }
+    }
+    const wasReel = p === 'reeling';
     g.update(dt);
+    if (wasReel && g.phase === 'lost' && !g.G.reel) snaps++;
     if (g.WS.frozen && !ringGrew) {
       const r = g.RINGS[0];
       if (r && ringSeen && ringSeen.ring === r && r.r > ringSeen.r) ringGrew = true;
@@ -64,7 +78,7 @@ function play(plan, label, opts) {
   const cards = UI.log.filter(l => l[0] === 'card').map(l => l[1].name + ': ' + l[1].desc + (l[1].voice ? ' ' + l[1].voice : ''));
   const card = (UI.log.filter(l => l[0] === 'ending').map(l => l[1]))[0];
   const S = g.STORY;
-  console.log(`[${label}] phase=${g.phase} t=${t.toFixed(1)}s catches=${S.catches} wishes=${S.wishes.join(',')} kept=${S.kept} firstAsk=${S.firstAsk} refused=${S.refused} answered=${S.answered} ocean=${S.ocean} ending=${card ? card.title + (card.variant ? ' (' + card.variant + ')' : '') : stalled}`);
+  console.log(`[${label}] phase=${g.phase} t=${t.toFixed(1)}s snaps=${snaps} catches=${S.catches} wishes=${S.wishes.join(',')} kept=${S.kept} firstAsk=${S.firstAsk} refused=${S.refused} answered=${S.answered} ocean=${S.ocean} ending=${card ? card.title + (card.variant ? ' (' + card.variant + ')' : '') : stalled}`);
   console.log('   ' + trace.join(' | '));
   console.log('   lines: ' + lines.join(' / '));
   console.log('   captions: ' + caps.join(' / '));
@@ -84,7 +98,7 @@ function play(plan, label, opts) {
   for (const s of opts.says || []) if (!said.some(x => x.indexOf(s) >= 0)) { ok = false; console.log('   missing line or caption: ' + s); }
   for (const s of opts.saysNot || []) if (said.some(x => x.indexOf(s) >= 0)) { ok = false; console.log('   unexpected line or caption: ' + s); }
   if (S.wishes.indexOf('forever') >= 0 && !ringGrew) { ok = false; console.log('   no ring grew while frozen'); }
-  return { ok, id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '', asked: card ? card.asked : '' };
+  return { ok, snaps, t, id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '', asked: card ? card.asked : '' };
 }
 // Phase 16: the ending card's base is one of the bible's twenty situations (ending x lake/sea x boat/sunk, and
 // for Still water at sea x heard). A plan's options may carry { base: n } to assert the card starts with that
@@ -141,8 +155,8 @@ const plans = [
   // the ending card carries the kept sentence where nothing outranks it.
   [[1, 3, 0, 2], 'keep, nothing, forever -> cut (the fish over the side)', 'You lifted it over the side. It let you. ' + BAIT_END, { base: 9 }],
   [[1, 2, 1, 0], 'keep, home, hear -> home', 'The golden fish slips out of the boat as you go in.', { base: 1 }],
-  [[1, 3, 3, 3], 'keep, nothing, nothing, nothing -> silent (kept)', 'You lifted it over the side. It let you. ' + BAIT_END, { base: 19 }],
-  [[1, 2, 2, 1], 'keep, home, gold -> dark (lake, sunk)', 'The golden fish circles you all night, glowing less each time.', { base: 6, says: ['The water goes very still. The flame leans toward the fish beside you.', 'Don’t leave me out here.'] }],
+  [[1, 3, 3, 3], 'keep, nothing, nothing, nothing -> silent (kept)', 'It went over the side on its own. You let it. ' + BAIT_END, { base: 19, says: ['It waits. Then it goes dark in the bottom of the boat.'] }],
+  [[1, 2, 2, 1], 'keep, home, gold -> dark (lake, sunk)', 'The golden fish circles you all night, glowing less each time.', { base: 6, says: ['The water goes very still. The flame leans toward the fish.', 'Don’t leave me out here.'] }],
   // Phase 6, the gold sink and Deep: gold at wish 2 sinks the boat; 'Let me get my gold' sits after Cut the
   // line (no Stay) or after Stay with them.
   [[0, 2, 2, 3], 'let go, home, gold -> deep', 'and there is no bottom.', { base: 17 }],
@@ -162,11 +176,12 @@ const plans = [
   [[0, 0, 0, 2, 0, 2], 'let go, company (someone), gold, yes -> cut (lake, sunk, company)', 'Someone swims behind you. You do not ask.', { base: 10, noPocket: true }],
   [[0, 0, 0, 2, 0, 0], 'let go, company (someone), gold, yes -> home (lake, sunk, company)', 'The water behind you is empty now. It was your turn.', { base: 2 }],
 ];
-let ok = true;
+let ok = true, snapsAll = 0, tAll = 0;
 const seen = {};
 for (const [plan, label, cardEnd, opts] of plans) {
   const r = play(plan, label, opts);
   ok = ok && r.ok;
+  snapsAll += r.snaps; tAll += r.t;
   if (cardEnd && !r.text.endsWith(cardEnd)) { ok = false; console.log('   card should end with: ' + cardEnd); }
   if (opts && opts.has && r.text.indexOf(opts.has) < 0) { ok = false; console.log('   card should contain: ' + opts.has); }
   if (opts && opts.base && !r.text.startsWith(BASES[opts.base])) { ok = false; console.log('   card should start with situation ' + opts.base + ': ' + BASES[opts.base]); }
@@ -177,6 +192,7 @@ for (const [plan, label, cardEnd, opts] of plans) {
 // all six ids must have been seen.
 const need = ['home', 'dark', 'cut', 'stay', 'deep', 'swallowed', 'cut:silent'];
 for (const id of need) console.log('ending ' + id.padEnd(11) + (seen[id] ? 'reached' : 'MISSING'));
+console.log('reel with a ' + 0.35 + ' s reaction: ' + snapsAll + ' snaps over ' + plans.length + ' runs (' + (snapsAll / plans.length).toFixed(2) + ' a run), mean run ' + (tAll / plans.length / 60).toFixed(2) + ' min');
 const missing = need.filter(id => !seen[id]);
 if (missing.length) ok = false;
 console.log(ok ? 'ALL ENDINGS REACHED' : 'SOMETHING STALLED');
