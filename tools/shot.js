@@ -66,13 +66,10 @@ if (which === 'all' || which === 'bait') shot('out_bait.png', (ws, G) => { g.set
 if (which === 'all' || which === 'bait_fly') shot('out_bait_fly.png', (ws, G) => { g.setPhase('casting'); G.cast = { t: 0.55, tx: 70, ty: 280, from: null }; }, 3.3);
 if (which === 'all' || which === 'ocean_mid') shot('out_ocean_mid.png', (ws) => { ws.far = 0.6; ws.sea = 0.6; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.a = 1; s.x = 20 + k * 26; s.y = g.HY + 30 + ((k * 37) % 90); } }, 6);
 // Phase 22: the shoal alone after the pull-back, before the big one; the big one settled under the speck with
-// the landing marker pulsing on its back; Swallowed mid whirlpool (the speck on the spiral); the eye open.
+// the landing marker pulsing on its back.
 const step = secs => { for (let i = 0; i < secs * 30; i++) g.update(1 / 30); };
 if (which === 'all' || which === 'ocean_shoal') shot('out_ocean_shoal.png', () => { g.playCine(g.CINE_OCEAN); step(8.5); }, 8.5);
 if (which === 'all' || which === 'ocean_marker') shot('out_ocean_marker.png', (ws, G) => { ocean(ws); G.pt = 2.2; }, 6);
-const swallowAt = secs => (ws, G) => { ocean(ws); G.pt = 2; G.tip = { x: g.W / 2, y: g.WL - 2 }; g.oceanCast(); step(secs); };
-if (which === 'all' || which === 'swallow_spin') shot('out_swallow_spin.png', swallowAt(3.3), 9);
-if (which === 'all' || which === 'swallow_eye') shot('out_swallow_eye.png', swallowAt(7.4), 12);
 // Phase 14, Stay: the companion standing at his seat under the red sun, the eye snapped toward him, the line
 // still taut, before the leap.
 const redSky = ws => { ws.mood = 2; ws.sunKind = 1; ws.sunR = 16; ws.sunY = 178; ws.sunGlow = 1.25; ws.horizGlow = 1.3; ws.pupil = 1; ws.stalk = 1; ws.ash = 1; ws.lantern = 1; ws.troubled = 0.55; };
@@ -147,27 +144,44 @@ if (which === 'all' || which === 'deep_glint') shot('out_deep_glint.png', (ws, G
 // Phase 24, the zoom the player can follow: eight frames across the pull-back (far 0 to 1, the mountains
 // sinking in step), tiled four across into one contact sheet, each settled 1.6 s so a tracking ring is out;
 // the same for the swimmer (a sunk run at sea).
-const ZOOM_FARS = [0, 0.14, 0.28, 0.43, 0.57, 0.71, 0.86, 1], ZOOM_COLS = 4, ZOOM_SC = 2;
-function zoomStrip(name, swim) {
-  const H = g.H, rows = Math.ceil(ZOOM_FARS.length / ZOOM_COLS);
-  const png = new PNG({ width: W * ZOOM_SC * ZOOM_COLS, height: H * ZOOM_SC * rows });
-  ZOOM_FARS.forEach((f, k) => {
+const ZOOM_FARS = [0, 0.14, 0.28, 0.43, 0.57, 0.71, 0.86, 1], STRIP_COLS = 4, STRIP_SC = 2;
+// A contact sheet: one frame per entry, set up by frame(entry) after a reset, tiled four across at 2x.
+function strip(name, entries, frame) {
+  const H = g.H, rows = Math.ceil(entries.length / STRIP_COLS);
+  const png = new PNG({ width: W * STRIP_SC * STRIP_COLS, height: H * STRIP_SC * rows });
+  entries.forEach((e, k) => {
     g.resetAll();
     const out = save();
+    g.render(frame(e));
+    const ox = (k % STRIP_COLS) * W * STRIP_SC, oy = Math.floor(k / STRIP_COLS) * H * STRIP_SC;
+    for (let y = 0; y < H * STRIP_SC; y++) for (let x = 0; x < W * STRIP_SC; x++) {
+      const p = out[Math.floor(y / STRIP_SC) * W + Math.floor(x / STRIP_SC)], i = ((oy + y) * png.width + ox + x) * 4;
+      png.data[i] = p & 255; png.data[i + 1] = (p >>> 8) & 255; png.data[i + 2] = (p >>> 16) & 255; png.data[i + 3] = 255;
+    }
+  });
+  fs.writeFileSync(path.join(OUT_DIR, name), PNG.sync.write(png));
+}
+function zoomFrame(swim) {
+  return f => {
     const ws = g.WS;
     ws.sea = f; ws.troubled = 0.15; g.setPhase('cine');
     if (swim) { ws.gold = 1; ws.boatSunk = 1; }
     ws.far = f;
     for (let i = 0; i < 96; i++) g.update(1 / 60); // 1.6 s: the first ring is out and spreading
     ws.far = f;
-    g.render(6);
-    const ox = (k % ZOOM_COLS) * W * ZOOM_SC, oy = Math.floor(k / ZOOM_COLS) * H * ZOOM_SC;
-    for (let y = 0; y < H * ZOOM_SC; y++) for (let x = 0; x < W * ZOOM_SC; x++) {
-      const p = out[Math.floor(y / ZOOM_SC) * W + Math.floor(x / ZOOM_SC)], i = ((oy + y) * png.width + ox + x) * 4;
-      png.data[i] = p & 255; png.data[i + 1] = (p >>> 8) & 255; png.data[i + 2] = (p >>> 16) & 255; png.data[i + 3] = 255;
-    }
-  });
-  fs.writeFileSync(path.join(OUT_DIR, name), PNG.sync.write(png));
+    return 6;
+  };
 }
-if (which === 'all' || which === 'zoom_strip') zoomStrip('out_zoom_strip.png', false);
-if (which === 'all' || which === 'zoom_swim_strip') zoomStrip('out_zoom_swim_strip.png', true);
+if (which === 'all' || which === 'zoom_strip') strip('out_zoom_strip.png', ZOOM_FARS, zoomFrame(false));
+if (which === 'all' || which === 'zoom_swim_strip') strip('out_zoom_swim_strip.png', ZOOM_FARS, zoomFrame(true));
+// Phase 25, Swallowed as one lunge: eight frames from the cast into the big one (seconds into the cinematic):
+// the head rising round the speck, the mouth open with the speck on its lip, the speck and the sheet tipping
+// in, the mouth closing, the head sinking, the splash, the shadow swimming away, the empty sea.
+const LUNGE_TS = [1.9, 2.85, 3.5, 4.15, 5.35, 5.95, 8.1, 10.2];
+function lungeFrame(secs) {
+  ocean(g.WS); g.G.pt = 2; g.G.tip = { x: g.W / 2, y: g.WL - 2 };
+  g.oceanCast();
+  for (let i = 0; i < Math.round(secs * 60); i++) g.update(1 / 60);
+  return 6 + secs;
+}
+if (which === 'all' || which === 'lunge_strip') strip('out_lunge_strip.png', LUNGE_TS, lungeFrame);
