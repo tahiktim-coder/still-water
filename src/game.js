@@ -69,10 +69,12 @@ const RAMP = {
 };
 // 12 bobber, 13-16 gold ramp, 17 lantern, 18 fish eye, 19 black, 20 star, 21 red eyes, 22-23 bone, 24 eye glint
 const ACC = {
-  day: ['#e2483a', '#5c3a08', '#a86f12', '#e2aa2a', '#ffe27c', '#ffd27a', '#1a0c02', '#000000', '#ffffff', '#ff3322', '#eee4d2', '#a89a86', '#7d1a12'].map(hexc),
-  night: ['#e0503f', '#3e2a0a', '#7c5614', '#c2902c', '#f2d47c', '#ffc766', '#1a0c02', '#000000', '#e8eeff', '#ff3322', '#c9c6d2', '#7c7a8c', '#7d1a12'].map(hexc),
-  blood: ['#ffe4cc', '#1e0203', '#5e0808', '#a8140e', '#ff4a22', '#ff3b1f', '#ff2a14', '#000000', '#ffc6a8', '#ff3322', '#f4c9ab', '#a8584a', '#7d1a12'].map(hexc),
+  day: ['#e2483a', '#5c3a08', '#a86f12', '#e2aa2a', '#ffe27c', '#ffd27a', '#1a0c02', '#000000', '#ffffff', '#ff3322', '#eee4d2', '#a89a86', '#7d1a12', '#27451f'].map(hexc),
+  night: ['#e0503f', '#3e2a0a', '#7c5614', '#c2902c', '#f2d47c', '#ffc766', '#1a0c02', '#000000', '#e8eeff', '#ff3322', '#c9c6d2', '#7c7a8c', '#7d1a12', '#18291c'].map(hexc),
+  blood: ['#ffe4cc', '#1e0203', '#5e0808', '#a8140e', '#ff4a22', '#ff3b1f', '#ff2a14', '#000000', '#ffc6a8', '#ff3322', '#f4c9ab', '#a8584a', '#7d1a12', '#2a1a0c'].map(hexc),
 };
+// 25 is the new shore's dark green (phase 21), the only green in the game.
+const SHORE_GREEN = 25;
 const PAL = new Uint32Array(32);
 const PALRGB = new Float32Array(32 * 3);
 function setPal(i, r, g, b) {
@@ -321,6 +323,45 @@ function starPass(rng, n, behind) {
   }
 }
 function genStars() { starPass(mulberry32(99), 70, false); starPass(mulberry32(98), 30, true); }
+// The shore nobody from home has seen (bible, Still water at sea with the fish heard): low, wide and flat,
+// nothing like the fjord, long flat headlands with open water between them (under the sun), one rising to a tall cliff,
+// and a thin dark line of green (SHORE_GREEN) where it meets the sea. Heights above the horizon from its own
+// seed, built once into NEWSHORE (NS_H rows above HY); drawNewShore blends it into TOP, so it reflects.
+const NS_H = 26, NS_Y0 = HY - NS_H, NEWSHORE = new Uint8Array(W * NS_H).fill(255);
+const NS_PTS = [[-2, -1], [3, 3], [12, 6], [30, 7], [40, 8], [47, 12], [53, 12], [58, 15], [64, 15], [68, 19], [72, 20], [73, 18], [74, 5], [76, -1],
+  [80, -1], [82, 4], [85, 3], [87, -1], [113, -1], [118, 4], [128, 6], [160, 7], [184, 6], [196, 3], [203, -1], [218, -1]];
+function newShorePix(x, y, top) {
+  if (y === HY - 1 || (y === HY - 2 && hash2(x, y, 5) < 0.5)) return SHORE_GREEN; // the green line at the water
+  const n = fbm(x * 0.22, y * 0.3, 77, 2), lit = y - top < 1 ? 1.6 : 0; // the dawn catches the top edge
+  return ci(dith(3.2 + (n - 0.5) * 1.4 + lit + (y - top) * 0.05, x, y));
+}
+function genNewShore() {
+  const r = genRidge(NS_PTS, 0.16, 71);
+  for (let i = 0; i < r.ys.length; i++) {
+    const x = r.x0 + i, h = r.ys[i];
+    if (x < 0 || x >= W || h < 0.8) continue;
+    const top = HY - Math.min(NS_H, Math.round(h));
+    for (let y = top; y < HY; y++) NEWSHORE[(y - NS_Y0) * W + x] = newShorePix(x, y, top);
+  }
+}
+// It rises out of the horizon haze: row y samples the source row that far above the horizon scaled by
+// 1 / newShore, and blends toward the sky behind it by newShore. Only its own NS_H rows are touched.
+function drawNewShore() {
+  const a = WS.newShore;
+  if (a <= 0) return;
+  const inv = 1 / Math.max(0.05, a);
+  for (let y = NS_Y0; y < HY; y++) {
+    const ys = HY - Math.round((HY - y) * inv);
+    if (ys < NS_Y0) continue;
+    const src = (ys - NS_Y0) * W, row = y * W;
+    for (let x = 0; x < W; x++) {
+      const m = NEWSHORE[src + x];
+      if (m === 255) continue;
+      const i = row + x, v = TOP[i] > 11 ? 11 : TOP[i];
+      TOP[i] = m > 11 ? (hash2(x, y, 13) < a ? m : v) : ci(dith(v + (m - v) * a, x, y));
+    }
+  }
+}
 
 // ---------------------------------------------------------------- sprites
 const CH = { '.': 255, '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, a: 10, b: 11, R: 12, d: 13, g: 14, y: 15, w: 16, L: 17, E: 18, K: 19, S: 20, X: 21 };
@@ -572,7 +613,12 @@ let BOAT, GOLD, GOLD_OPEN;
 // pole flattened to index 0, then downscaled by 2 and 4 with nearest-neighbour cells (a cell is dark if any
 // source pixel in it is, so the thin hull lines and the prow curl survive), and a 5 by 2 speck. Each keeps a
 // waterline row wl for the reflecting stamp.
-let BOAT_FAR2, BOAT_FAR4, BOAT_SPECK;
+let BOAT_FAR2, BOAT_FAR4, BOAT_SPECK, SWIM_FAR2, SWIM_FAR4, SWIM_SPECK;
+// The swimmer's far silhouettes (a sunk run at sea, Still water): his head and shoulders above the water with
+// the floating lantern beside him, shrunk the same way, and a 2 by 1 speck. SWIM_OFF is its centre's offset
+// from the boat's centre at full size, so the swap past far 0.5 does not jump.
+const SWIM_LX = 6, SWIM_FX = 18;
+let SWIM_OFF = 0;
 function shrink(s, k) {
   const w = Math.ceil(s.w / k), h = Math.ceil(s.h / k);
   const data = new Uint8Array(w * h).fill(255);
@@ -588,7 +634,21 @@ function boatSilhouette() {
   for (let y = BOAT.wl - 25; y < BOAT.wl - 21; y++) for (let x = 6; x < 9; x++) data[y * w + x] = 0;
   return { w, h, data, wl: BOAT.wl };
 }
+function swimmerSilhouette() {
+  const w = SWIM_FX - SWIM_LX + FISHER.w, h = FISHER_FLOAT, data = new Uint8Array(w * h).fill(255);
+  for (let y = 0; y < h; y++) for (let x = 0; x < FISHER.w; x++) if (FISHER.data[y * FISHER.w + x] !== 255) data[y * w + SWIM_FX - SWIM_LX + x] = 0;
+  for (let y = h - 3; y < h; y++) for (let x = 0; x < 3; x++) data[y * w + x] = 0; // the lantern afloat
+  return { w, h, data, wl: h };
+}
+function buildFarSwimmer() {
+  const full = swimmerSilhouette();
+  SWIM_FAR2 = shrink(full, 2);
+  SWIM_FAR4 = shrink(full, 4);
+  SWIM_SPECK = sprite(['00']); SWIM_SPECK.wl = 1;
+  SWIM_OFF = SWIM_LX + full.w / 2 - BOAT.w / 2;
+}
 function buildFarBoats() {
+  buildFarSwimmer();
   const full = boatSilhouette();
   BOAT_FAR2 = shrink(full, 2);
   BOAT_FAR4 = shrink(full, 4);
@@ -809,6 +869,10 @@ function resetWS() {
     // glint is the gold pile's two-frame sparkle seen from beneath.
     dive: 0, glint: 0,
     shoalOut: 0, // the still-water dawn: the shoal steers to the horizon at full weight and leaves as it arrives
+    // Phase 21, the Still water pictures: newShore the far coastline rising (sea, heard), farDrift the speck's
+    // slow drift from the centre once the camera has pulled back (sea, not heard), goldBelow the one glint
+    // under the swimmer when he wakes in the water again (lake, sunk).
+    newShore: 0, farDrift: 0, goldBelow: 0,
   });
 }
 const G = {
@@ -1089,6 +1153,7 @@ function topExtras(t) {
   const bt = WS.frozen ? G.frozeT : t; // frozen, the wings hold too
   if (!birdsHidden()) for (const b of BIRDS) stampTop(BIRD[((bt * 5 + b.ph) | 0) & 1], b.x | 0, b.y | 0);
   // The building fades with the mountains; its window goes dark on its own (cabinLit, the still-water dawn).
+  drawNewShore();
   if (WS.cabin > 0 && !seaGone()) stampTop(WS.cabinLit < 0.5 ? CABIN_DARK : CABIN, CABIN_X, CABIN_Y, WS.cabin * (1 - WS.sea));
   // The far boat reflects for free, and stays through the opening's dip to black (it leaves behind full black).
   if (WS.farBoat > 0 && (G.phase === 'title' || (G.open && G.open.stage === 0))) stampTop(FARBOAT, FAR_X, HY - FARBOAT.h);
@@ -1254,32 +1319,38 @@ function drawSwallow(t) {
   }
   swallowTeeth(r, cx, cy, ry);
 }
-// Small bone teeth (22 lit, 23 shade) around the opening: a row hanging from the horizon where the circle
-// meets it, and a row rising from its lower arc, each pointing into the dark. They grow with the circle.
-const SWALLOW_LIP = 7, SWALLOW_TOOTH_GAP = 10;
-function swallowTooth(x, y, hb, len, dir) {
+// Bone teeth (22 lit, 23 shade) inside the opening: a sparse row hanging from the horizon and another rising
+// from the lower arc, each rooted TOOTH_SET px in from the lip, spaced unevenly, each its own length and width,
+// curving toward the middle of the mouth, so it reads as a mouth opening and not a grin. They grow with it.
+const SWALLOW_LIP = 7, SWALLOW_TOOTH_GAP = 20, TOOTH_SET = 4;
+function swallowTooth(x, y, hb, len, dir, lean) {
   for (let k = 0; k < len; k++) {
-    const yy = y + dir * k, half = Math.round(hb * (1 - k / len));
+    const yy = y + dir * k, q = k / len, half = Math.round(hb * (1 - q)), xs = x + Math.round(lean * q * q * len * 0.45);
     if (yy <= HY || yy >= H) continue;
     for (let dx = -half; dx <= half; dx++) {
-      const xx = x + dx;
+      const xx = xs + dx;
       if (xx >= 0 && xx < W) FRAME[yy * W + xx] = dx < 0 || (dx === 0 && k === len - 1) ? 22 : 23;
     }
   }
 }
-const toothJag = k => (hash2(k, 5, 3) > 0.6 ? 1 : hash2(k, 9, 3) > 0.7 ? -1 : 0); // not every tooth the same
+// One tooth's own size from its index: 0.55 to 1.35 of the base length, some of them wider.
+function toothAt(k, x, y, dir, r, cx) {
+  const h = hash2(k, 17, 7), base = clamp(r / 16, 2, 6);
+  const len = Math.max(2, Math.round(base * (0.55 + 0.8 * h))), hb = r < 50 ? 1 : h > 0.55 ? 2 : 1;
+  swallowTooth(x, y, hb, len, dir, Math.sign(cx - x));
+}
+const toothStep = k => SWALLOW_TOOTH_GAP * (0.6 + 0.8 * hash2(k, 3, 11)); // uneven spacing
 function swallowTeeth(r, cx, cy, ry) {
   if (r < 14) return;
-  const hb = r < 50 ? 1 : 2, len = Math.round(clamp(r / 16, 2, 6));
-  const top = HY + 1, dyTop = (top - cy) / ry; // where the circle meets the horizon
+  const top = HY + 1 + Math.round(TOOTH_SET / 2), dyTop = (top - cy) / ry; // under the horizon lip
   if (Math.abs(dyTop) < 1) {
-    const half = r * Math.sqrt(1 - dyTop * dyTop) - 3;
-    for (let x = Math.ceil((cx - half) / SWALLOW_TOOTH_GAP) * SWALLOW_TOOTH_GAP; x <= cx + half; x += SWALLOW_TOOTH_GAP) swallowTooth(x, top, hb, len + toothJag(x), 1);
+    const half = r * Math.sqrt(1 - dyTop * dyTop) - TOOTH_SET * 3;
+    for (let x = cx - half + toothStep(0) * 0.5, k = 1; x <= cx + half; x += toothStep(k), k++) toothAt(k, Math.round(x), top, 1, r, cx);
   }
-  const n = Math.floor((Math.PI * r) / SWALLOW_TOOTH_GAP);
-  for (let k = 1; k < n; k++) {
-    const a = (k / n) * Math.PI, x = Math.round(cx + Math.cos(a) * (r - 1.5)), y = Math.round(cy + Math.sin(a) * (ry - 1));
-    if (y > top + len + 1) swallowTooth(x, y, hb, len + toothJag(k), -1);
+  const arc = Math.PI * r, rr = r - TOOTH_SET, ryy = ry - TOOTH_SET * 0.6;
+  for (let d = toothStep(50) * 0.5, k = 51; d < arc; d += toothStep(k), k++) {
+    const an = (d / arc) * Math.PI, x = Math.round(cx + Math.cos(an) * rr), y = Math.round(cy + Math.sin(an) * ryy);
+    if (y > top + 8) toothAt(k, x, y, -1, r, cx);
   }
 }
 // The eyes in the water (bible, section 8): about eight pairs of red pixels on the surface rows under
@@ -1356,12 +1427,16 @@ function drawRod(hx, hy, wl) {
 }
 // While far > 0 the boat's centre slides toward the middle of the screen; past 0.5 it is a silhouette
 // (half, quarter, then a speck) with the rod, line, float and lantern hidden (bible, Ocean).
-const boatCentreX = far => lerp(BOAT_X + WS.boatX + BOAT.w / 2, W / 2, far);
-function farBoatSprite(far) { return far <= 0.75 ? BOAT_FAR2 : far <= 0.92 ? BOAT_FAR4 : BOAT_SPECK; }
+const boatCentreX = far => lerp(BOAT_X + WS.boatX + BOAT.w / 2, W / 2 + WS.farDrift, far);
+function farBoatSprite(far) {
+  if (swimming()) return far <= 0.75 ? SWIM_FAR2 : far <= 0.92 ? SWIM_FAR4 : SWIM_SPECK;
+  return far <= 0.75 ? BOAT_FAR2 : far <= 0.92 ? BOAT_FAR4 : BOAT_SPECK;
+}
 // Over the Swallowed circle, and falling into it, it is drawn in front of the dark, unmasked, with a pale rim.
 function drawFarBoat(t, far) {
   const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2), dy = bob + Math.round(WS.boatDrop);
-  const s = farBoatSprite(far), x0 = Math.round(boatCentreX(far) - s.w / 2), y0 = WL - s.wl + dy;
+  const s = farBoatSprite(far), off = swimming() ? SWIM_OFF * (1 - far) : 0;
+  const x0 = Math.round(boatCentreX(far) + off - s.w / 2), y0 = WL - s.wl + dy;
   if (WS.swallow > 0.5) { stamp(s, x0, y0); rimBox(x0 - 1, y0 - 1, s.w + 2, s.h + 2); } else stampR(s, x0, y0, WL);
   G.tip = { x: x0 + s.w / 2, y: y0 }; // a cast from out here leaves from the silhouette itself
 }
@@ -1443,16 +1518,17 @@ function drawSwimmerBeneath() {
   if (STORY.kept && WS.goldKept > 0.01) stampBeneath(KEPT, bx + KEPT_DX, hy, KEPT.h);
   drawDeepGold(G.t, bx + 34, hy + 70);
 }
-// From night on the people are dark on a dark shore, so each gets a 1 px rim of RIM_IDX on its left edge,
-// the side the lantern is on. The rimmed copy is made once per sprite and kept on it.
-const RIM_IDX = 5, RIM_MOOD = 0.999;
+// From night on the people are dark on a dark shore, so each gets a 1 px rim on its left edge, the side the
+// lantern is on, in the ochre accent RIM_WARM: the lantern's light at low strength, warm against the blue
+// mountain (a ramp index read as part of the rock). The rimmed copy is made once per sprite and kept on it.
+const RIM_WARM = 14, RIM_MOOD = 0.999;
 function lanternRim(s) {
   if (WS.mood < RIM_MOOD) return s;
   if (!s.rim) {
     const d = s.data.slice();
     for (let j = 0; j < s.h; j++) for (let i = 0; i < s.w; i++) {
       const k = j * s.w + i;
-      if (s.data[k] !== 255 && (i === 0 || s.data[k - 1] === 255)) d[k] = RIM_IDX;
+      if (s.data[k] !== 255 && (i === 0 || s.data[k - 1] === 255)) d[k] = RIM_WARM;
     }
     s.rim = { w: s.w, h: s.h, data: d, wl: s.wl };
   }
@@ -1477,6 +1553,15 @@ function drawBoatGroup(t) {
   drawKeptFish(t, bx, dy);
   if (WS.companion > 0) drawCompanion(t, bx, dy);
   drawFisherman(t, bx, dy);
+  if (WS.goldBelow > 0) drawGoldBelow(t, bx);
+}
+// Lake, sunk, Still water: he wakes in the water again above the gold, one glint a few rows under him.
+const GOLD_BELOW_DX = 22, GOLD_BELOW_DY = 30;
+function drawGoldBelow(t, bx) {
+  const x = bx + GOLD_BELOW_DX, y = WL + GOLD_BELOW_DY, on = ((t * 3) | 0) % 3 !== 0;
+  plot(x, y, 16);
+  if (on) { plot(x - 1, y, 14); plot(x + 1, y, 14); plot(x, y - 1, 12); }
+  G.goldBelow = { x, y };
 }
 // The push-off (Stay): a small rock of the whole boat that dies out as WS.rock tweens back to 0.
 const rockPx = t => REDUCED_MOTION ? 0 : Math.round(Math.sin(t * 15) * WS.rock * 1.6);
@@ -1701,13 +1786,14 @@ function glowTint(cx, cy, r, acc, str) {
 }
 function applyGlows(t) {
   const s = jawShift();
-  if (WS.lantern > 0.01 && WS.lanternFlicker > 0.05) {
+  if (WS.lantern > 0.01 && WS.lanternFlicker > 0.05 && WS.far <= 0.5) { // far out the lantern is hidden, and so is its light
     const fl = WS.lanternFlicker * WS.lantern * (0.88 + 0.12 * Math.sin(t * 13) * Math.sin(t * 7.3));
     const lx = G.lanternPos.x, ly = G.lanternPos.y;
     const warm = WS.lanternWarm;
     glowTint(lx, ly - s, 18 + 12 * warm, 17, (0.8 + 0.25 * warm) * fl);
     glowTint(lx, 2 * WL - 1 - ly - s, 12 + 8 * warm, 17, (0.45 + 0.15 * warm) * fl);
   }
+  if (WS.goldBelow > 0 && G.goldBelow) glowTint(G.goldBelow.x, G.goldBelow.y, 8, 16, 0.7 * WS.goldBelow);
   if (WS.dive > DIVE_SWITCH && G.deepGold) glowTint(G.deepGold.x, G.deepGold.y, DEEP_GOLD_GLOW, 16, WS.glint > 0 ? 0.9 : 0.55);
   const cab = WS.cabin * WS.cabinLit * (1 - WS.sea) * (1 - WS.dive); // the window's glow is fixed to the shore, which the dive leaves
   if (cab > 0.4) {
@@ -2102,8 +2188,42 @@ function goldFishDrop() {
 }
 // The cut, or (silent) the line going slack: no snap, and the stalk sinks with the disc. No caption on
 // the cut itself: the interrupted word, the snap and the splash say it. Silent gets `The line goes slack.`
-const cutCine = silent => ({
-  dur: 17.5,
+// Phase 21: the dawn shows what the card says (bible, section 8, Still water), from the state the composer
+// reads: at sea with the fish heard the shapes lead the boat to a new shore (12; 14 has no path); at sea
+// without them, or sunk there, the camera pulls back to a speck (11, 13); on the lake with the boat sunk he
+// swims ashore and wakes in the water again above the gold (10); the lake boat rows away (9, and Silent).
+function cutVariant(silent) {
+  if (silent) return 'row';
+  if (WS.sea > 0.5) return STORY.heard ? 'shore' : 'speck';
+  return swimming() ? 'loop' : 'row';
+}
+const CUT_DUR = { row: 17.5, shore: 17.5, speck: 17.5, loop: 15 };
+const CUT_ROW_AT = 11, CUT_ROW_DUR = 6.5, CUT_ROW_PX = 120;
+const rowAway = (t, from, dur) => (t > from ? E.io(clamp((t - from) / dur, 0, 1)) * CUT_ROW_PX : 0);
+const SHORE_AT = 7, SHORE_RISE = 4, SHORE_ROW = 10, SHORE_ROW_DUR = 7.5, SHORE_FADE = 15;
+function cutShore(t, at) {
+  at('gather', 6, gatherShoal);
+  WS.newShore = E.io(clamp((t - SHORE_AT) / SHORE_RISE, 0, 1));
+  WS.boatX = rowAway(t, SHORE_ROW, SHORE_ROW_DUR);
+  at('fade', SHORE_FADE, () => UI.fade(1, 2.5));
+}
+const SPECK_FAR = 6, SPECK_DRIFT = 1.2, SPECK_FADE = 15.5;
+function cutSpeck(t, at) {
+  WS.far = E.io(clamp((t - 6) / camDur(SPECK_FAR), 0, 1));
+  WS.farDrift = Math.max(0, t - 6 - SPECK_FAR) * SPECK_DRIFT;
+  at('fade', SPECK_FADE, () => UI.fade(1, 2));
+}
+const LOOP_SWIM = 3.5, LOOP_PX = 58, LOOP_BLACK = 9.7, LOOP_WAKE = 10.1, LOOP_BACK = 10.7, LOOP_FADE = 13.7;
+function cutLoop(t, at) {
+  WS.boatX = t < LOOP_WAKE ? -E.io(clamp((t - 6) / LOOP_SWIM, 0, 1)) * LOOP_PX : 0;
+  at('black', LOOP_BLACK, () => UI.fade(1, 0.1));
+  at('wake', LOOP_WAKE, () => { WS.goldBelow = 1; });
+  at('back', LOOP_BACK, () => UI.fade(0, 1));
+  at('fade', LOOP_FADE, () => UI.fade(1, 1.3));
+}
+const CUT_MOVE = { row: t => { WS.boatX = rowAway(t, CUT_ROW_AT, CUT_ROW_DUR); }, shore: cutShore, speck: cutSpeck, loop: cutLoop };
+const cutCine = (silent, v = cutVariant(silent)) => ({
+  dur: CUT_DUR[v],
   init(s) { s.y0 = WS.sunY; s.tr0 = WS.troubled; },
   update(t, dt, at, s) {
     at('cut', 0.15, () => {
@@ -2138,7 +2258,7 @@ const cutCine = silent => ({
       WS.horizGlow = lerp(0.15, 1, kd);
     }
     if (t > 9) WS.lantern = 1 - clamp((t - 9) / 2, 0, 1);
-    WS.boatX = t > 11 ? E.io(clamp((t - 11) / 6.5, 0, 1)) * 120 : 0;
+    CUT_MOVE[v](t, at);
     at('cap', 3.4, () => { if (silent) cap('The line goes slack.', 3); });
   },
 });
@@ -2314,10 +2434,30 @@ function scatterFrom(b) {
     s.vx = (dx / n) * 70; s.vy = (dy / n) * 25 - 6; s.fade = 2; s.dir = s.vx >= 0 ? 1 : -1;
   }
 }
+// Still water at sea with the fish heard (bible, section 8): at the dawn the giant shapes gather in a line
+// just right of the boat, all facing right, and lead it as it rows. Old ones are kept, missing ones come up
+// from below; each steers to its slot (leadSlot), which moves with the boat.
+const LEAD_N = 5, LEAD_SIZES = [3, 2, 4, 2, 3], LEAD_PULL = 0.8;
+const leadSlot = k => ({ x: boatLeft() + 44 + k * 8, y: WL + 16 + k * 14 });
+function gatherShoal() {
+  const keep = OCEAN.shad.filter(s => s.sea && s.fade <= 0).slice(0, LEAD_N);
+  while (keep.length < LEAD_N) keep.push(seaShadow({}, H + 14));
+  keep.forEach((s, k) => Object.assign(s, { lead: k, size: LEAD_SIZES[k], fade: 0 }));
+  OCEAN.shad.length = 0;
+  OCEAN.shad.push(...keep);
+}
+function steerLead(s, dt) {
+  const p = leadSlot(s.lead), f = Math.min(1, dt * LEAD_PULL);
+  s.x += (p.x - s.x) * f;
+  s.y += (p.y + Math.sin(G.t * 0.8 + s.lead) * 2 - s.y) * f;
+  s.dir = 1;
+  s.a = Math.min(1, s.a + dt);
+}
 function updOcean(dt) {
   const hurry = WS.shoalOut ? SEA_HURRY : 1;
   for (let k = OCEAN.shad.length - 1; k >= 0; k--) {
     const s = OCEAN.shad[k];
+    if (s.lead !== undefined) { steerLead(s, dt); continue; }
     s.x += s.vx * dt; s.y += s.vy * (s.sea ? hurry : 1) * dt;
     if (s.fade > 0) { s.a -= dt / s.fade; if (s.a <= 0) { OCEAN.shad.splice(k, 1); continue; } }
     if (s.y < HY + 4 + s.size * 2) {
@@ -3193,7 +3333,7 @@ function update(dt) {
   ambientUpdate(dt);
 }
 function init() {
-  genClouds(); genMountains(); genStars(); buildSprites();
+  genClouds(); genMountains(); genStars(); genNewShore(); buildSprites();
   alloc();
   resetWS();
 }
