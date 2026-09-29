@@ -2813,10 +2813,10 @@ function eyesUpdate() {
 }
 const eyesOver = () => G.eyesDone && G.t - G.eyesAt >= EYES_DUR + EYES_CLEAR;
 // In act 2 the golden cast has nothing bite for slightly too long.
-const RED_BITE_DELAY = 1.8, FIRST_BITE_WIN = 1.3;
+const RED_BITE_DELAY = 1.8, FIRST_BITE_WIN = 1.6, BITE_WIN = 1.2, BITE_WAIT = 1.2, BITE_WAIT_RND = 2.4;
 function startWaiting() {
   const golden = STORY.goldenNext;
-  const bite = golden ? (1.6 + Math.random() * 0.8) * (STORY.act === 2 ? RED_BITE_DELAY : 1) : 1.6 + Math.random() * 3.2 * (WS.fishShadows ? 0.4 : 1);
+  const bite = golden ? (1.6 + Math.random() * 0.8) * (STORY.act === 2 ? RED_BITE_DELAY : 1) : BITE_WAIT + Math.random() * BITE_WAIT_RND * (WS.fishShadows ? 0.4 : 1);
   const nib = [];
   if (!golden) {
     const n = (Math.random() * 3) | 0;
@@ -2885,15 +2885,18 @@ function hook() {
 // A surge is cued (ring, sound, jitter) SURGE_WARN seconds before it pulls, so a player can react and let go.
 // Letting go costs RELEASE_LOSS of progress a second. The golden fish is heavy (GOLD_REEL_D) but its tension
 // is capped at GOLD_T_CAP, so it can never snap.
-const SURGE_WARN = 0.25, RELEASE_LOSS = 0.15, GOLD_REEL_D = 1.0, GOLD_T_CAP = 0.62;
+const SURGE_WARN = 0.25, RELEASE_LOSS = 0.06, GOLD_REEL_D = 1.0, GOLD_T_CAP = 0.62;
+// Reel feel (eased 2026-09-30 so a first-time phone player lands fish faster): progress per second while
+// holding, the steady and surge tension climbs, how fast tension falls on release, and the gap between surges.
+const REEL_RATE = 0.42, PULL_BASE = 0.32, PULL_SURGE = 1.0, RELEASE_EASE = 0.95, SURGE_GAP = 1.2, SURGE_GAP_RND = 1.8;
 function reelUpdate(dt) {
   const r = G.reel;
   if (G.holding) {
-    r.p += (dt * 0.3) / r.d;
-    r.T += dt * (0.4 + (r.surge > 0 && r.sAge > SURGE_WARN ? 1.3 : 0)) * r.d;
+    r.p += (dt * REEL_RATE) / r.d;
+    r.T += dt * (PULL_BASE + (r.surge > 0 && r.sAge > SURGE_WARN ? PULL_SURGE : 0)) * r.d;
     r.tick -= dt;
     if (r.tick <= 0) { r.tick = 0.07; SFX.tick(); }
-  } else { r.p -= dt * RELEASE_LOSS; r.T -= dt * 0.85; }
+  } else { r.p -= dt * RELEASE_LOSS; r.T -= dt * RELEASE_EASE; }
   if (!r.golden) {
     if (r.surge > 0) {
       r.surge -= dt; r.sAge += dt;
@@ -2902,7 +2905,7 @@ function reelUpdate(dt) {
       if (Math.random() < dt * 14) splash(G.bob.x, G.bob.y, 1);
     } else {
       r.next -= dt;
-      if (r.next <= 0) { r.surge = 0.45 + Math.random() * 0.55 + SURGE_WARN; r.sAge = 0; r.next = 0.8 + Math.random() * 1.6; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
+      if (r.next <= 0) { r.surge = 0.45 + Math.random() * 0.55 + SURGE_WARN; r.sAge = 0; r.next = SURGE_GAP + Math.random() * SURGE_GAP_RND; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
     }
   } else r.T = Math.min(r.T, GOLD_T_CAP);
   r.T = clamp(r.T, 0, 1.05); r.p = clamp(r.p, 0, 1);
@@ -3001,7 +3004,7 @@ function fishUpdate(dt) {
     if (glitter && Math.random() < dt * 6) sparkle(G.bob.x + (Math.random() - 0.5) * 10, G.bob.y - Math.random() * 4);
     if (w.t >= w.bite && redCast()) { if (eyesOver()) redSequence(); return; } // no bite: the line goes taut once the eyes have closed
     if (w.t >= w.bite) {
-      G.biteWin = STORY.goldenNext ? 3.2 : G.tutorial < 1 ? FIRST_BITE_WIN : 0.95; // the first bite is a little longer
+      G.biteWin = STORY.goldenNext ? 3.2 : G.tutorial < 1 ? FIRST_BITE_WIN : BITE_WIN; // the first bite is a little longer
       setPhase('bite');
       G.bobDip = 999;
       ring(G.bob.x, G.bob.y + 1); ring(G.bob.x, G.bob.y + 1, true); splash(G.bob.x, G.bob.y, 3);
