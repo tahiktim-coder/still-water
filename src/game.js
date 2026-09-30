@@ -1851,52 +1851,87 @@ function drawOceanShadows() {
   for (const s of OCEAN.shad) drawShadowShape(s.x, s.y, s.dir, s.size, s.a);
   if (OCEAN.big) drawBigShadow(OCEAN.big);
 }
-// The big one's plan shape, u along the body (head at u = -1, tail tip at u = 1), v across it, both -1..1.
-// Returns the darkness 0..1 inside, 0 outside: an elliptical body with a ridge down the middle, a pair of
-// pectoral fins, and a forked tail that flares from the root.
-function bigShape(u, v) {
-  const av = Math.abs(v);
-  if (u < 0.44) { // body, an ellipse from -1 to 0.44
-    const ub = (u + 0.28) / 0.72, q = ub * ub + v * v;
-    if (q < 1) return 0.25 + 0.75 * (1 - q);
-    const fu = Math.abs(u + 0.15); // fins root by the head
-    if (fu < 0.2 && av < 1 + 0.42 * (1 - fu / 0.2) - Math.abs(u + 0.15) * 0.8) return 0.3;
-    return 0;
-  }
-  const tt = (u - 0.44) / 0.56; // tail: flaring, forked at the tip
-  const p = lerp(0.14, 0.72, tt), notch = 0.55 * tt * tt * tt;
-  return av < p && av > notch ? 0.3 + 0.3 * (1 - av / p) : 0;
+// The big one (phase 33, one fish in perspective). The boat is a speck on the horizon, so the fish under it is
+// seen at a grazing angle: its head end lies flat along the horizon under the speck, squashed, and its body runs
+// down and to the left toward the camera, thicker as it comes nearer, to a forked tail. b.x, b.y are the snout
+// and the head end's centre row; b.t0 the head end's half thickness. The body's centre line drops BIG_DROP rows
+// over BIG_LEN columns on a curve (q ** BIG_BEND, so it hugs the horizon near the head) and its half thickness
+// grows from t0 to BIG_T1 the same way. k (1 at rest, down to SHADOW_IN) draws the body in toward the head end
+// as it tips up to breach: foreshortened, and paler toward the tail as the tail goes down into the deep (BIG_SINK,
+// a dithered gradient, so only the head end is left dark), while dk (0 to 1) darkens it BIG_DARK steps and
+// thickens the head end by BIG_T0_UP. a is its presence: each shade step is dithered by it, so it fades as a
+// whole and never grows past this size.
+const BIG_LEN = 124, BIG_DROP = 56, BIG_T0 = 3.5, BIG_T1 = 20, BIG_BEND = 1.8, BIG_GROW = 1, BIG_T0_UP = 2.4;
+const BIG_DARK = 2, SHADOW_IN = 0.5, BIG_SINK = 0.95;
+const smooth01 = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+// Its plan shape at q along it (0 the snout, 1 the tail tips) and v across (in half thicknesses, negative toward
+// the horizon): the darkness 0..1 inside, 0 outside. A blunt head, the body tapering to a narrow root, a forked
+// tail, one swept-back dorsal on the far side and one slim pectoral near the head on the near side.
+const BIG_ROOT = 0.8, BIG_FULL = 0.5, FIN_D = [0.34, 0.5, 0.6, 0.8], FIN_P = [0.16, 0.28, 0.45, 1.1];
+function bigBodyH(q) {
+  if (q < 0.12) { const s = (0.12 - q) / 0.12; return 0.45 + 0.55 * Math.sqrt(1 - s * s); }
+  return q < BIG_FULL ? 1 : 1 - 0.68 * smooth01((q - BIG_FULL) / (BIG_ROOT - BIG_FULL));
 }
-// a is its presence (0 to 1 as it fades in from the deep): each shade step is dithered by it. In Swallowed the
-// shadow is the same fish as the head (phase 32): k (1 at rest, down to SHADOW_IN) draws it in toward the
-// breach point (px, py), its snout end, rising toward the surface as it goes, while the tail tips down into
-// the deep and is lost so only the head end is left under the speck; dk (0 to 1) darkens it by up to BIG_DARK
-// steps more. The loss follows the silhouette, not a straight line: the fade front runs along the body (u)
-// bowed back by CUT_BOW toward the edges (v), broken by a little noise (CUT_NOISE), and inside the CUT_SOFT
-// ramp the shadow pales step by step instead of being cut, so the tail reads as going deeper.
-const BIG_DARK = 2, SHADOW_IN = 0.55, CUT_MIN = -0.4, CUT_SOFT = 0.6, CUT_BOW = 0.45, CUT_NOISE = 0.3;
-const CUT_FROM = 1 + CUT_BOW + CUT_NOISE / 2 + CUT_SOFT; // at k 1 the front is past every pixel of the tail
+function finAt(q, z, f) { // a swept-back fin: base f[0]..f[1], tip at q f[2], z f[3] out from the body
+  if (z < 0 || z > f[3]) return false;
+  const k = z / f[3];
+  return q > f[0] + (f[2] - f[0]) * k && q < f[1] + (f[2] - f[1]) * k * k;
+}
+function bigShape(q, v) {
+  if (q < 0 || q > 1) return 0;
+  const av = Math.abs(v);
+  if (q >= BIG_ROOT) { // the tail: flaring from the root, forked
+    const tt = (q - BIG_ROOT) / (1 - BIG_ROOT), p = 0.32 + 0.55 * Math.pow(tt, 0.8), notch = 0.72 * Math.pow(tt, 2.2);
+    return av < p && av > notch ? 0.45 + 0.3 * (1 - tt) : 0;
+  }
+  const h = bigBodyH(q);
+  if (av < h) { const r = av / h; return 0.3 + 0.7 * (1 - r * r); }
+  if (v < 0 && finAt(q, av - h, FIN_D)) return 0.5;
+  if (v > 0 && finAt(q, av - h, FIN_P)) return 0.5;
+  return 0;
+}
+// The live pose, from b: length, drop, head and tail half thickness.
+function bigPose(b) {
+  const k = b.k === undefined ? 1 : b.k, dk = b.dk || 0, r = clamp((k - SHADOW_IN) / (1 - SHADOW_IN), 0, 1);
+  const t0 = (b.t0 === undefined ? BIG_T0 : b.t0) + dk * BIG_T0_UP;
+  return { len: BIG_LEN * k, drop: BIG_DROP * k * k, t0, t1: lerp(t0, BIG_T1, r), sink: (1 - r) * BIG_SINK };
+}
+// Its centre row at column x (for the landing marker).
+function bigRowAt(b, x) {
+  const p = bigPose(b), q = clamp((b.x - x) / p.len, 0, 1);
+  return b.y + p.drop * Math.pow(q, BIG_BEND);
+}
+// Per column (the ripple shifts a row by a few columns, so PAD either side): q along the body, the centre
+// row, the half thickness and the presence left by the sink. Filled once a frame, so the pixel loop is cheap.
+const BIG_PAD = 8, BIG_Q = new Float32Array(W + 2 * BIG_PAD), BIG_YC = new Float32Array(W + 2 * BIG_PAD);
+const BIG_T = new Float32Array(W + 2 * BIG_PAD), BIG_A = new Float32Array(W + 2 * BIG_PAD);
+function bigColumns(b, p, a) {
+  for (let c = -BIG_PAD; c < W + BIG_PAD; c++) {
+    const q = (b.x - c) / p.len, k = c + BIG_PAD;
+    BIG_Q[k] = q;
+    if (q < 0 || q > 1) continue;
+    BIG_YC[k] = b.y + p.drop * Math.pow(q, BIG_BEND);
+    BIG_T[k] = p.t0 + (p.t1 - p.t0) * Math.pow(q, BIG_GROW);
+    BIG_A[k] = a * (1 - p.sink * Math.pow(q, 1.2));
+  }
+}
 function drawBigShadow(b) {
-  const a = b.a === undefined ? 1 : b.a, k = b.k === undefined ? 1 : b.k, dk = (b.dk || 0) * BIG_DARK;
-  if (a <= 0 || k <= 0) return;
-  const bx = k < 1 ? b.px + (b.x - b.px) * k : b.x, by = k < 1 ? b.py + (b.y - b.py) * k * k : b.y;
-  const hw = b.w * 0.5 * k, hh = b.h * 0.5 * k, cut = k < 1 ? lerp(CUT_FROM, CUT_MIN, (1 - k) / (1 - SHADOW_IN)) : 9;
-  const y0 = Math.max(HY, Math.floor(by - hh * 1.5)), y1 = Math.min(H - 1, Math.ceil(by + hh * 1.5));
-  const x0 = Math.max(0, Math.floor(bx - hw - 2)), x1 = Math.min(W - 1, Math.ceil(bx + hw + 2));
-  for (let y = y0; y <= y1; y++) {
-    const v = (y - by) / hh, rip = RIPX[y], row = y * W;
+  const a = b.a === undefined ? 1 : b.a;
+  if (a <= 0) return;
+  const p = bigPose(b), dk = (b.dk || 0) * BIG_DARK;
+  const x0 = Math.max(0, Math.floor(b.x - p.len - 3)), x1 = Math.min(W - 1, Math.ceil(b.x + 3));
+  const y1 = Math.min(H - 1, Math.ceil(b.y + p.drop + p.t1 * 1.4));
+  if (x0 > x1) return;
+  bigColumns(b, p, a);
+  for (let y = HY + 1; y <= y1; y++) {
+    const row = y * W, rk = clamp(RIPX[y], -BIG_PAD, BIG_PAD) + BIG_PAD;
     for (let x = x0; x <= x1; x++) {
-      const u = -(x + rip - bx) / hw, d = bigShape(u, v);
+      const k = x + rk, q = BIG_Q[k];
+      if (q < 0 || q > 1) continue;
+      const d = bigShape(q, (y - BIG_YC[k]) / BIG_T[k]);
       if (d <= 0) continue;
-      const bay = BAYER[((y & 3) << 2) | (x & 3)];
-      let fade = 1;
-      if (cut < 9) {
-        const uf = u + CUT_BOW * v * v + (vnoise(x * 0.3, y * 0.6, 29) - 0.5) * CUT_NOISE;
-        fade = clamp((cut - uf) / CUT_SOFT, 0, 1);
-        if (fade <= 0) continue;
-      }
       const i = row + x, f = FRAME[i];
-      if (f < 12) FRAME[i] = Math.max(0, f - Math.floor(((d > 0.7 ? 4 : d > 0.4 ? 3 : 2) + dk) * a * fade + bay));
+      if (f < 12) FRAME[i] = Math.max(0, f - Math.floor(((d > 0.7 ? 4 : d > 0.4 ? 3 : 2) + dk) * BIG_A[k] + BAYER[((y & 3) << 2) | (x & 3)]));
     }
   }
 }
@@ -3347,7 +3382,7 @@ function grant1(w) {
 }
 
 // -- the ocean (bible, sections 4 and 8). The shore sinks into the sky for good, the boat shrinks to a speck
-// on a vast lit sea, huge shadows drift to the horizon, and one the width of the screen stops under the boat.
+// on a vast lit sea, huge shadows drift to the horizon, and one vast fish settles with its head under the boat.
 const OCEAN_FAR_DUR = 8, OCEAN_SPAWN_T = 1.4, OCEAN_SPAWN_GAP = 0.35, OCEAN_BIG_T = 11.5, OCEAN_CROSS = 7, OCEAN_WINDOW = 10, OCEAN_RETURN = 2.5, OCEAN_FADE_IN = 3;
 function spawnOceanShadow(size) {
   const fromLeft = Math.random() < 0.5;
@@ -3369,37 +3404,40 @@ function spawnSeaShoal() {
   OCEAN.shad.length = 0;
   for (let k = 0; k < SEA_SHOAL; k++) OCEAN.shad.push(seaShadow({}, HY + 30 + Math.random() * (H - HY - 50)));
 }
-const bigRestY = () => HY + 16 + (H - HY) / 6; // its back just under the surface, the fins clear of the horizon
-const BIG_DEEP_PX = 12; // how many rows lower it swims while crossing, before it rises to rest
-// It settles with its snout end under the speck (phase 32), so in Swallowed the head breaches where the shadow's
-// head was: the snout tip BIG_SNOUT_LEAD px ahead of the speck, the landing marker just inside it, the body
-// and tail running off to the left the way it came.
-const BIG_SNOUT_LEAD = 9;
-const bigRestX = () => lungeCx() + BIG_SNOUT_LEAD - W / 2;
-// The big one (bible, section 8) does not rise from below: after the shoal has swum alone for a while it
-// enters at the left edge, faint and deep (a few rows lower, its presence a rising from 0 over OCEAN_FADE_IN
-// seconds), crosses over OCEAN_CROSS seconds slowing all the way, rises a little as it slows and settles with
-// its head under the boat (bigRestX). drawBigShadow reads a.
+// At rest its head end lies along the horizon under the speck (phase 33): the centre row BIG_REST_DY rows under
+// the horizon, the snout BIG_SNOUT_LEAD px right of the speck, where the breaching head's snout comes up, and
+// the body running down and left toward the camera.
+const BIG_REST_DY = 4, BIG_SNOUT_LEAD = 26;
+const bigRestY = () => HY + BIG_REST_DY;
+const bigRestX = () => lungeCx() + BIG_SNOUT_LEAD;
+// While crossing it is nearer: BIG_NEAR_DY rows lower and its head end BIG_NEAR_T0 thick (the same fish, only
+// closer); it swims away from the camera to the boat, rising to the horizon and thinning as it goes.
+const BIG_NEAR_DY = 26, BIG_NEAR_T0 = 5.5;
+// The big one (bible, section 8) does not rise from below: after the shoal has swum alone for a while its head
+// comes in at the left edge, near and faint (its presence a rising from 0 over OCEAN_FADE_IN seconds), crosses
+// over OCEAN_CROSS seconds slowing all the way, rising toward the horizon as it goes, and settles with its head
+// under the boat (bigRestX). drawBigShadow reads a.
 function bigEnter() {
-  const h = (H - HY) / 3, restY = bigRestY();
-  OCEAN.big = { x: -W * 0.55, y: restY + BIG_DEEP_PX, w: W, h, a: 0, crossing: true };
+  const restY = bigRestY();
+  OCEAN.big = { x: -6, y: restY + BIG_NEAR_DY, t0: BIG_NEAR_T0, a: 0, crossing: true };
   tween(OCEAN.big, 'x', bigRestX(), OCEAN_CROSS, E.out2, () => { if (OCEAN.big) OCEAN.big.crossing = false; });
-  tween(OCEAN.big, 'y', restY, OCEAN_CROSS, E.in);
+  tween(OCEAN.big, 'y', restY, OCEAN_CROSS, E.io);
+  tween(OCEAN.big, 't0', BIG_T0, OCEAN_CROSS, E.io);
   tween(OCEAN.big, 'a', 1, OCEAN_FADE_IN, E.io);
 }
 // For the shots: the big one already at rest under the boat.
 function bigRise() {
   bigEnter();
   const b = OCEAN.big;
-  untween(b, 'x'); untween(b, 'y'); untween(b, 'a');
-  Object.assign(b, { x: bigRestX(), y: bigRestY(), a: 1, crossing: false });
+  untween(b, 'x'); untween(b, 'y'); untween(b, 't0'); untween(b, 'a');
+  Object.assign(b, { x: bigRestX(), y: bigRestY(), t0: BIG_T0, a: 1, crossing: false });
 }
 // The smaller shapes scatter from the big one as its head reaches them, one by one, not all at once.
-const SCATTER_REACH = 0.55;
+const SCATTER_AHEAD = 40;
 function scatterFrom(b) {
   for (const s of OCEAN.shad) {
-    if (s.fade > 0 || Math.abs(s.x - b.x) > b.w * SCATTER_REACH) continue;
-    const dx = s.x - b.x, dy = s.y - b.y, n = Math.hypot(dx, dy) || 1;
+    if (s.fade > 0 || s.x > b.x + SCATTER_AHEAD || s.x < b.x - BIG_LEN) continue;
+    const dx = s.x - b.x + BIG_LEN * 0.3, dy = s.y - b.y, n = Math.hypot(dx, dy) || 1;
     s.vx = (dx / n) * 70; s.vy = (dy / n) * 25 - 6; s.fade = 2; s.dir = s.vx >= 0 ? 1 : -1;
   }
 }
@@ -3453,15 +3491,15 @@ const CINE_OCEAN = {
   },
 };
 // The tap that dismisses the warning must not also cast: the first second of the window ignores taps. After
-// it the prompt comes back and a pale ring pulses on the big one's back below the speck, where the float
-// would land (oceanMark, drawOceanMarker).
-const OCEAN_GRACE = 1.0, MARK_UP = 0.2, SURGE_DUR = 2.2;
+// it the prompt comes back and a pale ring pulses on the big one's head end just ahead of the speck, where the
+// float would land (oceanMark, drawOceanMarker).
+const OCEAN_GRACE = 1.0, MARK_DX = 7, MARK_DY = 1, SURGE_DUR = 2.2;
 function oceanTold() {
   dlgRun([fish('Here. I wouldn’t cast while it’s under you. It’s been waiting longer than you have.')], () => { OCEAN.hint = false; setPhase('ocean'); });
 }
 function oceanMark() {
-  const b = OCEAN.big;
-  return { x: Math.round(W / 2 + WS.farDrift), y: Math.round(b ? b.y - b.h * MARK_UP : bigRestY() - (H - HY) / 15) };
+  const b = OCEAN.big, x = lungeCx() + MARK_DX;
+  return { x, y: Math.round((b ? bigRowAt(b, x) : bigRestY()) + MARK_DY) };
 }
 const MARK_RING = [[-1, -1], [0, -1], [1, -1], [-2, 0], [2, 0], [-1, 1], [0, 1], [1, 1]]; // 5 px wide, flat on the water
 function drawOceanMarker(t) {
@@ -3481,10 +3519,10 @@ function oceanCast() {
 // Swallowed (bible, section 8, phase 25): one continuous lunge seen from the water. The float lands on the big
 // one's head; after a beat its head rises out of the sea round the speck with the mouth open along the
 // waterline, the speck and a sheet of water tip in, the mouth closes, the head sinks, the water closes with a
-// splash and three rings, and its shadow swims off right and down. The empty sea, then black and the card.
-// Phase 32, one fish: the shadow darkens and draws in to the breach point as it comes up (shadowUp), is gone
-// while the head is out (shadowGone), re-forms there from the rings as the head sinks and grows back to full
-// size (shadowBack), then swims on the way it came (bigSwimsOff).
+// splash and three rings, and its shadow swims off right along the horizon. The empty sea, then black and the
+// card. Phases 32 and 33, one fish: the shadow draws in to its head end under the speck as it tips up
+// (shadowUp), is gone while the head is out (shadowGone), re-forms at the rings as the head sinks and extends
+// back to its rest pose (shadowBack), then swims on the way it faces (bigSwimsOff).
 const SW = {
   up: 1.0, upDur: 0.8, gone: 1.7, goneDur: 0.4, back: 5.5, backA: 1.0, backDur: 1.4,
   fly: 0.7, bulge: 1.3, bulgeDur: 0.5, rise: 1.5, riseDur: 1.4, gape: 1.65, gapeDur: 1.1, gulp: 2.9, gulpDur: 1.0,
@@ -3501,22 +3539,22 @@ function lungeRise() {
   tween(WS, 'lunge', 1, SW.riseDur, E.out); tween(WS, 'streak', 1, 0.6);
   WS.shed = 1; tween(WS, 'shed', 0, SHED_DUR, E.lin); // sheets of water slide off the snout
 }
-// The shadow and the head are one fish. Coming up, it darkens and draws in toward its snout, rising to the
-// breach point just under the surface below the speck (BREACH_DY rows down) with its tail lost in the deep,
-// then it is gone as the head clears the water; sinking, it re-forms there head first, pale at first, and
-// grows back to its full length and depth.
-const BREACH_DY = 4;
+// The shadow and the head are one fish (phase 33). Coming up, it tips toward the surface: the body draws in to
+// the head end along the horizon under the speck (k to SHADOW_IN), its tail lifting, while the head end darkens
+// and thickens, and the head breaches out of that spot, its snout where the shadow's was; the shadow is gone as
+// the head clears the water. Sinking, the head end re-forms at the rings' row, pale at first, and the body
+// extends back out toward the camera to its full length (shadowBack), before it swims on (bigSwimsOff).
 function shadowUp() {
   const b = OCEAN.big;
   if (!b) return;
-  Object.assign(b, { px: b.x + b.w * 0.5, py: HY + BREACH_DY, k: 1, dk: 0 });
+  Object.assign(b, { k: 1, dk: 0 });
   tween(b, 'k', SHADOW_IN, SW.upDur, E.in); tween(b, 'dk', 1, SW.upDur, E.io);
 }
 function shadowGone() { if (OCEAN.big) tween(OCEAN.big, 'a', 0, SW.goneDur, E.in); }
 function shadowBack() {
   const b = OCEAN.big;
   if (!b) return;
-  Object.assign(b, { a: 0, k: SHADOW_IN, dk: 1 });
+  Object.assign(b, { x: bigRestX(), y: bigRestY(), a: 0, k: SHADOW_IN, dk: 1 });
   tween(b, 'a', 1, SW.backA, E.out); tween(b, 'k', 1, SW.backDur, E.io); tween(b, 'dk', 0, SW.backDur, E.io);
 }
 function lungeGape() { tween(WS, 'gape', 1, SW.gapeDur, E.out); tween(WS, 'bulge', 0, SW.gapeDur); }
@@ -3528,14 +3566,18 @@ function lungeSink() { tween(WS, 'lunge', 0, SW.sinkDur, E.in); tween(WS, 'strea
 function spray(x, y, n) { // the water closing: tall spray that rises and falls back to the horizon
   for (let k = 0; k < n; k++) PARTS.push({ x: x + (Math.random() - 0.5) * 16, y, vx: (Math.random() - 0.5) * 64, vy: -32 - Math.random() * 66, life: 0, max: 1.6, v: Math.random() < 0.55 ? 11 : 10, floor: y + 1, g: 115, tall: true });
 }
-function bigSwimsOff() {
+// It swims on the way it faces, right along the horizon and a little down into the deep, fading as a whole at
+// its rest size (bigLeaves), in Swallowed and when the window is waited out alike.
+const BIG_LEAVE_DY = 10;
+function bigLeaves(dur) {
   const b = OCEAN.big;
-  SFX.weight(false);
   if (!b) return;
-  tween(b, 'x', W + b.w * 0.7, SW.swimDur, E.in, () => { if (OCEAN.big === b) OCEAN.big = null; });
-  tween(b, 'y', b.y + 46, SW.swimDur, E.io);
-  tween(b, 'a', 0, SW.swimDur, E.in);
+  b.crossing = false;
+  tween(b, 'x', W + BIG_LEN * 0.6, dur, E.in, () => { if (OCEAN.big === b) OCEAN.big = null; });
+  tween(b, 'y', b.y + BIG_LEAVE_DY, dur, E.io);
+  tween(b, 'a', 0, dur, E.in);
 }
+function bigSwimsOff() { SFX.weight(false); bigLeaves(SW.swimDur); }
 const CINE_SWALLOW = {
   dur: SW.black + 0.4,
   init(s) {
@@ -3570,19 +3612,11 @@ function oceanLeave() {
     fish('Look how they all go the same way.'),
   ].concat(costLines()), afterGrant1));
 }
-// The big one swims on the way it faces (right, head first) and down into the deep, fading as it goes, then
-// the boat comes back to full size while sea stays 1: an empty horizon, the giant shapes still passing
-// beneath, the shoal spawned. No caption about it.
+// The big one swims on the way it faces (bigLeaves, as in Swallowed), then the boat comes back to full size
+// while sea stays 1: an empty horizon, the giant shapes still passing beneath, the shoal spawned. No caption.
 const CINE_OCEAN_BACK = {
   dur: OCEAN_RETURN * 2 + 0.6,
-  init() {
-    const b = OCEAN.big;
-    SFX.weight(false);
-    if (!b) return;
-    tween(b, 'x', W + b.w * 0.7, OCEAN_RETURN, E.in, () => { if (OCEAN.big === b) OCEAN.big = null; });
-    tween(b, 'y', b.y + 40, OCEAN_RETURN, E.io);
-    tween(b, 'a', 0, OCEAN_RETURN, E.in);
-  },
+  init() { SFX.weight(false); bigLeaves(OCEAN_RETURN); },
   update(t, dt, at) {
     at('back', OCEAN_RETURN, () => {
       spawnSeaShoal();
@@ -5112,7 +5146,7 @@ if (IS_BROWSER) {
     get H() { return H; }, W, HY,
     spawnShadows, SHAD, spawnBirds, BIRDS, RINGS, RUN, ENDING_COUNT,
     OCEAN, spawnOceanShadow, spawnSeaShoal, bigRise, bigEnter, bigRestY, untween, bubble, boatLeft, WL,
-    oceanCast, oceanTold, playCine, CINE_OCEAN, CINE_STAY, CINE_INSIDE, THINK_AT,
+    oceanCast, oceanTold, oceanLeave, playCine, CINE_OCEAN, CINE_STAY, CINE_INSIDE, THINK_AT,
     setCloudT(v) { cloudT = v; },
     setLang(l) { LANG = LANGS.indexOf(l) >= 0 ? l : DEFAULT_LANG; }, tr, get LANG() { return LANG; },
   };

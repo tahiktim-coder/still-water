@@ -59,7 +59,7 @@ if (which === 'all' || which === 'title_far') shot('out_title_far.png', (ws) => 
 const ocean = ws => { ws.far = 1; ws.sea = 1; ws.troubled = 0.15; g.setPhase('ocean'); g.bigRise(); g.untween(g.OCEAN.big, 'y'); g.OCEAN.big.y = g.bigRestY(); };
 if (which === 'all' || which === 'ocean') shot('out_ocean.png', (ws) => { ocean(ws); }, 6);
 // Phase 10: the big one mid-crossing, deep, at the left third, the smaller shapes ahead of it not yet scattered.
-if (which === 'all' || which === 'ocean_enter') shot('out_ocean_enter.png', (ws) => { ws.far = 1; ws.sea = 1; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.a = 1; s.x = 60 + k * 20; s.y = g.HY + 30 + ((k * 37) % 90); } g.bigEnter(); const b = g.OCEAN.big; g.untween(b, 'x'); g.untween(b, 'y'); g.untween(b, 'a'); b.x = g.W / 3; b.y = g.bigRestY() + 10; b.a = 0.6; }, 6);
+if (which === 'all' || which === 'ocean_enter') shot('out_ocean_enter.png', (ws) => { ws.far = 1; ws.sea = 1; ws.troubled = 0.15; g.setPhase('cine'); for (let k = 0; k < 8; k++) { g.spawnOceanShadow(2 + (k % 5)); const s = g.OCEAN.shad[k]; s.a = 1; s.x = 60 + k * 20; s.y = g.HY + 30 + ((k * 37) % 90); } g.bigEnter(); const b = g.OCEAN.big; g.untween(b, 'x'); g.untween(b, 'y'); g.untween(b, 't0'); g.untween(b, 'a'); b.x = g.W / 3; b.y = g.bigRestY() + 14; b.t0 = 4.5; b.a = 0.6; }, 6);
 // Phase 10, reworked in phase 15: act 0, the float in the water with the stranger's bait on the hook, one gold
 // pixel with a dark eye beside it; and the same lure in flight, mid-cast.
 if (which === 'all' || which === 'bait') shot('out_bait.png', (ws, G) => { g.setPhase('waiting'); G.wait = { t: 0, nib: [], bite: 99 }; G.bob = { x: 70, y: 280, fly: false }; }, 3.3);
@@ -190,11 +190,30 @@ function lungeFrame(secs) {
   return 6 + secs;
 }
 if (which === 'all' || which === 'lunge_strip') strip('out_lunge_strip.png', LUNGE_TS, lungeFrame);
-// Phase 32, the shadow and the head as one fish: settled with its snout under the speck, darkening and drawn
-// in to the breach point as it comes up, gone as the head clears, no shadow while the head is up, re-forming
-// from the rings as it sinks, grown back, and swimming off right the way it came.
-const SHADOW_TS = [0.9, 1.4, 1.75, 2.0, 3.2, 5.7, 6.4, 8.7];
+// Phase 33, the shadow and the head as one fish in perspective: settled with its head end along the horizon
+// under the speck, drawn in and darkened as it tips up, the head breaching out of that spot, the head up with
+// no shadow, the head end re-forming at the rings as it sinks, the body extended back toward the camera, and
+// swimming off right along the horizon, fading at its rest size.
+const SHADOW_TS = [0.9, 1.55, 1.75, 2.6, 5.75, 6.6, 7.9, 8.9];
 if (which === 'all' || which === 'lunge_shadow_strip') strip('out_lunge_shadow_strip.png', SHADOW_TS, lungeFrame);
+// Phase 33, the crossing: eight frames of the ocean cinematic from the big one's entry (OCEAN_BIG_T 11.5 s)
+// to settled under the speck: its head in at the left edge, near and faint, swimming away to the boat, rising
+// to the horizon and thinning. The wait-it-out departure: six frames of CINE_OCEAN_BACK from the rest pose.
+const CROSS_TS = [12.4, 13.1, 13.8, 14.5, 15.3, 16.2, 17.3, 18.6];
+function crossFrame(secs) {
+  g.playCine(g.CINE_OCEAN);
+  for (let i = 0; i < Math.round(secs * 60); i++) g.update(1 / 60);
+  return secs;
+}
+if (which === 'all' || which === 'ocean_cross_strip') strip('out_ocean_cross_strip.png', CROSS_TS, crossFrame);
+const WAIT_TS = [0, 0.5, 1.0, 1.5, 2.0, 2.6];
+function waitFrame(secs) {
+  ocean(g.WS); g.G.pt = 2;
+  g.oceanLeave();
+  for (let i = 0; i < Math.round(secs * 60); i++) g.update(1 / 60);
+  return 6 + secs;
+}
+if (which === 'all' || which === 'ocean_wait_strip') strip('out_ocean_wait_strip.png', WAIT_TS, waitFrame);
 // Phase 27, the lunge head as a fish: crops round the horizon at 4x across the rise (closed, opening, open with
 // the speck on the lip, the speck sliding in, closing, sinking), so the head reads up close.
 const HEAD_TS = [1.75, 1.9, 2.2, 2.85, 3.5, 4.2, 4.6, 5.1], CROP = { x: 20, y: 170, w: 176, h: 100, sc: 4 };
