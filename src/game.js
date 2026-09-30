@@ -948,10 +948,10 @@ function resetWS() {
     // then held at 1 for the rest of the run).
     goldKept: 0, boatSunk: 0, frozen: 0, far: 0, sea: 0, eyes: 0, farBoat: 0,
     // Phase 25, Swallowed as one lunge: bulge the water heaving round the speck before the head breaks it,
-    // lunge the head's rise out of the sea (0 under, 1 up), gape its mouth open along the waterline, gulp the
+    // lunge the head's rise out of the sea (0 under, 1 up), gape its lower jaw dropped open (phase 27), gulp the
     // speck and a sheet of water tipping in (1: gone), streak the water streaming off it, slosh the water
-    // closing over it (0 to 1, a heap that rises and falls).
-    bulge: 0, lunge: 0, gape: 0, gulp: 0, streak: 0, slosh: 0,
+    // closing over it (0 to 1, a heap that rises and falls), shed the sheets sliding off the snout (1 to 0).
+    bulge: 0, lunge: 0, gape: 0, gulp: 0, streak: 0, slosh: 0, shed: 0,
     // Stay: companionStand swaps in the standing frame, leap is his progress along the parabola to the disc
     // (held at 1 while he rides it down), rock the boat's push-off wobble, lanternWarm widens the glow.
     companionStand: 0, leap: 0, rock: 0, lanternWarm: 0,
@@ -1392,64 +1392,182 @@ function drawBigShadow(b) {
     }
   }
 }
-// Swallowed (bible, section 8, phase 25): the big one's head rises out of the sea round the speck, seen from
-// the water at the horizon. It is drawn into TOP above the horizon, so the mirror reflects it: a blunt head
-// (the snout to the left) in the darkest ramp with a lit rim and a wet highlight, water streaming down it and
-// one small gold slit eye; along the waterline its mouth is an open dark band, and the speck sits in it on a
-// pale sheet of water. lunge translates the whole head up out of the water; gape opens the band.
-const HEAD_HW = 55, HEAD_H = 51, HEAD_NOSE = -0.2, MOUTH_H = 10, MOUTH_U = 0.62, MOUTH_MAX = 0.45;
-const EYE_U = -0.66, EYE_UP = 27, HEAD_HI = 3, NOSE_N = 3.5, BACK_N = 1.6, BROW = 0.12;
-function headProf(u) { // about 0..1, the head's height at u: a blunt, near-vertical snout at -1, a long back to 1
-  if (u <= -1 || u >= 1) return 0;
-  const front = u < HEAD_NOSE, n = front ? NOSE_N : BACK_N;
-  const q = Math.abs(front ? (u - HEAD_NOSE) / (1 + HEAD_NOSE) : (u - HEAD_NOSE) / (1 - HEAD_NOSE));
-  return Math.pow(1 - Math.pow(q, n), 1 / n) * (1 - BROW * (u - HEAD_NOSE));
-}
+// Swallowed (bible, section 8, phase 27): the big one's head breaches round the speck, seen from the water at
+// the horizon, drawn into TOP so it reflects. It is a fish in profile facing left, tilted HEAD_ANG: the snout
+// to the upper left and the body running down to the right into the sea. It is built in its own frame (a along
+// the body from the snout, b across it, + toward the belly): a blunt snout, a lower jaw hinged at the corner of
+// the mouth that drops by gape so the gape is a dark wedge, a gill plate, a faint lateral line, sparse scales on
+// the back, a paler throat, a lit rim along the top and the gold slit eye above the corner. lunge slides it up
+// out of the sea along RISE and back down the same way, at the same angle.
+const HEAD_ANG = 0.6, RISE_ANG = 1.25; // tilted up as it breaks the surface, snout first, easing to HEAD_ANG
+const SNOUT_DX = -26, SNOUT_UP = 44, RISE_X = 0.25, RISE_Y = 0.97, RISE_LEN = 66;
+const HEAD_LEN = 150, HEAD_B0 = -30, HEAD_B1 = 30; // the frame's box, along the body and across it
+const FORE = 30, NOSE_B = 2, SNOUT_BACK = 4, BROW_B = -20, HUMP = 6, HUMP_A = 34, TAPER = 0.12; // the forehead, then the back
+const LIP0 = 9, LIP1 = 3, JAW_C = 40, JAW_T = -1, JAW_DEEP = 9, CHIN_K = 1.2, GAPE_ANG = 0.62;
+const MOUTH_RIM = 60, VENT0 = 12, VENT_K = 0.12, THROAT_A = 70;
+const GILL_A = 52, GILL_BOW = 5, GILL_H = 15, LAT_B = -9, LAT_K = 0.04;
+const RIM_A0 = 8, RIM_A1 = 90, BACK = 2, BELLY = 4, JAW_V = 3.6, THROAT_V = 4.4, SHUT = 0.15;
 const lungeCx = () => Math.round(W / 2 + WS.farDrift);
-const headTop = (u, up) => Math.round(HY - HEAD_H * headProf(u) + up);
-function mouthTop(u, top) { // the first row of the open band in this column (HY where it is shut)
-  const k = 1 - (u * u) / (MOUTH_U * MOUTH_U);
-  if (k <= 0 || WS.gape <= 0) return HY;
-  return HY - Math.round(Math.min(WS.gape * MOUTH_H * Math.pow(k, 0.3), (HY - top) * MOUTH_MAX)); // a flat slot, not a lens
+const lipB = a => LIP0 + (LIP1 - LIP0) * a / JAW_C; // the upper lip line (the lower lip too, shut)
+const ventB = a => VENT0 + (a - JAW_C) * VENT_K;     // the belly behind the corner of the mouth
+function topB(a) { // the upper outline: the heavy forehead from the snout, the nape's hump, the back tapering
+  if (a < FORE) {
+    const k = 1 - a / FORE;
+    return NOSE_B - (NOSE_B - BROW_B) * (1 - k * k);
+  }
+  const h = a - FORE;
+  return h < HUMP_A ? BROW_B - HUMP * (1 - Math.cos(h / HUMP_A * Math.PI)) / 2 : BROW_B - HUMP + (h - HUMP_A) * TAPER;
 }
-function headPix(x, y, d, u) { // the head's index d rows under its rim
-  if (d === 0) return Math.abs(u + 0.15) < 0.45 ? 6 : 5; // the rim, brightest facing the sun
-  if (d === 1) return 3;
-  if (d === HEAD_HI && hash2(x >> 2, 0, 29) > 0.3) return 4; // the wet highlight, broken
-  return ci(dith(2.3 - d / 16, x, y));
+// The pose for this frame: the snout's screen point, the jaw's rotation, and the gape's front and throat lines.
+const HP = { sx: 0, sy: 0, c: 1, s: 0, jc: 1, js: 0, ua: 0, ub: 0, ta: 0, tb: 0, fs: 0, ca: 0, cb: 0, va: 0, vb: 0, vs: 0 };
+function jawToHead(la, lb) { // the lower jaw's frame (shut coordinates) to the head's, rotated about the corner
+  const ja = la - JAW_C, jb = lb - LIP1;
+  return { a: HP.jc * ja + HP.js * jb + JAW_C, b: -HP.js * ja + HP.jc * jb + LIP1 };
 }
-function drawHead(cx, up) {
-  for (let x = Math.max(0, cx - HEAD_HW); x <= Math.min(W - 1, cx + HEAD_HW); x++) {
-    const u = (x - cx) / HEAD_HW, top = headTop(u, up);
-    if (top >= HY) continue;
-    const mt = mouthTop(u, top);
-    for (let y = Math.max(0, top); y < HY; y++) {
-      TOP[y * W + x] = y >= mt ? (y === mt ? 0 : 19) : y === mt - 1 && mt < HY ? 3 : headPix(x, y, y - top, u);
+const headXY = (a, b) => ({ x: HP.sx + a * HP.c - b * HP.s, y: HP.sy + a * HP.s + b * HP.c });
+const side = (pa, pb, qa, qb, a, b) => (qa - pa) * (b - pb) - (qb - pb) * (a - pa);
+function headPose(cx) {
+  const off = (1 - WS.lunge) * RISE_LEN, ph = WS.gape * GAPE_ANG;
+  const ang = WS.gulp < 1 ? lerp(RISE_ANG, HEAD_ANG, E.io(WS.lunge)) : HEAD_ANG; // it sinks at the angle it holds
+  HP.sx = cx + SNOUT_DX + off * RISE_X; HP.sy = HY - SNOUT_UP + off * RISE_Y; HP.c = Math.cos(ang); HP.s = Math.sin(ang);
+  HP.jc = Math.cos(ph); HP.js = Math.sin(ph);
+  const tip = jawToHead(JAW_T, lipB(JAW_T)), chin = jawToHead(JAW_T + CHIN_K * JAW_DEEP, lipB(JAW_T) + JAW_DEEP);
+  HP.ua = SNOUT_BACK; HP.ub = lipB(SNOUT_BACK); HP.ta = tip.a; HP.tb = tip.b; HP.fs = Math.sign(side(HP.ua, HP.ub, tip.a, tip.b, JAW_C, LIP1));
+  HP.ca = chin.a; HP.cb = chin.b; HP.va = THROAT_A; HP.vb = ventB(THROAT_A);
+  HP.vs = Math.sign(side(chin.a, chin.b, THROAT_A, HP.vb, JAW_C, LIP1));
+}
+function inGape(a, b, la, lb) { // the wedge between the upper lip, the dropped lower lip and the open front
+  return a < JAW_C && b > lipB(a) && lb < lipB(la) && side(HP.ua, HP.ub, HP.ta, HP.tb, a, b) * HP.fs > 0;
+}
+function underThroat(a, b) { // past the line from the chin to the belly: outside the head
+  if (a >= HP.va) return b > ventB(a);
+  return side(HP.ca, HP.cb, HP.va, HP.vb, a, b) * HP.vs < 0;
+}
+function gillIdx(a, b) { // the gill plate's curved edge, dark, with a lit lip in front of it
+  const q = b / GILL_H;
+  if (q * q >= 1) return -1;
+  const e = a - (GILL_A + GILL_BOW * (1 - q * q));
+  return e > -0.6 && e < 0.6 ? 0 : e > -2 && e <= -0.6 ? 4 : -1;
+}
+// The pectoral fin behind the gill plate, laid back along the flank: a paler fan with darker rays.
+const FIN_A = 58, FIN_B = -6, FIN_L = 16, FIN_SLOPE = 0.3, FIN_W = 0.32;
+function finIdx(a, b) {
+  const fa = a - FIN_A, hw = 0.8 + fa * FIN_W, fb = b - FIN_B - fa * FIN_SLOPE;
+  if (fa < 0 || fa > FIN_L * (1 - 0.25 * Math.abs(fb) / hw) || Math.abs(fb) > hw) return -1;
+  return fa > 3 && Math.round(fb / hw * 2.5) % 2 === 0 && Math.abs(fb % 1) < 0.5 ? 4 : 5;
+}
+function upperIdx(x, y, a, b, d) { // the skull, upper jaw and body above the belly line
+  const crown = a > RIM_A0 && a < RIM_A1;
+  if (d < 1) return crown ? 7 : 5; // the lit rim, brightest on the crown facing the sun
+  if (d < 2) return crown ? 4 : 3;
+  if (a < JAW_C && lipB(a) - b < 1) return WS.gape > SHUT ? 4 : 1; // the upper lip's wet edge, or the shut seam
+  const g = gillIdx(a, b);
+  if (g >= 0) return g;
+  const fin = finIdx(a, b);
+  if (fin >= 0) return fin;
+  if (a > GILL_A + GILL_BOW + 2 && Math.abs(b - LAT_B - (a - GILL_A) * LAT_K) < 0.5 && Math.round(a) % 4) return 4;
+  return ci(dith(BACK + (BELLY - BACK) * clamp((b + 4) / 16, 0, 1), x, y));
+}
+function lowerIdx(x, y, dl) { // the lower jaw (its lip lit) and the pale throat under it
+  if (dl < 1) return WS.gape > SHUT ? 5 : 3;
+  if (dl < JAW_DEEP) return ci(dith(JAW_V, x, y));
+  return dl < JAW_DEEP + 1 ? 2 : ci(dith(THROAT_V, x, y));
+}
+function headIdx(x, y) { // the head's index at a screen pixel, or -1
+  const dx = x - HP.sx, dy = y - HP.sy, a = dx * HP.c + dy * HP.s, b = dy * HP.c - dx * HP.s;
+  if (a < JAW_T - 1 || a > HEAD_LEN) return -1;
+  const top = topB(a);
+  if (b < top || (b > NOSE_B && a < SNOUT_BACK * ((b - NOSE_B) / (LIP0 - NOSE_B)) ** 2 && a < JAW_C && b <= LIP0)) return -1;
+  const ra = a - JAW_C, rb = b - LIP1, la = HP.jc * ra - HP.js * rb + JAW_C, lb = HP.js * ra + HP.jc * rb + LIP1;
+  if (inGape(a, b, la, lb)) return side(HP.ua, HP.ub, HP.ta, HP.tb, a, b) * HP.fs < MOUTH_RIM ? 0 : 19; // lit just inside
+  if (a < JAW_C ? b <= lipB(a) : b <= ventB(a)) return upperIdx(x, y, a, b, b - top);
+  const dl = lb - lipB(la);
+  if (dl < 0 || la < JAW_T + CHIN_K * Math.min(dl, JAW_DEEP) || underThroat(a, b)) return -1;
+  return lowerIdx(x, y, dl);
+}
+// Per column this frame: the head's top row (HY where it is absent) and whether it meets the sea there.
+const HEAD_TOPS = new Int16Array(W), HEAD_FOOT = new Uint8Array(W);
+const HEAD_BOX = { x0: 0, x1: -1 };
+function headBox() {
+  let x0 = W, x1 = -1, y0 = HY;
+  for (const [a, b] of [[0, HEAD_B0], [HEAD_LEN, HEAD_B0], [0, HEAD_B1], [HEAD_LEN, HEAD_B1]]) {
+    const p = headXY(a, b);
+    x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y);
+  }
+  return { x0: Math.max(0, Math.floor(x0)), x1: Math.min(W - 1, Math.ceil(x1)), y0: Math.max(0, Math.floor(y0)) };
+}
+function drawHead() {
+  const bx = headBox();
+  HEAD_TOPS.fill(HY); HEAD_FOOT.fill(0); HEAD_BOX.x0 = bx.x0; HEAD_BOX.x1 = bx.x1;
+  for (let y = bx.y0; y < HY; y++) for (let x = bx.x0; x <= bx.x1; x++) {
+    const v = headIdx(x, y);
+    if (v < 0) continue;
+    TOP[y * W + x] = v;
+    if (y < HEAD_TOPS[x]) HEAD_TOPS[x] = y;
+    if (y === HY - 1) HEAD_FOOT[x] = 1;
+  }
+}
+// Sparse scales on the back: a few curved 2 px marks, a step lighter than the back, behind the gill plate.
+const SCALE_DA = 8, SCALE_DB = 5, SCALE_V = 4;
+function drawScales() {
+  for (let a = GILL_A + GILL_BOW + 6, r = 0; a < HEAD_LEN; a += SCALE_DA, r++) {
+    for (let b = topB(a) + 4 + (r & 1) * 2; b < LAT_B - 2; b += SCALE_DB) {
+      if (hash2(a, b | 0, 53) > 0.55) continue;
+      const p = headXY(a, b), x = Math.round(p.x), y = Math.round(p.y);
+      if (y + 1 >= HY - 1 || x < 1 || x >= W - 1 || TOP[y * W + x] !== BACK) continue;
+      TOP[y * W + x] = SCALE_V; TOP[(y + 1) * W + x - 1] = SCALE_V;
     }
   }
 }
-// One small gold eye on the side of the head, the same slit eye as the bait: gold 13 to 16, a black slit.
+// One small gold eye above the corner of the mouth, the same slit eye as the bait: gold 13 to 16, a black slit.
 const HEAD_EYE = [[-1, -1, 15], [0, -1, 19], [1, -1, 15], [-2, 0, 14], [-1, 0, 16], [0, 0, 19], [1, 0, 16], [2, 0, 14], [-1, 1, 13], [0, 1, 19], [1, 1, 13]];
-function drawHeadEye(cx, up) {
-  const ex = cx + Math.round(EYE_U * HEAD_HW), ey = HY - EYE_UP + Math.round(up);
-  for (const [dx, dy, v] of HEAD_EYE) if (ey + dy < HY - 1) TOP[(ey + dy) * W + ex + dx] = v;
+const EYE_A = 34, EYE_B = -6;
+function drawHeadEye() {
+  const p = headXY(EYE_A, EYE_B), ex = Math.round(p.x), ey = Math.round(p.y);
+  for (const [dx, dy, v] of HEAD_EYE) if (ey + dy < HY - 1 && ex + dx >= 0 && ex + dx < W) TOP[(ey + dy) * W + ex + dx] = v;
 }
-// Water streaming down its sides: short pale dashes that fall from the rim and fade, more toward the edges.
-const STREAKS = 30, STREAK_V = 34;
-function drawStreaks(cx, up, t) {
-  for (let k = 0; k < STREAKS; k++) {
+// Water pouring off it: short bright dashes that fall from the lower lip's tip, the chin, the underside toward
+// the throat and the corner of the mouth, lengthening as they fall, two dashes per stream.
+const STREAMS = 14, POUR_RATE = 1.6, DASH_MAX = 5, CORNER_FALL = 7;
+function streamSrc(k) {
+  const kind = k === 4 ? 4 : k % 4, f = hash2(k, 4, 41); // one stream from the corner, the rest from the jaw
+  if (kind === 0) return jawToHead(JAW_T + 1 + f * 4, lipB(JAW_T));                    // over the lip's tip
+  if (kind === 1) return { a: HP.ca + f * 2, b: HP.cb };                              // the chin
+  if (kind === 4) return jawToHead(JAW_C - 2 - f * 3, lipB(JAW_C) + 1);                // the corner of the mouth
+  const g = 0.15 + 0.5 * f;                                                            // the underside
+  return { a: lerp(HP.ca, HP.va, g), b: lerp(HP.cb, HP.vb, g) };
+}
+function drawStreaks(t) {
+  for (let k = 0; k < STREAMS; k++) {
     if (hash2(k, 1, 41) > WS.streak) continue;
-    const r = hash2(k, 2, 41), u = (k & 1 ? 1 : -1) * (0.2 + 0.78 * Math.sqrt(r));
-    const x = Math.round(cx + u * HEAD_HW), top = headTop(u, up), span = mouthTop(u, top) - top - 2;
-    if (span < 4 || x < 0 || x >= W) continue;
-    const ph = (t * STREAK_V / span + hash2(k, 3, 41)) % 1, y = Math.round(top + 2 + ph * span);
-    const v = ph < 0.4 ? 11 : ph < 0.75 ? 10 : 9;
-    for (let j = 0; j < 3; j++) if (y - j > top + 1) TOP[(y - j) * W + x] = v - j;
+    const s = streamSrc(k), p = headXY(s.a, s.b), x = Math.round(p.x), y0 = Math.round(p.y) + 1;
+    const corner = k === 4, fall = corner ? Math.min(HY - y0, CORNER_FALL) : HY - y0; // the corner only drips
+    if (fall < 3 || x < 0 || x >= W) continue;
+    for (let n = 0; n < 2; n++) {
+      const ph = (t * POUR_RATE + hash2(k, 3, 41) + n * 0.5) % 1, y = y0 + Math.round(ph * ph * fall);
+      const len = corner ? 1 : 1 + Math.round(ph * DASH_MAX);
+      for (let j = 0; j < len; j++) if (y - j >= y0 && y - j < y0 + fall) TOP[(y - j) * W + x] = j === 0 ? 11 : j < len - 1 ? 10 : 9;
+    }
   }
 }
-// The pale water round the speck: while it rises the surface bulges into a low mound; once the mouth is open
-// the mound is a sheet of water on the lower lip that tips in with the speck (gulp) and is gone.
-const BULGE_W = 30, BULGE_H = 6, SHEET_W = 14, SHEET_H = 5, GULP_UP = 6, SLOSH_W = 22, SLOSH_H = 11, SLOSH_FOAM = 4;
+// In the first half second of the rise (shed 1 to 0) sheets of water slide off the top of the snout, back down
+// the crown and off the nose, thinning as they go.
+const SHED_A0 = 0, SHED_A1 = 40, SHED_SLIDE = 14, SHED_DUR = 0.5;
+function drawShed() {
+  const k = WS.shed;
+  if (k <= 0) return;
+  const slide = (1 - k) * SHED_SLIDE, thick = k > 0.3 ? 2 : 1;
+  for (let a = SHED_A0 + slide; a < SHED_A1 + slide; a += 0.6) {
+    if (hash2(a * 2 | 0, 0, 61) > k + 0.2) continue;
+    for (let j = 0; j < thick; j++) {
+      const p = headXY(a, topB(a) + 0.5 + j), x = Math.round(p.x), y = Math.round(p.y);
+      if (x >= 0 && x < W && y >= 0 && y < HY) TOP[y * W + x] = j ? 10 : 11;
+    }
+  }
+}
+// The pale water round the speck: while it rises the surface bulges into a low mound; once the mouth is open a
+// sheet of water lies on the lower lip and pours into the wedge, sliding in with the speck (gulp) until gone.
+const BULGE_W = 30, BULGE_H = 6, MOUND_H = 5, SHEET_A0 = 3, SHEET_A1 = 26, GULP_IN = 16, SLOSH_W = 22, SLOSH_H = 11, SLOSH_FOAM = 4;
 function drawBulge(cx) { // behind the head: it shows either side of it while the head is still narrow
   if (WS.gulp > 0) return;
   const k = WS.bulge;
@@ -1458,13 +1576,17 @@ function drawBulge(cx) { // behind the head: it shows either side of it while th
     for (let j = 1; j <= h; j++) TOP[(HY - j) * W + cx + dx] = j === h ? 10 : 9;
   }
 }
-function drawSheet(cx) {
-  const g = WS.gulp, a = WS.gape * (1 - g);
-  if (a <= 0.02) return;
-  const lift = Math.round(g * GULP_UP), h = Math.round(SHEET_H * (1 - g * 0.5)), w = SHEET_W * (1 - g * 0.6);
-  for (let j = 0; j < h; j++) {
-    const y = HY - 1 - lift - j, hw = Math.round(w * (1 - j / h));
-    for (let dx = -hw; dx <= hw; dx++) if (hash2(dx, j, 23) < a + 0.15) TOP[y * W + cx + dx] = j === h - 1 || Math.abs(dx) === hw ? 11 : j % 3 === 1 ? 9 : 10;
+function drawSheet(t) {
+  const g = WS.gulp, cov = WS.gape * (1 - g);
+  if (cov <= 0.05) return;
+  const s = g * GULP_IN, tk = (t * 10) | 0, mid = JAW_T + SPECK_LA + s;
+  for (let la = SHEET_A0 + s; la < SHEET_A1 + s && la < JAW_C - 2; la += 0.5) {
+    const top = Math.max(2, Math.round(MOUND_H - Math.abs(la - mid) * 0.5)); // heaped round the speck, so it shows
+    for (let j = 1; j <= top; j++) {
+      if (hash2(la * 2 | 0, j + tk, 23) > cov + (j === 1 ? 0.25 : j < top ? 0.1 : -0.2)) continue;
+      const q = jawToHead(la, lipB(la) - j), p = headXY(q.a, q.b), x = Math.round(p.x), y = Math.round(p.y);
+      if (x >= 0 && x < W && y >= 0 && y < HY) TOP[y * W + x] = j === top ? 11 : hash2(x, y, tk) > 0.3 ? 10 : 9;
+    }
   }
 }
 // The water closing over it: a heap of sea at the horizon point that rises and falls back.
@@ -1475,14 +1597,27 @@ function drawSlosh(cx) {
     for (let j = 1; j <= c && cx + dx >= 0 && cx + dx < W; j++) TOP[(HY - j) * W + cx + dx] = j === c ? 10 : j === c - 1 ? 9 : 8;
   }
 }
-// The water at its foot (after the mirror): a churned pale line where the head breaks the surface, the water
-// pouring into the open mouth where the mouth's reflection would be, and the head's reflection broken into
+// The white foam collar where the body meets the sea: piled against it above the line (in TOP) and churned on
+// the rows below it (after the mirror), 10 and 11 broken with 9.
+const COLLAR_PAD = 2;
+function nearFoot(x) {
+  for (let k = -COLLAR_PAD; k <= COLLAR_PAD; k++) if (x + k >= 0 && x + k < W && HEAD_FOOT[x + k]) return true;
+  return false;
+}
+const foamIdx = (x, j, tk) => { const h = hash2(x, j, tk); return h > 0.7 ? 11 : h > 0.3 ? 10 : 9; };
+function drawCollar(t) {
+  const tk = (t * 8) | 0;
+  for (let x = HEAD_BOX.x0; x <= HEAD_BOX.x1; x++) {
+    if (!nearFoot(x)) continue;
+    TOP[(HY - 1) * W + x] = foamIdx(x, 0, tk);
+    if (HEAD_FOOT[x] && hash2(x, 1, tk) > 0.6) TOP[(HY - 2) * W + x] = foamIdx(x, 1, tk);
+  }
+}
+// The water at its foot (after the mirror): the collar's churned rows, and the head's reflection broken into
 // rows by the heave, so the head and its mirror never close into one shape.
-const FOAM_ROWS = 2, POUR_ROWS = 2;
-function lungeWaterPix(v, x, y, j, mh, tk) {
-  if (j < FOAM_ROWS) return hash2(x, j, tk) > 0.4 ? 10 : 9;
-  if (mh > 0 && j < FOAM_ROWS + POUR_ROWS) return (j + tk) % 2 === 0 ? 9 : 8; // pouring over the lip
-  if (v === 19) v = 1; // the mouth is not mirrored: the water in front of it is moving
+const FOAM_ROWS = 2;
+function lungeWaterPix(v, x, y, j, tk) {
+  if (v === 19) v = 1; // the open mouth's mirror is the dark water, not a hole
   if (v < 5 && ((y + (tk >> 1)) % 3 === 0 || hash2(x >> 2, y, tk >> 2) > 0.8)) return v + 3;
   return v;
 }
@@ -1496,19 +1631,25 @@ function drawSloshFoam(cx, t) { // churned white water under the heap, where its
 function drawLungeWater(t) {
   if (WS.slosh > 0 && WS.slosh < 1) drawSloshFoam(lungeCx(), t);
   if (WS.lunge <= 0) return;
-  const cx = lungeCx(), up = (1 - WS.lunge) * HEAD_H, tk = (t * 8) | 0;
-  for (let x = Math.max(0, cx - HEAD_HW); x <= Math.min(W - 1, cx + HEAD_HW); x++) {
-    const u = (x - cx) / HEAD_HW, top = headTop(u, up), mh = HY - mouthTop(u, top);
-    for (let j = 0; j < HY - top && HY + j < H; j++) { const i = (HY + j) * W + x; FRAME[i] = lungeWaterPix(FRAME[i], x, HY + j, j, mh, tk); }
+  const tk = (t * 8) | 0;
+  for (let x = HEAD_BOX.x0; x <= HEAD_BOX.x1; x++) {
+    const foot = nearFoot(x);
+    for (let j = foot ? 0 : FOAM_ROWS; j < HY - HEAD_TOPS[x] && HY + j < H; j++) {
+      const i = (HY + j) * W + x;
+      FRAME[i] = foot && j < FOAM_ROWS ? foamIdx(x, j + 2, tk) : lungeWaterPix(FRAME[i], x, HY + j, j, tk);
+    }
+    if (foot && HEAD_TOPS[x] === HY) for (let j = 0; j < FOAM_ROWS; j++) FRAME[(HY + j) * W + x] = foamIdx(x, j + 2, tk);
   }
 }
 function drawLunge(t) {
-  const cx = lungeCx(), up = (1 - WS.lunge) * HEAD_H;
+  const cx = lungeCx();
+  HEAD_BOX.x1 = -1;
   if (WS.slosh > 0 && WS.slosh < 1) drawSlosh(cx);
   if (WS.lunge <= 0 && WS.bulge <= 0) return;
+  headPose(cx);
   drawBulge(cx);
-  if (WS.lunge > 0) { drawHead(cx, up); drawHeadEye(cx, up); drawStreaks(cx, up, t); }
-  drawSheet(cx);
+  if (WS.lunge <= 0) return;
+  drawHead(); drawScales(); drawHeadEye(); drawShed(); drawSheet(t); drawStreaks(t); drawCollar(t);
 }
 // The eyes in the water (bible, section 8): about eight pairs of red pixels on the surface rows under
 // the horizon beside the boat, fixed per run, with a dimmer pair a row below as the glint. Never reflected.
@@ -1613,14 +1754,22 @@ function farRings(dt) {
   const w = farLive() ? BOAT.w : farSprite(WS.far).w;
   ring(zoomAnchorX(), WL + 1, false, clamp(w / 18, FAR_RING_MIN, 2.4), true); // it outgrows the frame
 }
-// Swallowed: the bulge lifts the speck out of the water onto the head's lower lip, and it tips into the mouth
-// with the sheet (gulp): tipped, then a bit, dithered away, gone at 1.
-const SPECK_LIFT = 0.6, SPECK_SIT = HY - 1, BULGE_LIFT = 0.3;
+// Swallowed: the bulge lifts the speck out of the water, the water drawing it a little toward the mouth; the
+// rising lower jaw scoops it up onto its lip, and it slides into the wedge with the sheet (gulp): tipped, then a
+// bit, dithered away, gone at 1.
+const SPECK_LIFT = 0.6, SPECK_SIT = HY - 1, BULGE_LIFT = 0.3, SPECK_LA = 16, SUCK = 0.7, GULP_DEEP = 3;
+function lungeSpeckAt() {
+  const g = WS.gulp, lift = E.out(clamp(WS.bulge * BULGE_LIFT + WS.lunge / SPECK_LIFT, 0, 1)), wy = lerp(WL, SPECK_SIT, lift);
+  headPose(lungeCx());
+  const la = JAW_T + SPECK_LA + g * GULP_IN, q = jawToHead(la, lipB(la) - g * GULP_DEEP), p = headXY(q.a, q.b);
+  if (WS.lunge > 0 && p.y <= wy) return p;
+  return { x: lerp(zoomAnchorX(), p.x, E.io(clamp(WS.lunge / SUCK, 0, 1))), y: wy };
+}
 function drawLungeSpeck() {
   const g = WS.gulp;
   if (g >= 1) return;
-  const lift = E.out(clamp(WS.bulge * BULGE_LIFT + WS.lunge / SPECK_LIFT, 0, 1)), s = g < 0.3 ? BOAT_SPECK : g < 0.65 ? SPECK_TIP : SPECK_BIT;
-  const b = Math.round(lerp(WL, SPECK_SIT, lift) - g * GULP_UP), x0 = Math.round(zoomAnchorX() - s.ax);
+  const s = g < 0.3 ? BOAT_SPECK : g < 0.65 ? SPECK_TIP : SPECK_BIT, p = lungeSpeckAt();
+  const b = Math.round(p.y), x0 = Math.round(p.x - s.ax);
   stampR(s, x0, b - s.wl, b, 1 - g * g);
   G.tip = { x: x0 + s.tx, y: b - s.wl };
 }
@@ -2756,6 +2905,7 @@ function swallowFloat(t, at, s) {
 function lungeBulge() { tween(WS, 'bulge', 1, SW.bulgeDur, E.io); SFX.surge(); }
 function lungeRise() {
   tween(WS, 'lunge', 1, SW.riseDur, E.out); tween(WS, 'streak', 1, 0.6);
+  WS.shed = 1; tween(WS, 'shed', 0, SHED_DUR, E.lin); // sheets of water slide off the snout
   if (OCEAN.big) tween(OCEAN.big, 'a', 0.35, SW.riseDur); // its head is out of the water
 }
 function lungeGape() { tween(WS, 'gape', 1, SW.gapeDur, E.out); tween(WS, 'bulge', 0, SW.gapeDur); }

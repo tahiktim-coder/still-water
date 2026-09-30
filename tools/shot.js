@@ -189,3 +189,22 @@ function lungeFrame(secs) {
   return 6 + secs;
 }
 if (which === 'all' || which === 'lunge_strip') strip('out_lunge_strip.png', LUNGE_TS, lungeFrame);
+// Phase 27, the lunge head as a fish: crops round the horizon at 4x across the rise (closed, opening, open with
+// the speck on the lip, the speck sliding in, closing, sinking), so the head reads up close.
+const HEAD_TS = [1.75, 1.9, 2.2, 2.85, 3.5, 4.2, 4.6, 5.1], CROP = { x: 40, y: 170, w: 176, h: 100, sc: 4 };
+function cropStrip(name, entries, frame) {
+  const cols = 2, rows = Math.ceil(entries.length / cols), cw = CROP.w * CROP.sc, chh = CROP.h * CROP.sc;
+  const png = new PNG({ width: cw * cols, height: chh * rows });
+  entries.forEach((e, k) => {
+    g.resetAll();
+    const out = save();
+    g.render(frame(e));
+    const ox = (k % cols) * cw, oy = Math.floor(k / cols) * chh;
+    for (let y = 0; y < chh; y++) for (let x = 0; x < cw; x++) {
+      const p = out[(CROP.y + Math.floor(y / CROP.sc)) * W + CROP.x + Math.floor(x / CROP.sc)], i = ((oy + y) * png.width + ox + x) * 4;
+      png.data[i] = p & 255; png.data[i + 1] = (p >>> 8) & 255; png.data[i + 2] = (p >>> 16) & 255; png.data[i + 3] = 255;
+    }
+  });
+  fs.writeFileSync(path.join(OUT_DIR, name), PNG.sync.write(png));
+}
+if (which === 'all' || which === 'lunge_head') cropStrip('out_lunge_head.png', HEAD_TS, lungeFrame);
