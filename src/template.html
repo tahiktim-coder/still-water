@@ -50,8 +50,10 @@ body {
   font-family: var(--font); font-optical-sizing: auto; font-synthesis: none;
 }
 :root[lang="ru"] body { -webkit-hyphens: manual; hyphens: manual; }
-/* The pixel face: never faux-bolded, no tracking, and its full-cell space pulled in so two words do not look double-spaced. */
-.px { font-family: var(--font-px); font-weight: 400; letter-spacing: 0; word-spacing: -0.4em; text-transform: none; line-height: 1.25; }
+/* The pixel face: never faux-bolded, no tracking, and its full-cell space pulled in so two words do not look double-spaced.
+   Its ligatures are off: Press Start 2P squeezes "fi" into one 8 px cell, so "Golden fish" read "Golden ﬁsh". */
+.px { font-family: var(--font-px); font-weight: 400; letter-spacing: 0; word-spacing: -0.4em; text-transform: none; line-height: 1.25;
+  font-variant-ligatures: none; font-feature-settings: "liga" 0, "clig" 0; }
 #wrap { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 #stage {
   position: relative; overflow: hidden; width: 216px; height: 384px;
