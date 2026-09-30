@@ -477,6 +477,24 @@ const COMP_STAND = sprite([
   '...0.0...',
   '..00.00..',
 ]);
+// Phase 29: the crouch before the launch, in profile toward the sun on his left: head low and forward, one red
+// eye, the arms swung back, the knees bent over the plank.
+const COMP_CROUCH = sprite([
+  '..000......',
+  '.00000.....',
+  '.X00000....',
+  '.000000....',
+  '..00000....',
+  '..00000000.',
+  '.0000000000',
+  '.00000000.00',
+  '000000000..0',
+  '00..000000..',
+  '.00...0000..',
+  '..00..000...',
+  '..000.0000..',
+].map(r => r.padEnd(12, '.')));
+// (The crouch's rim, lit by the eye up and to the left, is added once sunRim is defined, below.)
 const COMP_LEAP = sprite([
   '.....000....',
   '....00000...',
@@ -503,17 +521,27 @@ function scale2(s) {
 // Backlit by the eye: a 1 px rim of a bright ramp index on the edges facing the disc (left and below), so
 // the dark frame reads against the dark ridge behind the stern as well as against the sky.
 const LEAP_RIM = 10;
-function sunRim(s, v) {
+function sunRim(s, v, up) {
   const d = s.data.slice();
   for (let j = 0; j < s.h; j++) for (let i = 0; i < s.w; i++) {
     const k = j * s.w + i;
     if (s.data[k] === 255) continue;
-    const left = i === 0 || s.data[k - 1] === 255, below = j === s.h - 1 || s.data[k + s.w] === 255;
-    if (left || below) d[k] = v;
+    const left = i === 0 || s.data[k - 1] === 255;
+    const edge = up ? j === 0 || s.data[k - s.w] === 255 : j === s.h - 1 || s.data[k + s.w] === 255;
+    if (left || edge) d[k] = v;
   }
   return { w: s.w, h: s.h, data: d };
 }
 const COMP_LEAP2 = sunRim(scale2(COMP_LEAP), LEAP_RIM);
+const COMP_CROUCH_LIT = sunRim(COMP_CROUCH, LEAP_RIM, true);
+// Phase 29: hanging from the eye by both hands, the left hooked over the top of the rim and the right on its
+// slope, the head between the arms, the legs kicking (two frames). Stamped at 2x like the leap, solid dark:
+// on the lit disc the silhouette is the read, so it carries no rim.
+const CLING_TOP = ['0.....', '0.....', '0.00..', '0.00.0', '000000', '.0000.', '.0000.', '.0000.', '.0000.'];
+const COMP_CLING2 = [
+  scale2(sprite(CLING_TOP.concat(['.0..0.', '.0..0.', '.0...0', '0....0']))),
+  scale2(sprite(CLING_TOP.concat(['.0..0.', '0...0.', '0..0..', '...0..']))),
+];
 const BIRD = [sprite(['1...1', '.1.1.', '..1..']), sprite(['.....', '11.11', '..1..'])];
 const EXCL = sprite(['.1.', '1b1', '1b1', '1b1', '.1.', '1b1', '.1.']);
 const ICON = sprite(['.bbb.b', 'bbbbbb', '.bbb.b']);
@@ -1221,6 +1249,7 @@ const RU = {
   'Stay with him. Two wishes, one seat.': 'Остаться с ним. Два желания, одно место.',
   'He said he’d stay with me.': 'Он сказал, что останется со мной.',
   'He said a lot of things.': 'Мало ли что он говорил.',
+  'Stay.': 'Останься.',
   'It’s all still down there. Nobody comes back up with it.': 'Золото всё там же, внизу. Никто не поднимается с ним наверх.',
   'You say nothing.': 'Ты молчишь.',
   'It waits. Then it goes dark in the bottom of the boat.': 'Она ждёт. Потом гаснет на дне лодки.',
@@ -1282,6 +1311,10 @@ function resetWS() {
     // Stay: companionStand swaps in the standing frame, leap is his progress along the parabola to the disc
     // (held at 1 while he rides it down), rock the boat's push-off wobble, lanternWarm widens the glow.
     companionStand: 0, leap: 0, rock: 0, lanternWarm: 0,
+    // Phase 29: companionCrouch the crouch before the launch, cling him hanging from the disc's rim, strain the
+    // line bowing and shivering under his weight (0 to 1, back to 0 as it snaps), eyeWide the eye widening
+    // as he comes (the pupil and the iris grow).
+    companionCrouch: 0, cling: 0, strain: 0, eyeWide: 0,
     // Phase 6: dive is the Deep descent (the horizon rises past the top and the mirror fills the frame);
     // glint is the gold pile's two-frame sparkle seen from beneath.
     dive: 0, glint: 0,
@@ -1541,17 +1574,20 @@ function renderTop(t) {
 // still-water dawn) its halo reaches the top of the ramp, and a darker rim read as a hollow ring; there the
 // disc takes the star white (index 20, above the ramp) with an index 11 rim, so it reads as a solid coin.
 const SUN_SOLID_MOOD = 0.04;
+// Stay: as he comes the eye widens, the pupil slit by up to EYE_WIDE_PX a side and the pale iris by a fifth.
+const EYE_WIDE_PX = 3, EYE_WIDE_IRIS = 0.2;
 function sunPix(dx, dy, d2) {
   const r = WS.sunR;
   if (WS.sunKind === 0) {
     const rim = d2 > (r - 1) * (r - 1);
     return WS.mood > SUN_SOLID_MOOD ? (rim ? 11 : 20) : (rim ? 10 : 11);
   }
-  let v = d2 > (r - 1.6) * (r - 1.6) ? 8 : d2 < (r * 0.5) * (r * 0.5) ? 10 : 9;
+  const ir = r * (0.5 + EYE_WIDE_IRIS * WS.eyeWide);
+  let v = d2 > (r - 1.6) * (r - 1.6) ? 8 : d2 < ir * ir ? 10 : 9;
   if (WS.pupil > 0.01) {
     const ph = r * 0.84, px = dx - WS.pupilDx;
     if (Math.abs(dy) < ph) {
-      const half = WS.pupil * 2.3 * Math.sqrt(1 - (dy * dy) / (ph * ph));
+      const half = WS.pupil * (2.3 + EYE_WIDE_PX * WS.eyeWide) * Math.sqrt(1 - (dy * dy) / (ph * ph));
       const ax = Math.abs(px);
       if (ax <= half) v = 1; else if (ax <= half + 1.1) v = 6;
     }
@@ -1588,13 +1624,20 @@ function topExtras(t) {
   // The far boat reflects for free, and stays through the opening's dip to black (it leaves behind full black).
   if (WS.farBoat > 0 && (G.phase === 'title' || (G.open && G.open.stage === 0))) stampTop(FARBOAT, FAR_X, HY - FARBOAT.h);
   drawLunge(t); // Swallowed: the head is in the sky buffer, so it reflects
-  if (WS.stalk > 0) {
-    const yEnd = WS.sunY - WS.sunR * 0.9;
-    const y1 = yEnd * WS.stalk * (1 - WS.stalkCut);
-    for (let y = 0; y < Math.min(HY, y1); y++) {
-      const x = Math.round(WS.sunX + Math.sin(y * 0.04 + t * 0.9) * 0.8 * (y / Math.max(1, yEnd)));
-      if (x >= 0 && x < W && mountIdx(x, y) === 255) TOP[y * W + x] = 1;
-    }
+  if (WS.stalk > 0) drawStalk(t);
+}
+// The line holding the sun. Stay: under his weight it bows toward the stern and shivers (strain), and after
+// the snap the loose upper part keeps whipping as it recoils (strain dies out while stalkCut rises).
+const STALK_BOW = 5, STALK_SHIVER = 1.3;
+function drawStalk(t) {
+  const yEnd = WS.sunY - WS.sunR * 0.9, st = WS.strain;
+  const y1 = yEnd * WS.stalk * (1 - WS.stalkCut), iy = 1 / Math.max(1, yEnd);
+  for (let y = 0; y < Math.min(HY, y1); y++) {
+    const f = y * iy;
+    let x = WS.sunX + Math.sin(y * 0.04 + t * 0.9) * 0.8 * f;
+    if (st > 0) x += st * (STALK_BOW * Math.sin(Math.PI * f) + Math.sin(t * 71 + y * 0.45) * STALK_SHIVER * f);
+    x = Math.round(x);
+    if (x >= 0 && x < W && mountIdx(x, y) === 255) TOP[y * W + x] = 1;
   }
 }
 // The sun's reflection is one pixel larger than the disc (bible, 8c). The white sun is redrawn in the
@@ -2112,7 +2155,10 @@ function drawLungeSpeck() {
   G.tip = { x: x0 + s.tx, y: b - s.wl };
 }
 // Facing the horizon, turned (the red), or standing (Stay).
-function compSprite() { return WS.companionStand > 0.5 ? COMP_STAND : WS.companionTurn > 0.5 ? COMP_TURN : COMP; }
+function compSprite() {
+  if (WS.companionCrouch > 0.5) return COMP_CROUCH_LIT;
+  return WS.companionStand > 0.5 ? COMP_STAND : WS.companionTurn > 0.5 ? COMP_TURN : COMP;
+}
 // The boat's left corner on screen, the origin of every sprite in the boat group.
 function boatLeft() { return Math.round(zoomAnchorX() - zoomCx()); }
 // The gold sink (bible, section 8): at boatSunk 1 the hull rides SINK_PX lower, which puts the prow curl and
@@ -2241,6 +2287,7 @@ const seatTop = (s, dy) => compY(dy) - (s.h - COMP.h);
 // then rides the disc down at leap 1. It is a reflecting sprite whose mirror line slides from the boat's
 // waterline to the horizon, where the disc's own reflection is, so the two go under together.
 function drawCompanion(t, bx, dy) {
+  if (WS.cling > 0) { const c = clingAt(); stampR(COMP_CLING2[((t * 7) | 0) & 1], c.x, c.y, HY); return; }
   if (WS.leap <= 0) { stampR(lanternRim(compSprite()), bx + COMP_DX, seatTop(compSprite(), dy) + swimBob(t, 2.6), WL, WS.companion); return; }
   const p = WS.leap, s = COMP_LEAP2;
   for (let k = LEAP_TRAIL.length - 1; k >= 0; k--) { // the oldest first, so the nearer ones sit on top
@@ -2252,11 +2299,19 @@ function drawCompanion(t, bx, dy) {
   const c = leapXY(p, bx, dy);
   stampR(s, Math.round(c.x - s.w / 2), Math.round(c.y - s.h / 2), leapWL(p));
 }
-// The centre of the leaping frame: from his seat (feet on the plank) along the parabola to the disc's centre.
+// The centre of the leaping frame: from his seat (feet on the plank) along the parabola to where he clings.
 function leapXY(p, bx, dy) {
-  const x0 = bx + COMP_DX + COMP.w / 2, y0 = compY(dy) + COMP.h - COMP_LEAP2.h / 2;
+  const x0 = bx + COMP_DX + COMP.w / 2, y0 = compY(dy) + COMP.h - COMP_LEAP2.h / 2, c = clingAt();
+  const x1 = c.x + COMP_CLING2[0].w / 2, y1 = c.y + COMP_CLING2[0].h / 2;
   // x leads (out-eased), so he is over the open sky between the ridges before the top of the arc
-  return { x: lerp(x0, WS.sunX, E.out2(p)), y: lerp(y0, WS.sunY + 1, p) - LEAP_ARC * 4 * p * (1 - p) };
+  return { x: lerp(x0, x1, E.out2(p)), y: lerp(y0, y1, p) - LEAP_ARC * 4 * p * (1 - p) };
+}
+// The cling frame's top-left: its left hand hooked over the rim CLING_DX right of the top, the body down the
+// disc's stern side, clear of the pupil.
+const CLING_DX = 8;
+function clingAt() {
+  const r = WS.sunR, hx = CLING_DX + 1;
+  return { x: Math.round(WS.sunX + CLING_DX), y: Math.round(WS.sunY - Math.sqrt(r * r - hx * hx) - 3) };
 }
 const leapWL = p => Math.round(lerp(WL, HY, p));
 // A sprite's silhouette in one index, Bayer-dithered to alpha in screen space (the leap's trail, an even
@@ -2353,6 +2408,7 @@ function drawLanding() {
 function drawParts(t) {
   for (const p of PARTS) {
     if (p.blink && (((t * 12 + p.x) | 0) % 3) === 0) continue;
+    if (p.fade && BAYER[((p.y & 3) << 2) | (p.x & 3)] > 1 - p.life / p.max) continue; // steam thins as it rises
     plot(p.x, p.y, p.v);
     if (p.tall) plot(p.x, p.y + 1, p.v - 1); // spray: a drop and its trail
   }
@@ -2613,6 +2669,8 @@ const SFX = {
   slam() { this.noise(0.9, 0.34, 'lowpass', 700, 70, 1); this.tone(62, 0.8, 'sine', 0.32, 30); },
   douse() { this.noise(1.4, 0.24, 'lowpass', 2800, 260, 0.7); this.noise(0.6, 0.08, 'highpass', 3000, 1200, 0.5, 0.2); },
   crunch() { this.noise(0.9, 0.45, 'lowpass', 900, 60, 1.2); this.tone(90, 1, 'sawtooth', 0.25, 28); },
+  // Stay: the line straining under him, a rising creak (a rough low saw sliding up through a narrow band).
+  creak(d) { this.tone(58, d, 'sawtooth', 0.12, 150); this.noise(d, 0.07, 'bandpass', 320, 1500, 7); this.tone(117, d, 'square', 0.03, 300); },
   knock() { this.tone(88, 0.16, 'sine', 0.32, 52); this.noise(0.12, 0.16, 'lowpass', 380, 140, 1.2); }, // one knock, muffled by the water between
   heartbeat() { this.tone(52, 0.2, 'sine', 0.3, 40); this.tone(48, 0.22, 'sine', 0.24, 36, 0.26); },
   drone(on) {
@@ -2836,58 +2894,105 @@ const CINE_DARK = {
     at('fade', 8.3, () => UI.fade(1, 1));
   },
 };
-// Stay (bible, section 8): two claims collide over him. He stands, the eye snaps to him and the heartbeat
-// quickens; he leaps from the stern along a parabola to the red disc; on impact the glow spikes, the eye
-// closes and the disc drops from its line into the sea exactly as in the still-water cut, and he goes under
-// with it. Then the night comes back without a sun: the lantern stays lit and warms a little, the boat sits
-// where it is, and the last three seconds fade to black. The sun never returns; sunX never moves.
+// Stay (bible, section 8), phase 29: a fight you can see. He stands, the eye snaps to him and the heartbeat
+// quickens; he crouches and says one word (the only timed bubble in the game); he launches from a rocking
+// boat with a spray at the stern and flies a long arc at the eye, which widens and tracks him; he lands and
+// clings to its rim; the line strains, creaks and snaps, and the disc falls into the sea with him on it in a
+// hiss of steam. Then the red drains back to night without a sun: the lantern stays lit and warms a little,
+// the seat is empty, and the last three seconds fade to black. The sun never returns; sunX never moves.
 const STAY_LOOK = 7;                    // pupilDx toward the stern, which is to the right of the disc
-// Phase 23: a slower leap (2.4 s) so a phone can follow it, and the impact frame held STAY_HOLD before the drop.
-const STAY_LEAP_AT = 2, STAY_LEAP_DUR = 2.4, STAY_HIT = STAY_LEAP_AT + STAY_LEAP_DUR, STAY_HOLD = 0.45;
-const STAY_DROP_AT = STAY_HIT + STAY_HOLD, STAY_DROP = 1.5, STAY_UNDER = STAY_DROP_AT + STAY_DROP, STAY_NIGHT = 5, STAY_FADE_AT = 13;
+const STAY_WORD = 'Stay.';
+const STAY_SAY_AT = 0.4, STAY_CROUCH_AT = 1.2, STAY_LEAP_AT = 1.8, STAY_LEAP_DUR = 2.4, STAY_HIT = STAY_LEAP_AT + STAY_LEAP_DUR;
+const STAY_STRAIN = 0.7, STAY_SNAP = STAY_HIT + STAY_STRAIN, STAY_DROP = 1.5, STAY_UNDER = STAY_SNAP + STAY_DROP;
+const STAY_SAG = 3, STAY_STEAM = 2, STAY_STEAM_RATE = 70, STAY_NIGHT = 5, STAY_FADE_AT = 13;
 // The eye follows him through the arc: from STAY_LOOK at the stern to straight at him as he reaches it.
 function stayEyeTrack() {
   const c = leapXY(WS.leap, boatLeft(), boatSinkPx());
   WS.pupilDx = clamp((c.x - WS.sunX) * 0.12, -STAY_LOOK, STAY_LOOK);
 }
+// His one word, in his bubble, shown for STAY_LEAP_AT - STAY_SAY_AT and hidden as he launches.
+function staySay() { UI.think(tr(STAY_WORD), { side: 'companion', more: false }); }
+// Sunk: he floats, so there is nothing to crouch on and nothing to rock.
+function stayCrouch() { if (!swimming()) { WS.companionStand = 0; WS.companionCrouch = 1; } }
+const sternX = () => boatLeft() + COMP_DX + 4;
+// Stay's water, thrown up pale (the bone accent and the star white) so it reads on the glare and the ridge
+// alike: tall drops from x, spread w wide, pushed by vx0 and vx, rising to vy.
+const STAY_WATER = [22, 20, 12];
+function stayBurst(x, y, n, w, vx0, vx, vy) {
+  for (let k = 0; k < n; k++) PARTS.push({ x: x + (Math.random() - 0.5) * w, y, vx: vx0 + (Math.random() - 0.5) * vx, vy: -vy * (0.35 + Math.random() * 0.65), life: 0, max: 1.6, v: STAY_WATER[k % 3], floor: y + 1, g: 150, tall: true });
+}
 function stayPushOff() {
-  WS.companionStand = 0;
-  if (!swimming()) { WS.rock = 1; tween(WS, 'rock', 0, 1.2); } // no boat to rock on the sunk path
-  const x = boatLeft() + COMP_DX + 4;
-  ring(x, WL + 1); ring(x + 3, WL + 2); SFX.plop();
+  UI.thinkHide();
+  WS.companionStand = 0; WS.companionCrouch = 0;
+  if (!swimming()) { WS.rock = 2.2; tween(WS, 'rock', 0, 1.6); }
+  const x = sternX();
+  ring(x, WL + 1); ring(x + 4, WL + 2); stayBurst(x + 4, WL - 1, 22, 10, 26, 44, 70); SFX.plop(); SFX.whoosh();
 }
-// The glow spike is skipped for a player who asked for less motion; the sky fish goes under with the sun.
-function stayImpact() {
+function stayFlight(t) {
+  WS.leap = clamp((t - STAY_LEAP_AT) / STAY_LEAP_DUR, 0, 1);
+  WS.eyeWide = E.io(WS.leap);
+  stayEyeTrack();
+}
+// He lands and hangs on: the glow spikes for two frames (skipped for reduced motion), the crunch, the creak.
+function stayImpact(s) {
   if (!REDUCED_MOTION) WS.sunGlow = 2.4;
-  WS.leap = 1; WS.pupil = 0; SFX.crunch(); goldFishFade(STAY_HOLD + STAY_DROP);
+  WS.leap = 0; WS.cling = 1; WS.eyeWide = 1; s.yHit = WS.sunY;
+  SFX.crunch(); SFX.creak(STAY_STRAIN); goldFishFade(STAY_STRAIN + STAY_DROP);
 }
-function stayDiscHitsWater() { SFX.hiss(2.2); ring(SUNX, HY + 3, true); ring(SUNX, HY + 3); splash(SUNX, HY + 2, 10); SFX.drone(false); }
-function stayGoneUnder() { WS.companion = 0; WS.leap = 0; }
+// The line takes his weight: it bows and shivers harder, the disc sags and trembles.
+function stayStrain(t, s) {
+  const k = clamp((t - STAY_HIT) / STAY_STRAIN, 0, 1);
+  WS.strain = 0.35 + 0.65 * k;
+  WS.sunY = s.yHit + Math.round(STAY_SAG * k) + (REDUCED_MOTION ? 0 : ((t * 24) | 0) & 1);
+}
+function staySnap(s) { SFX.snap(); SFX.snapLow(); s.ySnap = WS.sunY; }
+// The disc and he fall together; the upper line recoils, whipping; where they meet the water, the splash.
+function stayFall(t, dt, s) {
+  const k = clamp((t - STAY_SNAP) / STAY_DROP, 0, 1);
+  WS.sunY = lerp(s.ySnap, HY + 28, E.in(k));
+  WS.stalkCut = clamp((t - STAY_SNAP) / 0.5, 0, 1);
+  WS.strain = Math.max(0, 1 - (t - STAY_SNAP) / 0.6);
+  WS.sunGlow = lerp(1.25, 0.12, clamp((t - STAY_SNAP - 0.1) / 1.8, 0, 1));
+  if (!s.wet && WS.sunY + WS.sunR >= HY) { s.wet = t; stayDiscHitsWater(); }
+  if (s.wet && t - s.wet < STAY_STEAM) staySteam(dt * STAY_STEAM_RATE * (1 - (t - s.wet) / STAY_STEAM), s);
+}
+function stayDiscHitsWater() {
+  SFX.hiss(3); SFX.splash(); SFX.drone(false);
+  ring(SUNX, HY + 3, true); ring(SUNX, HY + 3); ring(SUNX, HY + 5, true, 1.5);
+  stayBurst(SUNX, HY, 40, 26, 0, 80, 105);
+}
+// Steam off the drowned sun: pale specks rising and drifting, thinning as they go (fade dithers them out).
+function staySteam(n, s) {
+  s.steam = (s.steam || 0) + n;
+  for (; s.steam >= 1; s.steam--) PARTS.push({ x: SUNX + (Math.random() - 0.5) * 22, y: HY - 1, vx: (Math.random() - 0.5) * 7 + 2, vy: -6 - Math.random() * 10, life: 0, max: 1.4 + Math.random() * 0.8, v: STAY_WATER[(Math.random() * 2) | 0], floor: 9999, g: 0, fade: true });
+}
+function stayGoneUnder() { WS.companion = 0; WS.leap = 0; WS.cling = 0; WS.pupil = 0; WS.eyeWide = 0; }
+// The red drains back to night: stars (none if frozen), no ash, the night glows, the lantern warmer.
+function stayNight(t) {
+  const k = clamp((t - STAY_UNDER) / STAY_NIGHT, 0, 1);
+  if (k <= 0) return;
+  WS.mood = lerp(2, 1, k); WS.starA = WS.frozen ? 0 : k; WS.ash = 1 - k;
+  WS.horizGlow = lerp(1.3, 0.3, k); WS.lanternWarm = 0.6 * k;
+}
 const CINE_STAY = {
   dur: 16,
   init(s) {
-    s.y0 = WS.sunY;
     if (!swimming()) WS.companionStand = 1; // sunk: he leaps from the water, never stands on it
     tween(WS, 'pupilDx', STAY_LOOK, 0.4);
     G.hbGap = HB_GAP * 0.45; G.hb = Math.min(G.hb, 0.4); // the heartbeat quickens
   },
   update(t, dt, at, s) {
+    at('say', STAY_SAY_AT, staySay);
+    at('crouch', STAY_CROUCH_AT, stayCrouch);
     at('leap', STAY_LEAP_AT, stayPushOff);
-    if (t >= STAY_LEAP_AT && t < STAY_HIT && WS.companion > 0) { WS.leap = clamp((t - STAY_LEAP_AT) / STAY_LEAP_DUR, 0, 1); stayEyeTrack(); }
-    at('hit', STAY_HIT, stayImpact);
-    at('unspike', STAY_HIT + 0.07, () => { WS.sunGlow = 1.25; }); // the spike lasts two frames; the frame holds STAY_HOLD
-    if (t >= STAY_DROP_AT) {
-      WS.sunY = lerp(s.y0, HY + 28, E.in(clamp((t - STAY_DROP_AT) / STAY_DROP, 0, 1)));
-      WS.stalkCut = clamp((t - STAY_DROP_AT) / 0.7, 0, 1);
-    }
-    at('hiss', STAY_DROP_AT + 1.3, stayDiscHitsWater);
+    if (t >= STAY_LEAP_AT && t < STAY_HIT && WS.companion > 0) stayFlight(t);
+    at('hit', STAY_HIT, () => stayImpact(s));
+    at('unspike', STAY_HIT + 0.07, () => { WS.sunGlow = 1.25; }); // the spike lasts two frames
+    if (t >= STAY_HIT && t < STAY_SNAP) stayStrain(t, s);
+    at('snap', STAY_SNAP, () => staySnap(s));
+    if (t >= STAY_SNAP) stayFall(t, dt, s);
     at('under', STAY_UNDER, stayGoneUnder);
-    if (t > STAY_DROP_AT + 0.1) WS.sunGlow = lerp(1.25, 0.12, clamp((t - STAY_DROP_AT - 0.1) / 2.5, 0, 1));
-    const k = clamp((t - STAY_UNDER) / STAY_NIGHT, 0, 1);
-    if (k > 0) {
-      WS.mood = lerp(2, 1, k); WS.starA = WS.frozen ? 0 : k; WS.ash = 1 - k; // a frozen sky stays starless
-      WS.horizGlow = lerp(1.3, 0.3, k); WS.lanternWarm = 0.6 * k;
-    }
+    stayNight(t);
     at('fade', STAY_FADE_AT, () => UI.fade(1, 3));
   },
 };
@@ -4542,7 +4647,7 @@ if (IS_BROWSER) {
     get H() { return H; }, W, HY,
     spawnShadows, SHAD, spawnBirds, BIRDS, RINGS, RUN, ENDING_COUNT,
     OCEAN, spawnOceanShadow, spawnSeaShoal, bigRise, bigEnter, bigRestY, untween, bubble, boatLeft, WL,
-    oceanCast, oceanTold, playCine, CINE_OCEAN,
+    oceanCast, oceanTold, playCine, CINE_OCEAN, CINE_STAY, THINK_AT,
     setCloudT(v) { cloudT = v; },
     setLang(l) { LANG = LANGS.indexOf(l) >= 0 ? l : DEFAULT_LANG; }, tr, get LANG() { return LANG; },
   };

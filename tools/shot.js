@@ -146,13 +146,14 @@ if (which === 'all' || which === 'deep_glint') shot('out_deep_glint.png', (ws, G
 // the same for the swimmer (a sunk run at sea).
 const ZOOM_FARS = [0, 0.14, 0.28, 0.43, 0.57, 0.71, 0.86, 1], STRIP_COLS = 4, STRIP_SC = 2;
 // A contact sheet: one frame per entry, set up by frame(entry) after a reset, tiled four across at 2x.
-function strip(name, entries, frame) {
+function strip(name, entries, frame, overlay) {
   const H = g.H, rows = Math.ceil(entries.length / STRIP_COLS);
   const png = new PNG({ width: W * STRIP_SC * STRIP_COLS, height: H * STRIP_SC * rows });
   entries.forEach((e, k) => {
     g.resetAll();
     const out = save();
     g.render(frame(e));
+    if (overlay) overlay(out, e, k);
     const ox = (k % STRIP_COLS) * W * STRIP_SC, oy = Math.floor(k / STRIP_COLS) * H * STRIP_SC;
     for (let y = 0; y < H * STRIP_SC; y++) for (let x = 0; x < W * STRIP_SC; x++) {
       const p = out[Math.floor(y / STRIP_SC) * W + Math.floor(x / STRIP_SC)], i = ((oy + y) * png.width + ox + x) * 4;
@@ -208,3 +209,24 @@ function cropStrip(name, entries, frame) {
   fs.writeFileSync(path.join(OUT_DIR, name), PNG.sync.write(png));
 }
 if (which === 'all' || which === 'lunge_head') cropStrip('out_lunge_head.png', HEAD_TS, lungeFrame);
+// Phase 29, Stay as a fight you can see: eight beats timed from the cinematic's start: the crouch with his
+// one-word bubble (its DOM box marked by a dashed outline at THINK_AT.companionRed), the launch from the
+// rocking boat, mid-flight, the eye widening as he arrives, clinging to the rim, the line snapping, the fall
+// and the splash with steam, the night after.
+const STAY_TS = [1.5, 1.95, 2.9, 3.95, 4.5, 5.0, 6.1, 12];
+function stayFrame(secs) {
+  const ws = g.WS;
+  redSky(ws); ws.companion = 1; ws.companionTurn = 1; g.G.bob = { x: 101, y: g.HY + 5, taut: true };
+  g.playCine(g.CINE_STAY);
+  for (let i = 0; i < Math.round(secs * 60); i++) g.update(1 / 60);
+  return 7 + secs;
+}
+const BUBBLE_H = 20; // about one line of bubble text at phone size, in internal pixels
+function markBubble(out, secs) {
+  if (!g.UI.log.some(l => l[0] === 'think') || secs >= 1.8) return;
+  const a = g.THINK_AT.companionRed, x0 = a.left, x1 = Math.round(a.left + W * 0.4), y1 = a.y, y0 = y1 - BUBBLE_H;
+  const dot = (x, y) => { if ((x + y) & 2) out[y * W + x] = 0xffffffff; };
+  for (let x = x0; x <= x1; x++) { dot(x, y0); dot(x, y1); }
+  for (let y = y0; y <= y1; y++) { dot(x0, y); dot(x1, y); }
+}
+if (which === 'all' || which === 'stay_strip') strip('out_stay_strip.png', STAY_TS, stayFrame, markBubble);
