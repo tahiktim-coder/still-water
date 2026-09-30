@@ -8,7 +8,7 @@ In Russian (Тихий омут): **https://tahiktim-coder.github.io/still-water
 
 Controls: tap to cast, then tap when the float goes under. Hold to reel, and let go before the line snaps. When the golden fish speaks, tap to read on and pick an answer. Someone in the boat can be tapped too.
 
-A run takes about four minutes and ends one of six ways (Home, Dark, Still water, Stay, Deep, Swallowed), depending on what you ask for and what you keep. The endings you have found are counted on the title.
+A run takes about four minutes and ends one of seven ways (Home, Dark, Still water, Stay, Deep, Swallowed, Inside), depending on what you ask for and what you keep. The endings you have found are counted on the title.
 
 ## Develop
 ```

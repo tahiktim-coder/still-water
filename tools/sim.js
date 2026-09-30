@@ -127,7 +127,7 @@ function play(plan, label, opts) {
 const BAIT_END = 'There is a bait in your pocket. It has an eye.';
 // Phase 23, the knocking on the home path: both captions and the fish's line, and the cabin card sentences.
 const KNOCKS = ['Someone knocks on the cabin door.', 'The knocking again. Slower.', 'Don’t mind the knocking. They’re not trying to get in.'];
-const CABIN_HOME = 'The knocking stops. Now it’s you on the inside.';
+const CABIN_HOME = 'The knocking stops. Nobody answers it now.';
 const CABIN_DARK = 'The knocking goes on all night. Nobody opens.';
 const CABIN_CUT = 'The cabin goes dark. The knocking stops. You don’t go back to see why.';
 const NEXT_SUN = ' Somewhere a sun is coming up. Someone is rowing out.';
@@ -152,6 +152,15 @@ const BASES = {
   18: 'The gold is somewhere below. The water is warmer than you thought, and full of light, and the big ones let you pass. There is no bottom.',
   19: 'You wanted nothing. It showed you anyway. You row until the water is only water. Some evenings, the sunset looks back.',
   20: 'Somewhere far above, the sun is still shining on the sea. There is no boat on it.',
+  21: 'You open the door. Someone was waiting to get out. They take the boat. Some nights you hear them cast. Some nights, you knock.',
+  22: 'You swim ashore and open the door. Someone was waiting to get out. They walk into the water, toward the gold. Some nights, you knock.',
+};
+// Phase 30, Inside: the Russian card text too, asserted in the Russian pass ({ ruCard: { base, extra } }).
+const RU_INSIDE = {
+  21: 'Ты открываешь дверь. Там кто-то ждал, чтобы выйти. Он берёт твою лодку. Иногда ночью ты слышишь, как он забрасывает леску. Иногда ночью стучишь ты.',
+  22: 'Ты доплываешь до берега и открываешь дверь. Там кто-то ждал, чтобы выйти. Он уходит в воду, к золоту. Иногда ночью стучишь ты.',
+  kept: 'Золотая рыбка уходит с ним. Ты остаёшься за дверью.',
+  forever: 'День за окном не кончается. Ты смотришь на него в окно.',
 };
 function baitOk(r, opts) {
   if (!r.id.startsWith('cut')) return r.text.indexOf(BAIT_END) < 0;
@@ -184,7 +193,7 @@ const plans = [
   [[1, 2, 2, 1], 'keep, home, gold -> dark (lake, sunk)', 'The golden fish circles you all night, glowing less each time.', { base: 6, says: ['The water goes very still. The flame leans toward the fish.', 'Don’t leave me out here.'] }],
   // Phase 6, the gold sink and Deep: gold at wish 2 sinks the boat; 'Let me get my gold' sits after Cut the
   // line (no Stay) or after Stay with him.
-  [[0, 2, 2, 3], 'let go, home, gold -> deep', 'and there is no bottom.', { base: 17 }],
+  [[0, 2, 2, 4], 'let go, home, gold -> deep', 'and there is no bottom.', { base: 17 }],
   [[1, 0, 0, 2, 0, 4], 'keep, company (someone), gold, yes -> deep (kept)', 'The golden fish goes down with you. It knows the way.', { base: 17 }],
   [[0, 2, 2, 0], 'let go, home, gold -> home (lake, sunk)', CABIN_HOME, { base: 2, says: KNOCKS }],
   [[0, 2, 3, 1], 'let go, home, nothing -> dark (lake, the cabin line)', CABIN_DARK, { base: 5, says: KNOCKS }],
@@ -201,6 +210,9 @@ const plans = [
   [[1, 3, 2, 2], 'keep, nothing, gold -> cut (lake, sunk, kept let go)', 'You let it go. It let you.', { base: 10, noPocket: true, says: ['You let the golden fish go.'] }],
   [[0, 0, 0, 2, 0, 2], 'let go, company (someone), gold, yes -> cut (lake, sunk, company)', 'Someone swims behind you. You do not ask.', { base: 10, noPocket: true }],
   [[0, 0, 0, 2, 0, 0], 'let go, company (someone), gold, yes -> home (lake, sunk, company)', 'The water behind you is empty now. It was your turn.', { base: 2 }],
+  // Phase 30, Inside: 'Let me in.' sits after Cut the line on the house path.
+  [[0, 2, 0, 3], 'let go, home, forever -> inside', 'The day outside does not end. You watch it through the window.', { base: 21, ruCard: { base: 21, extra: 'forever' }, says: ['Of course. They’ve been waiting to get out.'].concat(KNOCKS) }],
+  [[1, 2, 2, 3], 'keep, home, gold -> inside (sunk)', 'The golden fish goes with them. You stay behind the door.', { base: 22, ruCard: { base: 22, extra: 'kept' } }],
 ];
 let ok = true, snapsAll = 0, tAll = 0;
 const seen = {}, enIds = [];
@@ -215,9 +227,9 @@ for (const [plan, label, cardEnd, opts] of plans) {
   enIds.push(r.id);
   if (r.id && !baitOk(r, opts)) { ok = false; console.log('   the bait sentence is ' + (r.id.startsWith('cut') && !(opts && opts.noPocket) ? 'missing from' : 'on') + ' the ' + r.id + ' card'); }
 }
-// One line per ending id (six, plus the silent variant of cut), then the verdict: every plan must end and
-// all six ids must have been seen.
-const need = ['home', 'dark', 'cut', 'stay', 'deep', 'swallowed', 'cut:silent'];
+// One line per ending id (seven, plus the silent variant of cut), then the verdict: every plan must end and
+// all seven ids must have been seen.
+const need = ['home', 'dark', 'cut', 'stay', 'deep', 'swallowed', 'inside', 'cut:silent'];
 for (const id of need) console.log('ending ' + id.padEnd(11) + (seen[id] ? 'reached' : 'MISSING'));
 // The Russian pass: the same plans, the same endings, and nothing Latin on screen. The English assertions on
 // lines and card text stay in the English pass; here the card is printed so it can be read.
@@ -229,6 +241,8 @@ plans.forEach(([plan, label, , opts], i) => {
   const r = play(plan, 'ru: ' + label, { ru: true, wait: o.wait, tap: o.tap });
   if (r.id) seenRu[r.id] = true;
   const same = r.id === enIds[i];
+  const rc = o.ruCard;
+  if (rc && !(r.text.startsWith(RU_INSIDE[rc.base]) && r.text.indexOf(RU_INSIDE[rc.extra]) >= 0)) { r.ok = false; console.log('   the Russian card should start with ' + RU_INSIDE[rc.base] + ' and carry ' + RU_INSIDE[rc.extra]); }
   if (!same) console.log('   the Russian run should end as the English one: ' + enIds[i] + ', not ' + r.id);
   ruOk = ruOk && r.ok && same;
 });

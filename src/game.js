@@ -551,14 +551,41 @@ const CABIN_ROWS = [
   '..00000000',
   '.000000000',
   '0000000000',
-  '.00000000.',
-  '.0LL00000.',
-  '.0LL00000.',
-  '.00000000.',
+  '.00000KK0.',
+  '.0LL00KK0.',
+  '.0LL00KK0.',
+  '.00000KK0.',
 ];
 const CABIN = sprite(CABIN_ROWS);
 // The same cabin with the window dark (WS.cabinLit 0, after the still-water dawn): the building stays.
 const CABIN_DARK = sprite(CABIN_ROWS.map(r => r.replace(/L/g, '0')));
+// Phase 30, Inside: the door's dark gap (K, columns 6 and 7) opens into a warm lit doorway (WS.door).
+const CABIN_OPEN = sprite(CABIN_ROWS.map((r, j) => r.replace(/K/g, j < 7 ? 'S' : 'w'))); // white-hot with a gold sill, so it reads in the red
+// Two people at the far shore, 4 by 7, facing left (the way to the door), two walking frames: the fisherman
+// in the boat's dark and whoever was inside, darker (19). On the dark shore each is rimmed on its top and on
+// the side facing the eye (walkRim, a line of light just outside the shape, so the body keeps its width):
+// the fisherman in the eye's light, the other dimmer.
+const WALK_ROWS = [
+  ['.00.', '.00.', '0000', '0000', '.00.', '0..0', '0..0'],
+  ['.00.', '.00.', '0000', '0000', '.00.', '.00.', '.00.'],
+];
+const WALK_RIM_MAN = 11, WALK_RIM_OTHER = 8;
+// side 1 lights the right (walking left, the eye behind him), -1 the left (the sprite is then flipped). The
+// result is one column wider (on the lit side) and one row taller (the light over the head), so the body
+// stays at x (flipped or not) and the frame is stamped one row up.
+function walkRim(s, v, side) {
+  const w = s.w + 1, h = s.h + 1, ox = side > 0 ? 0 : 1, d = new Uint8Array(w * h).fill(255);
+  const at = (i, j) => (i < 0 || j < 0 || i >= s.w || j >= s.h ? 255 : s.data[j * s.w + i]);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const si = i - ox, sj = j - 1, v0 = at(si, sj);
+    if (v0 !== 255) d[j * w + i] = v0;
+    else if (at(si - side, sj) !== 255 || at(si, sj + 1) !== 255) d[j * w + i] = v;
+  }
+  return { w, h, data: d };
+}
+const walkSet = (rows, v) => [1, -1].map(side => rows.map(r => walkRim(sprite(r), v, side)));
+const WALK_MAN = walkSet(WALK_ROWS, WALK_RIM_MAN);
+const WALK_OTHER = walkSet(WALK_ROWS.map(r => r.map(row => row.replace(/0/g, 'K'))), WALK_RIM_OTHER);
 const GOLDPILE = sprite(['...y.w..', '..yygyy.', '.gyygyyg', 'dgggdggd']);
 // The kept golden fish (bible, section 8): about 10 by 4 in the gold indices 13 to 16, lying in the boat
 // bottom beside the gold-pile slot, head to the left. KEPT_OPEN is the open-mouth variant used while it talks.
@@ -705,7 +732,7 @@ let BOAT, GOLD, GOLD_OPEN;
 // The swimmer (a sunk run at sea) has the same ladder: head, shoulders, the rod and the floating lantern.
 const FAR_SCALES = [0.85, 0.72, 0.6, 0.5, 0.42, 0.34, 0.27, 0.2, 0.14, 0.09];
 const ZOOM_H = 40, SWIM_CX = 18; // the canvas rows above the waterline (the rod tip at rest is 37 up); the swimmer's centre column
-let BOAT_ZOOM, SWIM_ZOOM, BOAT_SPECK, SPECK_TIP, SPECK_BIT, SWIM_SPECK;
+let BOAT_ZOOM, SWIM_ZOOM, BOAT_EMPTY, BOAT_SPECK, SPECK_TIP, SPECK_BIT, SWIM_SPECK;
 // A canvas in boat coordinates: x from the boat's left, y relative to the waterline (negative is up).
 function zoomCanvas(cx) {
   const w = BOAT.w, h = ZOOM_H, data = new Uint8Array(w * h).fill(255);
@@ -728,14 +755,15 @@ function zoomRod(c, hx, hy) {
 function zoomLantern(c, ly) {
   for (let j = 0; j < 4; j++) for (let i = 0; i < 3; i++) c.put(6 + i, ly + j, i === 0 || i === 2 || j === 0 || j === 3 ? 0 : 2);
 }
-function boatZoomSource() {
+// empty: the hull and the lantern only (Inside: the boat once he has stepped out of it).
+function boatZoomSource(empty) {
   const c = zoomCanvas(BOAT.w / 2);
   zoomSprite(c, BOAT, 0, -BOAT.wl);
-  zoomSprite(c, FISHER, 18, FISHER_DY);
+  if (!empty) zoomSprite(c, FISHER, 18, FISHER_DY);
   for (let y = -27; y < -8; y++) c.put(9, y, 0); // the lantern pole and its hook
   c.put(8, -27, 0); c.put(7, -27, 0); c.put(7, -26, 0);
   zoomLantern(c, LANTERN_DY);
-  zoomRod(c, 18, FISHER_DY + 9);
+  if (!empty) zoomRod(c, 18, FISHER_DY + 9);
   return c;
 }
 function swimZoomSource() {
@@ -764,6 +792,7 @@ function buildFarBoats() {
   const boat = boatZoomSource(), swim = swimZoomSource();
   BOAT_ZOOM = FAR_SCALES.map(sc => zoomFrame(boat, sc));
   SWIM_ZOOM = FAR_SCALES.map(sc => zoomFrame(swim, sc));
+  BOAT_EMPTY = zoomFrame(boatZoomSource(true), FAR_SCALES[INSIDE_K - 1]);
   BOAT_SPECK = speckOf(['.000.', '00000'], 2);
   SWIM_SPECK = speckOf(['00'], 1);
   SPECK_TIP = speckOf(['000..', '.0000'], 2); // tipping into the mouth (Swallowed)
@@ -827,10 +856,10 @@ const VOICE = {
   home: 'I wished for a home too. This is it.',
   nothing: 'I wanted nothing too. It waited.',
 };
-const ENDING_COUNT = 6;
+const ENDING_COUNT = 7;
 const ENDINGS = {
   home: { title: 'Home' }, dark: { title: 'Dark' }, cut: { title: 'Still water' },
-  swallowed: { title: 'Swallowed' }, stay: { title: 'Stay' }, deep: { title: 'Deep' },
+  swallowed: { title: 'Swallowed' }, stay: { title: 'Stay' }, deep: { title: 'Deep' }, inside: { title: 'Inside' },
 };
 // The ending card's BASE (bible, section 4 Ending cards: twenty situations), keyed by ending (the silent
 // variant as 'silent'), then by lake or sea (WS.sea past 0.5), then by boat or sunk (WS.boatSunk at 1); Still
@@ -896,6 +925,12 @@ const END_BASES = {
   swallowed: { // act 0, the sea
     sea: { boat: 'Somewhere far above, the sun is still shining on the sea. There is no boat on it.' }, // 20
   },
+  inside: { // lake only: the cabin is a first wish
+    lake: {
+      boat: 'You open the door. Someone was waiting to get out. They take the boat. Some nights you hear them cast. Some nights, you knock.', // 21
+      sunk: 'You swim ashore and open the door. Someone was waiting to get out. They walk into the water, toward the gold. Some nights, you knock.', // 22
+    },
+  },
 };
 // ONE extra sentence after the base: the first true state in each ending's priority order. A line is a
 // string, or an alternate keyed by boat/sunk or lake/sea; an alternate with no entry for the situation is
@@ -906,7 +941,7 @@ const END_EXTRA = {
     lines: {
       kept: { boat: 'The golden fish slips out of the boat as you go in.', sunk: 'The golden fish follows you in.' },
       company: { boat: 'The seat behind you is empty now. It was your turn.', sunk: 'The water behind you is empty now. It was your turn.' },
-      cabin: 'The knocking stops. Now it’s you on the inside.',
+      cabin: 'The knocking stops. Nobody answers it now.',
       heard: 'You know the words already. You will say them.',
       forever: 'The day does not end. You aren’t in it.',
       refused2: 'You asked for nothing, and then for home. Home was the only thing it had.',
@@ -952,6 +987,13 @@ const END_EXTRA = {
   },
   silent: { order: ['kept'], lines: { kept: 'It went over the side on its own. You let it.' } },
   swallowed: { order: ['kept'], lines: { kept: 'The golden fish went in with you. It had been in before.' } },
+  inside: { // the house path: no companion, no sea
+    order: ['kept', 'forever'],
+    lines: {
+      kept: 'The golden fish goes with them. You stay behind the door.',
+      forever: 'The day outside does not end. You watch it through the window.',
+    },
+  },
 };
 // The wish button labels, read back on the ending card (gold as one phrase, so the list reads as one wish each).
 const WISH_LABELS = {
@@ -1042,6 +1084,11 @@ const RU = {
   'Swallowed': 'Проглочен',
   'Stay': 'Остаться',
   'Deep': 'Глубина',
+  'Inside': 'Внутри',
+  'You open the door. Someone was waiting to get out. They take the boat. Some nights you hear them cast. Some nights, you knock.': 'Ты открываешь дверь. Там кто-то ждал, чтобы выйти. Он берёт твою лодку. Иногда ночью ты слышишь, как он забрасывает леску. Иногда ночью стучишь ты.',
+  'You swim ashore and open the door. Someone was waiting to get out. They walk into the water, toward the gold. Some nights, you knock.': 'Ты доплываешь до берега и открываешь дверь. Там кто-то ждал, чтобы выйти. Он уходит в воду, к золоту. Иногда ночью стучишь ты.',
+  'The golden fish goes with them. You stay behind the door.': 'Золотая рыбка уходит с ним. Ты остаёшься за дверью.',
+  'The day outside does not end. You watch it through the window.': 'День за окном не кончается. Ты смотришь на него в окно.',
   ' Somewhere a sun is coming up. Someone is rowing out.': ' Где-то встаёт солнце. Кто-то отчаливает от берега.',
   'The water is warmer than you thought, and full of light, and ': 'Вода теплее, чем ты думал, и полна света, и ',
   'He took the sun down with him. ': 'Он унёс солнце с собой под воду. ',
@@ -1076,7 +1123,7 @@ const RU = {
   'The golden fish follows you in.': 'Золотая рыбка заплывает внутрь следом за тобой.',
   'The seat behind you is empty now. It was your turn.': 'Место позади тебя теперь пустое. Настал твой черёд.',
   'The water behind you is empty now. It was your turn.': 'Вода позади тебя теперь пуста. Настал твой черёд.',
-  'The knocking stops. Now it’s you on the inside.': 'Стук прекращается. Теперь внутри — ты.',
+  'The knocking stops. Nobody answers it now.': 'Стук стихает. Теперь на него некому ответить.',
   'You know the words already. You will say them.': 'Ты уже знаешь слова. Ты их скажешь.',
   'The day does not end. You aren’t in it.': 'День не кончается. Тебя в нём нет.',
   'You asked for nothing, and then for home. Home was the only thing it had.': 'Ты просил «ничего», а потом попросился домой. Дом — единственное, что у него было.',
@@ -1238,6 +1285,8 @@ const RU = {
   'Cut the line': 'Перерезать леску',
   'Stay with him': 'Остаться с ним',
   'Let me get my gold': 'Дай мне забрать моё золото',
+  'Let me in.': 'Впусти меня.',
+  'Of course. They’ve been waiting to get out.': 'Конечно. Там давно ждут, чтобы их выпустили.',
   'Home. Yes. Come inside.': 'Домой. Да. Заходи.',
   'Thank you.': 'Спасибо.',
   'As you wish. Without light you won’t have to see the teeth.': 'Как пожелаешь. Без света тебе не придётся видеть зубы.',
@@ -1323,6 +1372,9 @@ function resetWS() {
     // slow drift from the centre once the camera has pulled back (sea, not heard), goldBelow the one glint
     // under the swimmer when he wakes in the water again (lake, sunk).
     newShore: 0, farDrift: 0, goldBelow: 0,
+    // Phase 30, Inside: push the camera's push-in toward the cabin door (0 to 1: zoom 1 to PUSH_Z, the
+    // centre eased from the screen's to the door), door the cabin door open (the warm doorway and its glow).
+    push: 0, door: 0,
   });
 }
 const G = {
@@ -1330,7 +1382,7 @@ const G = {
   rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 }, farRing: 0.6,
   lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0, hbGap: HB_GAP,
   capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null,
-  arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0,
+  arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, inside: null,
 };
 // wishes holds granted wishes only, in order. kept, firstAsk, refused, answered, ocean, said and usedRepl follow
 // the bible, section 3: said counts the fisherman's four act 0 lines that have shown (0 to 4), usedRepl the card replacements fired.
@@ -1609,6 +1661,7 @@ function stampTop(s, x0, y0, alpha) {
   }
 }
 const CABIN_X = 62, CABIN_Y = HY - 12;
+const cabinSprite = () => WS.door > 0.5 ? CABIN_OPEN : WS.cabinLit < 0.5 || WS.cabinKnock > 0.5 ? CABIN_DARK : CABIN;
 function topExtras(t) {
   if (WS.starA > 0.02) {
     for (const s of STARS) {
@@ -1620,7 +1673,7 @@ function topExtras(t) {
   if (!birdsHidden()) for (const b of BIRDS) stampTop(BIRD[((bt * 5 + b.ph) | 0) & 1], b.x | 0, b.y | 0);
   // The building fades with the mountains; its window goes dark on its own (cabinLit, the still-water dawn).
   drawNewShore();
-  if (WS.cabin > 0 && !seaGone()) stampTop(WS.cabinLit < 0.5 || WS.cabinKnock > 0.5 ? CABIN_DARK : CABIN, CABIN_X, CABIN_Y, WS.cabin * (1 - WS.sea));
+  if (WS.cabin > 0 && !seaGone()) stampTop(cabinSprite(), CABIN_X, CABIN_Y, WS.cabin * (1 - WS.sea));
   // The far boat reflects for free, and stays through the opening's dip to black (it leaves behind full black).
   if (WS.farBoat > 0 && (G.phase === 'title' || (G.open && G.open.stage === 0))) stampTop(FARBOAT, FAR_X, HY - FARBOAT.h);
   drawLunge(t); // Swallowed: the head is in the sky buffer, so it reflects
@@ -2259,6 +2312,7 @@ function drawFisherman(t, bx, dy) {
 }
 const DIVE_SWITCH = 0.02; // Deep: the view swaps to the shape from beneath once the horizon has risen a little
 function drawBoatGroup(t) {
+  if (insideFar()) { drawInsideShore(t); return; }
   if (!farLive()) { drawFarBoat(); return; }
   if (WS.dive > DIVE_SWITCH) { drawSwimmerBeneath(); return; } // a few rows of rise first, no one-frame cut
   const bob = Math.round(Math.sin(t * 1.3) * WS.troubled * 1.2) + rockPx(t);
@@ -2512,6 +2566,7 @@ function drawUIPix(t) {
   if (G.phase === 'reeling' && G.reel) drawTensionBar(t, G.reel);
 }
 function glowTint(cx, cy, r, acc, str) {
+  if (VIEW.z !== 1) { cx = (cx - VIEW.x0) * VIEW.z; cy = (cy - VIEW.y0) * VIEW.z; r *= VIEW.z; } // Inside: the glows ride the push-in
   const cr = PALRGB[acc * 3], cg = PALRGB[acc * 3 + 1], cb = PALRGB[acc * 3 + 2];
   const r2 = r * r;
   const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(W - 1, Math.ceil(cx + r));
@@ -2533,7 +2588,7 @@ function glowTint(cx, cy, r, acc, str) {
 }
 function applyGlows(t) {
   const s = jawShift();
-  if (WS.lantern > 0.01 && WS.lanternFlicker > 0.05 && farLive()) { // far out the lantern is a silhouette, and its light is off
+  if (WS.lantern > 0.01 && WS.lanternFlicker > 0.05 && farLive() && !insideFar()) { // far out the lantern is a silhouette, and its light is off
     const fl = WS.lanternFlicker * WS.lantern * (0.88 + 0.12 * Math.sin(t * 13) * Math.sin(t * 7.3));
     const lx = G.lanternPos.x, ly = G.lanternPos.y;
     const warm = WS.lanternWarm;
@@ -2548,6 +2603,8 @@ function applyGlows(t) {
     glowTint(wx, wy + s, 7, 17, 0.55 * cab); // the sky (and the cabin in it) slides down with the upper jaw
     glowTint(wx, 2 * HY - 1 - wy - s, 5, 17, 0.35 * cab);
   }
+  const door = WS.cabin * WS.door * (1 - WS.sea);
+  if (door > 0.5) { glowTint(DOOR_X, DOOR_Y, DOOR_GLOW, 17, 0.7 * door); glowTint(DOOR_X, 2 * HY - 1 - DOOR_Y, DOOR_GLOW - 2, 17, 0.4 * door); }
 }
 function render(t) {
   buildPalette(WS.mood, WS.dim);
@@ -2570,6 +2627,7 @@ function render(t) {
   composite();
   drawFangs();
   drawUIPix(t);
+  pushView();
   for (let i = 0, n = W * H; i < n; i++) OUT32[i] = PAL[IDX[i]];
   applyGlows(t);
 }
@@ -2671,7 +2729,7 @@ const SFX = {
   crunch() { this.noise(0.9, 0.45, 'lowpass', 900, 60, 1.2); this.tone(90, 1, 'sawtooth', 0.25, 28); },
   // Stay: the line straining under him, a rising creak (a rough low saw sliding up through a narrow band).
   creak(d) { this.tone(58, d, 'sawtooth', 0.12, 150); this.noise(d, 0.07, 'bandpass', 320, 1500, 7); this.tone(117, d, 'square', 0.03, 300); },
-  knock() { this.tone(88, 0.16, 'sine', 0.32, 52); this.noise(0.12, 0.16, 'lowpass', 380, 140, 1.2); }, // one knock, muffled by the water between
+  knock(v = 1) { this.tone(88, 0.16, 'sine', 0.32 * v, 52); this.noise(0.12, 0.16 * v, 'lowpass', 380, 140, 1.2); }, // one knock, muffled by the water between (v: quieter)
   heartbeat() { this.tone(52, 0.2, 'sine', 0.3, 40); this.tone(48, 0.22, 'sine', 0.24, 36, 0.26); },
   drone(on) {
     const c = this.ctx; if (!c) return;
@@ -3593,6 +3651,7 @@ function wish3Choices() {
     { label: 'Take the light away', pick: endDark },
     { label: 'Cut the line', pick: endCut },
   ];
+  if (has('home')) c.push({ label: 'Let me in.', pick: endInside });
   if (STORY.answered === true) c.push({ label: 'Stay with him', pick: endStay });
   if (has('gold')) c.push({ label: 'Let me get my gold', pick: endDeep });
   if (STORY.refused === 2) c.push({ label: 'Nothing', pick: endSilent });
@@ -3676,6 +3735,126 @@ function endSilent() {
   if (STORY.kept) L.push({ act: () => tween(WS, 'goldKept', 0.05, 1.5) });
   dlgRun(L, () => playCine(cutCine(true), () => showEnding('cut', 'silent')));
 }
+// Inside (phase 30, bible sections 4 and 8), the house path: let in. The eye turns to the cabin; the boat
+// drifts to the shore under it (shrinking through the far ladder to the frame whose man is the walkers' size)
+// while the camera pushes in toward the door; he steps out and walks up; the knocking stops; the door opens
+// and someone darker steps out; they pass, he goes in, the door shuts; the other walks down, takes the boat,
+// rows a little way out and casts. Three faint knocks, from inside. Sunk: he swims ashore, and the other walks
+// down into the water toward the gold and goes under.
+function endInside() {
+  dlgRun([red('Of course. They’ve been waiting to get out.')], () => playCine(CINE_INSIDE, () => showEnding('inside')));
+}
+const INSIDE_LOOK = -7;              // pupilDx toward the cabin, left of the disc
+const INSIDE_K = 7;                  // the shore frame is BOAT_ZOOM[6] (0.27): the man seated in it, the walkers standing
+const SHORE_AX = 100, PUSH_Z = 2.2;  // the boat's anchor at the shore, just off the foot under the cabin; the final zoom
+const DOOR_X = CABIN_X + 7, DOOR_Y = CABIN_Y + 7, DOOR_GLOW = 7;
+const IN = {
+  drift: 0.2, driftDur: 5, knockGap: 1.4, walk: 5.3, walkDur: 2.8, open: 8.4, appear: 8.8, out: 9.3, outDur: 0.8,
+  enter: 9.7, enterDur: 0.45, close: 10.5, down: 10.7, downDur: 1.4, row: 12.2, rowDur: 0.9, cast: 13.2,
+  castDur: 0.5, under: 11.9, underDur: 1.4, knocks: [14.1, 14.55, 15], fade: 16.5, dur: 17.6,
+};
+// The walkers' top-left corners (feet 6 rows lower): stepping out at the shore, beside the door, in the
+// doorway, past it, and (sunk) under the water.
+const W_SHORE = { x: SHORE_AX - 8, y: HY - 7 }, W_SIDE = { x: DOOR_X + 3, y: CABIN_Y + 2 };
+const W_DOOR = { x: DOOR_X - 2, y: CABIN_Y + 2 }, W_PASS = { x: DOOR_X + 8, y: CABIN_Y + 2 };
+const W_UNDER = { x: SHORE_AX + 2, y: HY + 1 };
+const ROW_DX = 4, ROW_DY = 3, CAST_DX = -14, CAST_DY = 7, CAST_ARC = 8;
+const span = (t, a, d) => clamp((t - a) / d, 0, 1);
+function walkPose(p, a, b, t) {
+  return { x: Math.round(lerp(a.x, b.x, p)), y: Math.round(lerp(a.y, b.y, p)), f: p > 0 && p < 1 ? ((t * 6) | 0) & 1 : 1, flip: b.x > a.x };
+}
+// The fisherman: in the boat until the walk, up the shore, beside the door, then into it.
+function insideMan(t) {
+  if (t < IN.walk) return null;
+  if (t < IN.enter) return walkPose(span(t, IN.walk, IN.walkDur), W_SHORE, W_SIDE, t);
+  return t < IN.enter + IN.enterDur ? walkPose(span(t, IN.enter, IN.enterDur), W_SIDE, W_DOOR, t) : null;
+}
+// Whoever was inside: out of the doorway past him, then down to the boat (or into the water).
+function insideOther(t, sunk) {
+  if (t < IN.appear) return null;
+  if (t < IN.down) return walkPose(span(t, IN.out, IN.outDur), W_DOOR, W_PASS, t); // in the doorway first, blocking its light
+  if (!sunk) return t < IN.down + IN.downDur ? walkPose(span(t, IN.down, IN.downDur), W_PASS, W_SHORE, t) : null;
+  if (t < IN.under) return walkPose(span(t, IN.down, IN.under - IN.down), W_PASS, W_SHORE, t);
+  return t < IN.under + IN.underDur ? walkPose(span(t, IN.under, IN.underDur), W_SHORE, W_UNDER, t) : null;
+}
+// The whole picture at time t: the boat (its ladder step, anchor and waterline, who is in it) and the walkers.
+function insidePose(t, s) {
+  const k = E.io(span(t, IN.drift, IN.driftDur)), row = E.io(span(t, IN.row, IN.rowDur));
+  const n = Math.min(INSIDE_K, Math.floor(k * (INSIDE_K + 1)));
+  let boat = 'man';
+  if (t >= IN.walk) boat = s.sunk ? null : t < IN.down + IN.downDur ? 'empty' : 'other';
+  return {
+    sunk: s.sunk, n, boat, k, man: insideMan(t), other: insideOther(t, s.sunk),
+    ax: lerp(s.ax0, SHORE_AX, k) + ROW_DX * row, wl: Math.round(lerp(WL, HY, k) + ROW_DY * row), cast: span(t, IN.cast, IN.castDur),
+  };
+}
+const insideFar = () => !!(G.inside && G.inside.n > 0);
+function drawInsideShore() {
+  const I = G.inside;
+  G.tip = null;
+  if (I.boat) {
+    const s = I.boat === 'empty' ? BOAT_EMPTY : (I.sunk ? SWIM_ZOOM : BOAT_ZOOM)[I.n - 1];
+    const x0 = Math.round(I.ax - s.ax), y0 = I.wl - s.wl;
+    stampR(s, x0, y0, I.wl);
+    if (I.boat === 'other' && I.cast > 0) drawInsideCast(x0 + s.tx, y0 + s.ty, I.cast);
+  }
+  drawWalker(I.other, WALK_OTHER);
+  drawWalker(I.man, WALK_MAN);
+}
+function drawWalker(p, set) {
+  if (p) stampR(set[p.flip ? 1 : 0][p.f], p.x, p.y - 1, HY, undefined, p.flip);
+}
+// The cast: a thin arc from the rod tip out onto the water, then the line settling with the float on it.
+const bez = (a, c, b, u) => (1 - u) * (1 - u) * a + 2 * (1 - u) * u * c + u * u * b;
+function drawInsideCast(tx, ty, q) {
+  const lx = tx + CAST_DX, ly = HY + CAST_DY, cx = (tx + lx) / 2;
+  const cy = q < 1 ? Math.min(ty, ly) - CAST_ARC : (ty + ly) / 2 + 2, m = Math.round(40 * q);
+  for (let k = 0; k <= m; k++) linePix(bez(tx, cx, lx, k / 40), bez(ty, cy, ly, k / 40));
+  if (q >= 1) plot(lx, ly, 12);
+}
+// The push-in: the composed picture resampled from a shrinking rectangle (nearest neighbour, one pass);
+// VIEW maps the glows, which come after, into it.
+const VIEW = { z: 1, x0: 0, y0: 0 };
+let ZBUF = null, ZXS = null;
+function pushView() {
+  const k = WS.push;
+  if (k <= 0) { VIEW.z = 1; VIEW.x0 = 0; VIEW.y0 = 0; return; }
+  const z = lerp(1, PUSH_Z, k), w = W / z, h = H / z;
+  VIEW.z = z;
+  VIEW.x0 = clamp(lerp(W / 2, DOOR_X, k) - w / 2, 0, W - w);
+  VIEW.y0 = clamp(lerp(H / 2, DOOR_Y, k) - h / 2, 0, H - h);
+  if (!ZBUF || ZBUF.length !== IDX.length) { ZBUF = new Uint8Array(IDX.length); ZXS = new Int32Array(W); }
+  ZBUF.set(IDX);
+  for (let x = 0; x < W; x++) ZXS[x] = Math.min(W - 1, (VIEW.x0 + x / z) | 0);
+  for (let y = 0; y < H; y++) {
+    const r = Math.min(H - 1, (VIEW.y0 + y / z) | 0) * W, o = y * W;
+    for (let x = 0; x < W; x++) IDX[o + x] = ZBUF[r + ZXS[x]];
+  }
+}
+function insideKnock(v) { SFX.knock(v); WS.cabinKnock = 1; tween(WS, 'cabinKnock', 0, KNOCK_BLINK, E.lin); }
+const CINE_INSIDE = {
+  dur: IN.dur,
+  init(s) {
+    s.sunk = swimming(); s.ax0 = zoomAnchorX(); s.bx0 = WS.boatX; s.nextKnock = IN.drift; s.ring = IN.drift;
+    G.bob = null;
+    tween(WS, 'pupilDx', INSIDE_LOOK, 0.8);
+  },
+  update(t, dt, at, s) {
+    const I = G.inside = insidePose(t, s);
+    WS.push = I.k;
+    if (I.n === 0) WS.boatX = s.bx0 + I.ax - s.ax0; // the live group drifts first, then the ladder takes over
+    if (t >= s.nextKnock && t < IN.walk + IN.walkDur - 0.3) { s.nextKnock += IN.knockGap; insideKnock(0.4); }
+    if (s.sunk && t >= s.ring && t < IN.drift + IN.driftDur) { s.ring += 0.8; ring(I.ax, I.wl + 1, false, 0.6, true); }
+    at('open', IN.open, () => { WS.door = 1; SFX.creak(0.6); });
+    at('close', IN.close, () => { WS.door = 0; SFX.knock(0.7); G.hbGap = 1e9; });
+    at('row', IN.row, () => { if (!s.sunk) SFX.row(); });
+    at('cast', IN.cast, () => { if (!s.sunk) SFX.whoosh(); });
+    at('plop', IN.cast + IN.castDur, () => { if (!s.sunk) { SFX.plop(); ring(I.ax + CAST_DX - 6, HY + CAST_DY); } });
+    at('under', IN.under + IN.underDur * 0.8, () => { if (s.sunk) { SFX.plop(); ring(W_UNDER.x + 2, HY + 1); } });
+    IN.knocks.forEach((k, i) => at('k' + i, k, () => insideKnock(0.3)));
+    at('fade', IN.fade, () => UI.fade(1, 1));
+  },
+};
 function loadJSON(key, fallback) {
   try { const v = JSON.parse((IS_BROWSER && window.localStorage.getItem(key)) || 'null'); return v === null ? fallback : v; } catch (e) { return fallback; }
 }
@@ -4222,7 +4401,7 @@ function resetAll() {
   resetWS();
   Object.assign(STORY, freshStory());
   loadRun();
-  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null, arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 }, farRing: FAR_RING_FIRST });
+  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null, arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 }, farRing: FAR_RING_FIRST, inside: null });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
   OCEAN.shad.length = 0; OCEAN.big = null; OCEAN.tr0 = 0;
   cloudT = 0; genEyes();
@@ -4647,7 +4826,7 @@ if (IS_BROWSER) {
     get H() { return H; }, W, HY,
     spawnShadows, SHAD, spawnBirds, BIRDS, RINGS, RUN, ENDING_COUNT,
     OCEAN, spawnOceanShadow, spawnSeaShoal, bigRise, bigEnter, bigRestY, untween, bubble, boatLeft, WL,
-    oceanCast, oceanTold, playCine, CINE_OCEAN, CINE_STAY, THINK_AT,
+    oceanCast, oceanTold, playCine, CINE_OCEAN, CINE_STAY, CINE_INSIDE, THINK_AT,
     setCloudT(v) { cloudT = v; },
     setLang(l) { LANG = LANGS.indexOf(l) >= 0 ? l : DEFAULT_LANG; }, tr, get LANG() { return LANG; },
   };

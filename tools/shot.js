@@ -230,3 +230,21 @@ function markBubble(out, secs) {
   for (let y = y0; y <= y1; y++) { dot(x0, y); dot(x1, y); }
 }
 if (which === 'all' || which === 'stay_strip') strip('out_stay_strip.png', STAY_TS, stayFrame, markBubble);
+// Phase 30, Inside: eight beats timed from the cinematic's start on the house path in the red: the drift and
+// the push-in, the walk up the shore, the door opening, the other stepping out, the door closing, the other
+// rowing out, the cast, the empty shore. The sunk variant: the swim ashore, the walk, the door, the pass, the
+// other walking down and into the water toward the gold, going under, the empty shore.
+const INSIDE_TS = [3, 6.8, 8.6, 9.6, 10.55, 12.6, 13.45, 16];
+const INSIDE_SUNK_TS = [3, 6.8, 8.6, 9.6, 10.55, 11.8, 12.9, 16];
+function insideFrame(sunk) {
+  return secs => {
+    const ws = g.WS;
+    redSky(ws); ws.cabin = 1; ws.companion = 0; g.G.bob = { x: 101, y: g.HY + 5, taut: true };
+    if (sunk) { ws.gold = 1; ws.boatSunk = 1; }
+    g.playCine(g.CINE_INSIDE);
+    for (let i = 0; i < Math.round(secs * 60); i++) g.update(1 / 60);
+    return 7 + secs;
+  };
+}
+if (which === 'all' || which === 'inside_strip') strip('out_inside_strip.png', INSIDE_TS, insideFrame(false));
+if (which === 'all' || which === 'inside_sunk_strip') strip('out_inside_sunk_strip.png', INSIDE_SUNK_TS, insideFrame(true));

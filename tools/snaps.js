@@ -55,7 +55,7 @@ play([0, 2, 1, 0], 'e_', [[2.6, 'jaw_cabin']]); // Home with a cabin: the window
 play([0, 2, 2, 2], 'e_', [[2.2, 'cutfall']]);
 play([0, 2, 1, 2], 'e_', [[16, 'cutdawn', 'cine']]); // the lake boat rows away (situation 9)
 play([0, 3, 3, 3], 'e_', [[2.2, 'silentfall'], [18, 'silentdawn']]);
-play([0, 2, 2, 3], 'e_', [[5, 'deepmid'], [11, 'deep']]); // the descent: the horizon half way up, then the mirror filling the frame after the glint
+play([0, 2, 2, 4], 'e_', [[5, 'deepmid'], [11, 'deep']]); // the descent: the horizon half way up, then the mirror filling the frame after the glint
 // Phase 9: Home on the open sea (the fish wish waited out: the jaw closes with no mountains). The still-water
 // dawn on a sunk run is phase 21's loop below.
 play([0, 1, 0, 0], 'e_', [[3.5, 'jaw_sea']], { wait: true });
