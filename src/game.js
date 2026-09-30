@@ -852,7 +852,7 @@ function buildFarBoats() {
   IN_EMPTY = topLit(zoomFrame(boatZoomSource(true), INSIDE_SS[INSIDE_SS.length - 1]));
   BOAT_SPECK = speckOf(['.000.', '00000'], 2);
   SWIM_SPECK = speckOf(['00'], 1);
-  SPECK_TIP = speckOf(['000..', '.0000'], 2); // tipping into the mouth (Swallowed)
+  SPECK_TIP = speckOf(['..000', '0000.'], 2); // tipping into the mouth (Swallowed), which is to its left
   SPECK_BIT = speckOf(['00'], 1);
 }
 function buildSprites() {
@@ -1867,25 +1867,33 @@ function bigShape(u, v) {
   const p = lerp(0.14, 0.72, tt), notch = 0.55 * tt * tt * tt;
   return av < p && av > notch ? 0.3 + 0.3 * (1 - av / p) : 0;
 }
-// a is its presence (0 to 1 as it fades in from the deep): each shade step is dithered by it.
+// a is its presence (0 to 1 as it fades in from the deep): each shade step is dithered by it. In Swallowed the
+// shadow is the same fish as the head (phase 32): k (1 at rest, down to SHADOW_IN) draws it in toward the
+// breach point (px, py), its snout end, rising toward the surface as it goes, while the tail tips down into
+// the deep and is lost (the cut along u, dithered over CUT_SOFT) so only the head end is left under the speck;
+// dk (0 to 1) darkens it by up to BIG_DARK steps more.
+const BIG_DARK = 2, SHADOW_IN = 0.55, CUT_MIN = -0.4, CUT_SOFT = 0.35;
 function drawBigShadow(b) {
-  const hw = b.w * 0.5, hh = b.h * 0.5, a = b.a === undefined ? 1 : b.a;
-  if (a <= 0) return;
-  const y0 = Math.max(HY, Math.floor(b.y - hh * 1.5)), y1 = Math.min(H - 1, Math.ceil(b.y + hh * 1.5));
-  const x0 = Math.max(0, Math.floor(b.x - hw - 2)), x1 = Math.min(W - 1, Math.ceil(b.x + hw + 2));
+  const a = b.a === undefined ? 1 : b.a, k = b.k === undefined ? 1 : b.k, dk = (b.dk || 0) * BIG_DARK;
+  if (a <= 0 || k <= 0) return;
+  const bx = k < 1 ? b.px + (b.x - b.px) * k : b.x, by = k < 1 ? b.py + (b.y - b.py) * k * k : b.y;
+  const hw = b.w * 0.5 * k, hh = b.h * 0.5 * k, cut = k < 1 ? lerp(1 + CUT_SOFT, CUT_MIN, (1 - k) / (1 - SHADOW_IN)) : 9;
+  const y0 = Math.max(HY, Math.floor(by - hh * 1.5)), y1 = Math.min(H - 1, Math.ceil(by + hh * 1.5));
+  const x0 = Math.max(0, Math.floor(bx - hw - 2)), x1 = Math.min(W - 1, Math.ceil(bx + hw + 2));
   for (let y = y0; y <= y1; y++) {
-    const v = (y - b.y) / hh, rip = RIPX[y], row = y * W;
+    const v = (y - by) / hh, rip = RIPX[y], row = y * W;
     for (let x = x0; x <= x1; x++) {
-      const d = bigShape(-(x + rip - b.x) / hw, v);
-      if (d <= 0) continue;
+      const u = -(x + rip - bx) / hw, d = bigShape(u, v);
+      if (d <= 0 || (u > cut - CUT_SOFT && (cut - u) / CUT_SOFT < BAYER[((y & 3) << 2) | (x & 3)])) continue;
       const i = row + x, f = FRAME[i];
-      if (f < 12) FRAME[i] = Math.max(0, f - Math.floor((d > 0.7 ? 4 : d > 0.4 ? 3 : 2) * a + BAYER[((y & 3) << 2) | (x & 3)]));
+      if (f < 12) FRAME[i] = Math.max(0, f - Math.floor(((d > 0.7 ? 4 : d > 0.4 ? 3 : 2) + dk) * a + BAYER[((y & 3) << 2) | (x & 3)]));
     }
   }
 }
 // Swallowed (bible, section 8, phase 27): the big one's head breaches round the speck, seen from the water at
-// the horizon, drawn into TOP so it reflects. It is a fish in profile facing left, tilted HEAD_ANG: the snout
-// to the upper left and the body running down to the right into the sea. It is built in its own frame (a along
+// the horizon, drawn into TOP so it reflects. It is a fish in profile facing right (phase 32: the way its
+// shadow swam in), tilted HEAD_ANG: the snout to the upper right and the body running down to the left into
+// the sea. The frame is built facing left and mirrored about the speck (HEAD_M). It is built in its own frame (a along
 // the body from the snout, b across it, + toward the belly): a blunt snout, a lower jaw hinged at the corner of
 // the mouth that drops by gape so the gape is a dark wedge, a gill plate, a faint lateral line, sparse scales on
 // the back, a paler throat, a lit rim along the top and the gold slit eye above the corner. lunge slides it up
@@ -1899,6 +1907,7 @@ const MOUTH_RIM = 60, VENT0 = 12, VENT_K = 0.12, THROAT_A = 70;
 const GILL_A = 52, GILL_BOW = 5, GILL_H = 15, LAT_B = -9, LAT_K = 0.04;
 const RIM_A0 = 8, RIM_A1 = 90, BACK = 2, BELLY = 4, JAW_V = 3.6, THROAT_V = 4.4, SHUT = 0.15;
 const lungeCx = () => Math.round(W / 2 + WS.farDrift);
+const HEAD_M = -1; // the head faces right: screen x runs against the frame's
 const lipB = a => LIP0 + (LIP1 - LIP0) * a / JAW_C; // the upper lip line (the lower lip too, shut)
 const ventB = a => VENT0 + (a - JAW_C) * VENT_K;     // the belly behind the corner of the mouth
 function topB(a) { // the upper outline: the heavy forehead from the snout, the nape's hump, the back tapering
@@ -1915,12 +1924,12 @@ function jawToHead(la, lb) { // the lower jaw's frame (shut coordinates) to the 
   const ja = la - JAW_C, jb = lb - LIP1;
   return { a: HP.jc * ja + HP.js * jb + JAW_C, b: -HP.js * ja + HP.jc * jb + LIP1 };
 }
-const headXY = (a, b) => ({ x: HP.sx + a * HP.c - b * HP.s, y: HP.sy + a * HP.s + b * HP.c });
+const headXY = (a, b) => ({ x: HP.sx + HEAD_M * (a * HP.c - b * HP.s), y: HP.sy + a * HP.s + b * HP.c });
 const side = (pa, pb, qa, qb, a, b) => (qa - pa) * (b - pb) - (qb - pb) * (a - pa);
 function headPose(cx) {
   const off = (1 - WS.lunge) * RISE_LEN, ph = WS.gape * GAPE_ANG;
   const ang = WS.gulp < 1 ? lerp(RISE_ANG, HEAD_ANG, E.io(WS.lunge)) : HEAD_ANG; // it sinks at the angle it holds
-  HP.sx = cx + SNOUT_DX + off * RISE_X; HP.sy = HY - SNOUT_UP + off * RISE_Y; HP.c = Math.cos(ang); HP.s = Math.sin(ang);
+  HP.sx = cx + HEAD_M * (SNOUT_DX + off * RISE_X); HP.sy = HY - SNOUT_UP + off * RISE_Y; HP.c = Math.cos(ang); HP.s = Math.sin(ang);
   HP.jc = Math.cos(ph); HP.js = Math.sin(ph);
   const tip = jawToHead(JAW_T, lipB(JAW_T)), chin = jawToHead(JAW_T + CHIN_K * JAW_DEEP, lipB(JAW_T) + JAW_DEEP);
   HP.ua = SNOUT_BACK; HP.ub = lipB(SNOUT_BACK); HP.ta = tip.a; HP.tb = tip.b; HP.fs = Math.sign(side(HP.ua, HP.ub, tip.a, tip.b, JAW_C, LIP1));
@@ -1965,7 +1974,7 @@ function lowerIdx(x, y, dl) { // the lower jaw (its lip lit) and the pale throat
   return dl < JAW_DEEP + 1 ? 2 : ci(dith(THROAT_V, x, y));
 }
 function headIdx(x, y) { // the head's index at a screen pixel, or -1
-  const dx = x - HP.sx, dy = y - HP.sy, a = dx * HP.c + dy * HP.s, b = dy * HP.c - dx * HP.s;
+  const dx = HEAD_M * (x - HP.sx), dy = y - HP.sy, a = dx * HP.c + dy * HP.s, b = dy * HP.c - dx * HP.s;
   if (a < JAW_T - 1 || a > HEAD_LEN) return -1;
   const top = topB(a);
   if (b < top || (b > NOSE_B && a < SNOUT_BACK * ((b - NOSE_B) / (LIP0 - NOSE_B)) ** 2 && a < JAW_C && b <= LIP0)) return -1;
@@ -3352,14 +3361,19 @@ function spawnSeaShoal() {
 }
 const bigRestY = () => HY + 16 + (H - HY) / 6; // its back just under the surface, the fins clear of the horizon
 const BIG_DEEP_PX = 12; // how many rows lower it swims while crossing, before it rises to rest
+// It settles with its snout end under the speck (phase 32), so in Swallowed the head breaches where the shadow's
+// head was: the snout tip BIG_SNOUT_LEAD px ahead of the speck, the landing marker just inside it, the body
+// and tail running off to the left the way it came.
+const BIG_SNOUT_LEAD = 9;
+const bigRestX = () => lungeCx() + BIG_SNOUT_LEAD - W / 2;
 // The big one (bible, section 8) does not rise from below: after the shoal has swum alone for a while it
 // enters at the left edge, faint and deep (a few rows lower, its presence a rising from 0 over OCEAN_FADE_IN
-// seconds), crosses to the centre over OCEAN_CROSS seconds slowing all the way, rises a little as it slows and
-// settles under the boat. drawBigShadow reads a.
+// seconds), crosses over OCEAN_CROSS seconds slowing all the way, rises a little as it slows and settles with
+// its head under the boat (bigRestX). drawBigShadow reads a.
 function bigEnter() {
   const h = (H - HY) / 3, restY = bigRestY();
   OCEAN.big = { x: -W * 0.55, y: restY + BIG_DEEP_PX, w: W, h, a: 0, crossing: true };
-  tween(OCEAN.big, 'x', W / 2, OCEAN_CROSS, E.out2, () => { if (OCEAN.big) OCEAN.big.crossing = false; });
+  tween(OCEAN.big, 'x', bigRestX(), OCEAN_CROSS, E.out2, () => { if (OCEAN.big) OCEAN.big.crossing = false; });
   tween(OCEAN.big, 'y', restY, OCEAN_CROSS, E.in);
   tween(OCEAN.big, 'a', 1, OCEAN_FADE_IN, E.io);
 }
@@ -3368,7 +3382,7 @@ function bigRise() {
   bigEnter();
   const b = OCEAN.big;
   untween(b, 'x'); untween(b, 'y'); untween(b, 'a');
-  Object.assign(b, { x: W / 2, y: bigRestY(), a: 1, crossing: false });
+  Object.assign(b, { x: bigRestX(), y: bigRestY(), a: 1, crossing: false });
 }
 // The smaller shapes scatter from the big one as its head reaches them, one by one, not all at once.
 const SCATTER_REACH = 0.55;
@@ -3455,10 +3469,14 @@ function oceanCast() {
   playCine(CINE_SWALLOW, () => showEnding('swallowed'));
 }
 // Swallowed (bible, section 8, phase 25): one continuous lunge seen from the water. The float lands on the big
-// one's back; after a beat its head rises out of the sea round the speck with the mouth open along the
+// one's head; after a beat its head rises out of the sea round the speck with the mouth open along the
 // waterline, the speck and a sheet of water tip in, the mouth closes, the head sinks, the water closes with a
 // splash and three rings, and its shadow swims off right and down. The empty sea, then black and the card.
+// Phase 32, one fish: the shadow darkens and draws in to the breach point as it comes up (shadowUp), is gone
+// while the head is out (shadowGone), re-forms there from the rings as the head sinks and grows back to full
+// size (shadowBack), then swims on the way it came (bigSwimsOff).
 const SW = {
+  up: 1.0, upDur: 0.8, gone: 1.7, goneDur: 0.4, back: 5.5, backA: 1.0, backDur: 1.4,
   fly: 0.7, bulge: 1.3, bulgeDur: 0.5, rise: 1.5, riseDur: 1.4, gape: 1.65, gapeDur: 1.1, gulp: 2.9, gulpDur: 1.0,
   close: 3.9, closeDur: 0.5, sink: 4.4, sinkDur: 1.4, splash: 5.6, sloshDur: 1.2, swim: 7.0, swimDur: 2.5, black: 10.7,
 };
@@ -3472,17 +3490,31 @@ function lungeBulge() { tween(WS, 'bulge', 1, SW.bulgeDur, E.io); SFX.surge(); }
 function lungeRise() {
   tween(WS, 'lunge', 1, SW.riseDur, E.out); tween(WS, 'streak', 1, 0.6);
   WS.shed = 1; tween(WS, 'shed', 0, SHED_DUR, E.lin); // sheets of water slide off the snout
-  if (OCEAN.big) tween(OCEAN.big, 'a', 0.35, SW.riseDur); // its head is out of the water
+}
+// The shadow and the head are one fish. Coming up, it darkens and draws in toward its snout, rising to the
+// breach point just under the surface below the speck (BREACH_DY rows down) with its tail lost in the deep,
+// then it is gone as the head clears the water; sinking, it re-forms there head first, pale at first, and
+// grows back to its full length and depth.
+const BREACH_DY = 4;
+function shadowUp() {
+  const b = OCEAN.big;
+  if (!b) return;
+  Object.assign(b, { px: b.x + b.w * 0.5, py: HY + BREACH_DY, k: 1, dk: 0 });
+  tween(b, 'k', SHADOW_IN, SW.upDur, E.in); tween(b, 'dk', 1, SW.upDur, E.io);
+}
+function shadowGone() { if (OCEAN.big) tween(OCEAN.big, 'a', 0, SW.goneDur, E.in); }
+function shadowBack() {
+  const b = OCEAN.big;
+  if (!b) return;
+  Object.assign(b, { a: 0, k: SHADOW_IN, dk: 1 });
+  tween(b, 'a', 1, SW.backA, E.out); tween(b, 'k', 1, SW.backDur, E.io); tween(b, 'dk', 0, SW.backDur, E.io);
 }
 function lungeGape() { tween(WS, 'gape', 1, SW.gapeDur, E.out); tween(WS, 'bulge', 0, SW.gapeDur); }
 function waterCloses() {
   spray(lungeCx(), HY, SPRAY_N); SFX.douse();
   tween(WS, 'slosh', 1, SW.sloshDur, E.lin);
 }
-function lungeSink() {
-  tween(WS, 'lunge', 0, SW.sinkDur, E.in); tween(WS, 'streak', 0, SW.sinkDur);
-  if (OCEAN.big) tween(OCEAN.big, 'a', 0.9, SW.sinkDur);
-}
+function lungeSink() { tween(WS, 'lunge', 0, SW.sinkDur, E.in); tween(WS, 'streak', 0, SW.sinkDur); }
 function spray(x, y, n) { // the water closing: tall spray that rises and falls back to the horizon
   for (let k = 0; k < n; k++) PARTS.push({ x: x + (Math.random() - 0.5) * 16, y, vx: (Math.random() - 0.5) * 64, vy: -32 - Math.random() * 66, life: 0, max: 1.6, v: Math.random() < 0.55 ? 11 : 10, floor: y + 1, g: 115, tall: true });
 }
@@ -3504,13 +3536,16 @@ const CINE_SWALLOW = {
   update(t, dt, at, s) {
     swallowFloat(t, at, s);
     at('cap', 1.1, () => cap('The float lands on something that is not water.', 3.2));
+    at('up', SW.up, shadowUp);
     at('bulge', SW.bulge, lungeBulge);
     at('rise', SW.rise, lungeRise);
+    at('gone', SW.gone, shadowGone);
     at('gape', SW.gape, lungeGape);
     at('gulp', SW.gulp, () => tween(WS, 'gulp', 1, SW.gulpDur, E.in));
     at('close', SW.close, () => tween(WS, 'gape', 0, SW.closeDur, E.in));
     at('slam', SW.close + SW.closeDur * 0.8, () => SFX.slam());
     at('sink', SW.sink, lungeSink);
+    at('back', SW.back, shadowBack);
     at('splash', SW.splash, waterCloses);
     for (let k = 0; k < 3; k++) at('ring' + k, SW.splash + k * RING_GAP, () => ring(lungeCx(), HY + 3, true, 1.5 - k * 0.3));
     at('swim', SW.swim, bigSwimsOff);

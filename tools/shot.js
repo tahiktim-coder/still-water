@@ -190,9 +190,14 @@ function lungeFrame(secs) {
   return 6 + secs;
 }
 if (which === 'all' || which === 'lunge_strip') strip('out_lunge_strip.png', LUNGE_TS, lungeFrame);
+// Phase 32, the shadow and the head as one fish: settled with its snout under the speck, darkening and drawn
+// in to the breach point as it comes up, gone as the head clears, no shadow while the head is up, re-forming
+// from the rings as it sinks, grown back, and swimming off right the way it came.
+const SHADOW_TS = [0.9, 1.4, 1.75, 2.0, 3.2, 5.7, 6.4, 8.7];
+if (which === 'all' || which === 'lunge_shadow_strip') strip('out_lunge_shadow_strip.png', SHADOW_TS, lungeFrame);
 // Phase 27, the lunge head as a fish: crops round the horizon at 4x across the rise (closed, opening, open with
 // the speck on the lip, the speck sliding in, closing, sinking), so the head reads up close.
-const HEAD_TS = [1.75, 1.9, 2.2, 2.85, 3.5, 4.2, 4.6, 5.1], CROP = { x: 40, y: 170, w: 176, h: 100, sc: 4 };
+const HEAD_TS = [1.75, 1.9, 2.2, 2.85, 3.5, 4.2, 4.6, 5.1], CROP = { x: 20, y: 170, w: 176, h: 100, sc: 4 };
 function cropStrip(name, entries, frame) {
   const cols = 2, rows = Math.ceil(entries.length / cols), cw = CROP.w * CROP.sc, chh = CROP.h * CROP.sc;
   const png = new PNG({ width: cw * cols, height: chh * rows });
