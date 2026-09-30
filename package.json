@@ -6,9 +6,11 @@
   "scripts": {
     "build": "node build.js",
     "build:test": "node build.js --test",
+    "build:ru": "node build.js --lang=ru && node build.js --lang=ru --test",
+    "build:site": "node build.js --out=site/index.html && node build.js --test --out=site/test.html && node build.js --lang=ru --out=site/ru/index.html && node build.js --lang=ru --test --out=site/ru/test.html",
     "sim": "node tools/sim.js",
     "shots": "node tools/shot.js all && node tools/snaps.js",
-    "domtest": "node build.js && node tools/domtest.js",
+    "domtest": "node build.js && node build.js --lang=ru && node tools/domtest.js",
     "skipcheck": "node tools/skipcheck.js"
   },
   "devDependencies": {

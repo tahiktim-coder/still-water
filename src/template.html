@@ -64,7 +64,7 @@ body {
   font-size: max(10px, calc(var(--u) * 3.3)); pointer-events: none;
 }
 #count { color: var(--ui-ink); opacity: 0.85; }
-#mute, #skip {
+#mute, #skip, #lang {
   pointer-events: auto; font: inherit; color: var(--ui-ink); background: transparent; cursor: pointer;
   min-height: max(44px, calc(var(--u) * 11)); min-width: 44px;
   border: calc(var(--u) * 0.45) solid var(--ui-edge); padding: calc(var(--u) * 0.6) calc(var(--u) * 1.8);
@@ -72,7 +72,11 @@ body {
 }
 #skip { margin-left: calc(var(--u) * 1.5); border-style: dashed; }
 #skip[hidden] { display: none; }
-#mute:focus-visible, #skip:focus-visible, .choice:focus-visible, #again:focus-visible { outline: calc(var(--u) * 0.6) solid var(--ui-accent); outline-offset: calc(var(--u) * 0.5); }
+#hudButtons { display: flex; align-items: stretch; }
+/* The link to the other language's page, on the title only: the same frame as Mute, left of it. */
+#lang { display: inline-flex; align-items: center; justify-content: center; margin-right: calc(var(--u) * 1.5); text-decoration: none; }
+#lang[hidden] { display: none; }
+#mute:focus-visible, #skip:focus-visible, #lang:focus-visible, .choice:focus-visible, #again:focus-visible { outline: calc(var(--u) * 0.6) solid var(--ui-accent); outline-offset: calc(var(--u) * 0.5); }
 
 #caption {
   position: absolute; z-index: 5; top: 11%; left: 9%; right: 9%; text-align: center;
@@ -221,7 +225,7 @@ body {
 <div id="wrap">
   <div id="stage" aria-label="Still Water, a short fishing tale">
     <canvas id="c" width="216" height="384"></canvas>
-    <div id="hud"><span id="count" class="shade" aria-live="polite"></span><span><button id="mute" type="button">Mute</button><button id="skip" type="button" hidden>Skip fish</button></span></div>
+    <div id="hud"><span id="count" class="shade" aria-live="polite"></span><span id="hudButtons"><a id="lang" href="ru/" hreflang="ru" lang="ru" hidden>RU</a><button id="mute" type="button">Mute</button><button id="skip" type="button" hidden>Skip fish</button></span></div>
     <div id="caption" class="shade" aria-live="polite"></div>
     <div id="prompt" class="shade"></div>
     <div id="think" aria-live="polite">

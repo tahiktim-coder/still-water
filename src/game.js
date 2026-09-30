@@ -807,6 +807,7 @@ const ENDINGS = {
 // The ending card's BASE (bible, section 4 Ending cards: twenty situations), keyed by ending (the silent
 // variant as 'silent'), then by lake or sea (WS.sea past 0.5), then by boat or sunk (WS.boatSunk at 1); Still
 // water at sea splits once more on whether he heard the fish. The number after each line is the bible's.
+// A cell built from shared pieces is an array of parts, translated one by one before joining (endingBase).
 const NEXT_SUN = ' Somewhere a sun is coming up. Someone is rowing out.';
 const NO_BOTTOM = 'The water is warmer than you thought, and full of light, and ';
 const STAY_END = 'He took the sun down with him. ';
@@ -817,21 +818,21 @@ const GUTTER = 'You never reel it in.';
 const END_BASES = {
   home: {
     lake: {
-      boat: 'The lake is quiet again. The fish are hungry.' + NEXT_SUN, // 1
-      sunk: 'The lake is quiet again. The boat is on the bottom and so is the gold.' + NEXT_SUN, // 2
+      boat: ['The lake is quiet again. The fish are hungry.', NEXT_SUN], // 1
+      sunk: ['The lake is quiet again. The boat is on the bottom and so is the gold.', NEXT_SUN], // 2
     },
     sea: {
-      boat: 'The sea is quiet again. Nobody will come this far to look.' + NEXT_SUN, // 3
-      sunk: 'The sea is quiet again. The gold is on the bottom, and it is a long way down.' + NEXT_SUN, // 4
+      boat: ['The sea is quiet again. Nobody will come this far to look.', NEXT_SUN], // 3
+      sunk: ['The sea is quiet again. The gold is on the bottom, and it is a long way down.', NEXT_SUN], // 4
     },
   },
   dark: {
     lake: {
-      boat: 'You sit with the lantern until it gutters out. Sometimes something takes the bait. ' + GUTTER, // 5
-      sunk: 'You hang in the water beside the lantern until it gutters out. Sometimes something takes the bait. ' + GUTTER, // 6
+      boat: ['You sit with the lantern until it gutters out. Sometimes something takes the bait. ', GUTTER], // 5
+      sunk: ['You hang in the water beside the lantern until it gutters out. Sometimes something takes the bait. ', GUTTER], // 6
     },
     sea: {
-      boat: 'You sit with the lantern until it gutters out. There is no shore to see it from. Sometimes something takes the bait. ' + GUTTER, // 7
+      boat: ['You sit with the lantern until it gutters out. There is no shore to see it from. Sometimes something takes the bait. ', GUTTER], // 7
       sunk: 'You hang in the water beside the lantern until it gutters out. The big ones pass under you all night. You never reel anything in.', // 8
     },
   },
@@ -843,23 +844,23 @@ const END_BASES = {
     sea: {
       boat: {
         quiet: 'You cut it. The red sun goes down for everyone. There is no shore in any direction. You row anyway, for a while.', // 11
-        heard: KNOW_WAY + 'bring' + NEW_SHORE, // 12
+        heard: [KNOW_WAY, 'bring', NEW_SHORE], // 12
       },
       sunk: {
         quiet: 'You cut it. The red sun goes down for everyone. You swim for a while.', // 13
-        heard: KNOW_WAY + 'carry' + NEW_SHORE, // 14 (unreachable: hear and gold share wish 2)
+        heard: [KNOW_WAY, 'carry', NEW_SHORE], // 14 (unreachable: hear and gold share wish 2)
       },
     },
   },
   stay: { // lake only: the companion is a first wish
     lake: {
-      boat: 'You stay. ' + STAY_END + 'The seat behind you is empty again. ' + STAY_DARK, // 15
-      sunk: 'You stay, in the water. ' + STAY_END + STAY_DARK, // 16
+      boat: ['You stay. ', STAY_END, 'The seat behind you is empty again. ', STAY_DARK], // 15
+      sunk: ['You stay, in the water. ', STAY_END, STAY_DARK], // 16
     },
   },
   deep: { // sunk only: Deep needs the gold
-    lake: { sunk: 'The gold is where you left it. So is everything else. ' + NO_BOTTOM + 'there is no bottom.' }, // 17
-    sea: { sunk: 'The gold is somewhere below. ' + NO_BOTTOM + 'the big ones let you pass. There is no bottom.' }, // 18
+    lake: { sunk: ['The gold is where you left it. So is everything else. ', NO_BOTTOM, 'there is no bottom.'] }, // 17
+    sea: { sunk: ['The gold is somewhere below. ', NO_BOTTOM, 'the big ones let you pass. There is no bottom.'] }, // 18
   },
   silent: { // lake, boat: Silent needs two refusals, so no gold and no sea
     lake: { boat: 'You wanted nothing. It showed you anyway. You row until the water is only water. Some evenings, the sunset looks back.' }, // 19
@@ -935,6 +936,332 @@ const RECOUNT = {
   forever: 'a day that never ends', hear: 'to hear the fish', gold: 'a boat full of gold',
 };
 
+// ---------------------------------------------------------------- language
+// One page per language: the build bakes DEFAULT_LANG in (build.js --lang=ru), and ?lang=ru or ?lang=en
+// overrides it for testing. There is no saved choice and no browser detection. RU is keyed by the exact
+// English string; tr(s) returns the Russian in RU mode and s otherwise. Text is translated where it reaches
+// the player (cap, thinkLine, dlgRun, lakeWhisper, showCard, composeEnding, refreshPrompt, makeUI and
+// staticText), and composed text translates its parts before joining (trJoin, recountLine, askedLine,
+// endingBase). Logic never reads translated text: choices pick by closure, and a dialogue line keeps its
+// English `who`. To add a string, write it in English where it is used and add 'English': 'Russian' to RU;
+// the sim's Russian pass fails on any Latin letter the player would see.
+const DEFAULT_LANG = 'en';
+const LANGS = ['en', 'ru'];
+let LANG = DEFAULT_LANG;
+function pickLang() {
+  if (!IS_BROWSER) return DEFAULT_LANG;
+  const q = new URLSearchParams(window.location.search).get('lang');
+  return LANGS.indexOf(q) >= 0 ? q : DEFAULT_LANG;
+}
+const RU = {
+  'Still Water': 'Тихий омут',
+  'Still Water, a short fishing tale': 'Тихий омут, короткая рыбацкая сказка',
+  'Mute': 'Без звука',
+  'Skip fish': 'Пропустить рыбу',
+  'Fisherman': 'Рыбак',
+  'Tap to continue': 'Нажми, чтобы продолжить',
+  'A short fishing tale': 'Короткая рыбацкая сказка',
+  'Tap to begin': 'Нажми, чтобы начать',
+  'Tap to cast. Tap when the float goes under. Hold to reel.': 'Нажми, чтобы забросить. Поплавок ушёл под воду — подсекай. Держи, чтобы тянуть.',
+  'Cast again': 'Забросить снова',
+  'Glass perch': 'Стеклянный окунь',
+  'Eyeless perch': 'Безглазый окунь',
+  'Mirror char': 'Зеркальный голец',
+  'Hollow char': 'Пустой голец',
+  'Blue smelt': 'Синяя корюшка',
+  'Grinning smelt': 'Оскаленная корюшка',
+  'Fjord trout': 'Фьордовая форель',
+  'Drowned trout': 'Утонувшая форель',
+  'Needle eel': 'Игольчатый угорь',
+  'Knot eel': 'Узловатый угорь',
+  'Endless eel': 'Бесконечный угорь',
+  'Pale grayling': 'Бледный хариус',
+  'Ash grayling': 'Пепельный хариус',
+  'You can see its heart beating through it.': 'Сквозь него видно, как бьётся сердце.',
+  'There is an old hook inside it. Not yours.': 'Внутри него старый крючок. Не твой.',
+  'No eyes. It still turns toward the lantern.': 'Глаз нет. Он всё равно поворачивается к фонарю.',
+  'Its scales show you the sky. You check. It matches.': 'В его чешуе отражается небо. Ты проверяешь. Совпадает.',
+  'Its scales show you a red sky.': 'В его чешуе отражается красное небо.',
+  'Its scales show your boat from underneath.': 'В его чешуе — днище твоей лодки.',
+  'Small and cold. It holds still for the knife.': 'Маленькая и холодная. Замирает под ножом.',
+  'It has teeth. They look like yours.': 'У неё зубы. Похожи на твои.',
+  'It is dry. It came out of the water dry.': 'Она сухая. Из воды она вышла сухой.',
+  'It fought like it had somewhere to be.': 'Она билась так, будто куда-то спешила.',
+  'It keeps looking at the sun.': 'Она всё смотрит на солнце.',
+  'It drowned. It is a fish. It drowned.': 'Она утонула. Это рыба. Она утонула.',
+  'Longer than the boat. It weighs nothing.': 'Длиннее лодки. Ничего не весит.',
+  'It knotted itself so you couldn’t keep it.': 'Он завязался узлом, чтобы ты не смог его оставить.',
+  'It is still coming out of the water.': 'Он всё ещё тянется из воды.',
+  'It smells of snow.': 'Он пахнет снегом.',
+  'It smells of smoke.': 'Он пахнет дымом.',
+  'It smells like you.': 'Он пахнет тобой.',
+  'Its scales show someone sitting behind you.': 'В его чешуе отражается кто-то у тебя за спиной.',
+  'There is a gold scale in its mouth.': 'Во рту — золотая чешуйка.',
+  'Its stomach is full of hooks. All of them yours.': 'Желудок набит крючками. Все до одного твои.',
+  'It swam to the hook. It didn’t have to.': 'Рыба сама пошла на крючок. Её никто не заставлял.',
+  'It smells of woodsmoke. Someone’s home.': 'Он пахнет печным дымом. Кто-то дома.',
+  'There are coins in it. They are still warm.': 'Внутри — монеты. Ещё тёплые.',
+  'It is looking at you the way you look at it.': 'Рыба смотрит на тебя так же, как ты на неё.',
+  'There is an old hook in its lip.': 'В губе застрял старый крючок.',
+  'I wished for company too. Now I have plenty.': 'Мне тоже хотелось компании. Теперь нас тут много.',
+  'I wished to go where the fish are too. Here I am.': 'Мне тоже хотелось туда, где рыба. Вот я и здесь.',
+  'I wished for a home too. This is it.': 'Мне тоже хотелось своего дома. Вот он.',
+  'I wanted nothing too. It waited.': 'Мне тоже ничего не хотелось. Оно ждало.',
+  ' kg': ' кг',
+  'Home': 'Дом',
+  'Dark': 'Тьма',
+  'Still water': 'Тихая вода',
+  'Swallowed': 'Проглочен',
+  'Stay': 'Остаться',
+  'Deep': 'Глубина',
+  ' Somewhere a sun is coming up. Someone is rowing out.': ' Где-то встаёт солнце. Кто-то отчаливает от берега.',
+  'The water is warmer than you thought, and full of light, and ': 'Вода теплее, чем ты думал, и полна света, и ',
+  'He took the sun down with him. ': 'Он унёс солнце с собой под воду. ',
+  'It does not get light, and after a while you stop minding.': 'Светло так и не становится, и через какое-то время тебе уже всё равно.',
+  'You cut it. The fish you can hear know the way. They ': 'Ты перерезаешь леску. Рыбы, которых ты слышишь, знают дорогу. Они ',
+  'bring': 'выводят',
+  'carry': 'выносят',
+  ' you to a shore nobody from home has seen, and you start again there.': ' тебя к берегу, которого никто в твоих краях не видел, и там ты начинаешь всё сначала.',
+  'You never reel it in.': 'Ты его так и не вытаскиваешь.',
+  'The lake is quiet again. The fish are hungry.': 'Озеро снова спокойно. Рыба голодна.',
+  'The lake is quiet again. The boat is on the bottom and so is the gold.': 'Озеро снова спокойно. Лодка на дне, и золото тоже.',
+  'The sea is quiet again. Nobody will come this far to look.': 'Море снова спокойно. Так далеко искать никто не поплывёт.',
+  'The sea is quiet again. The gold is on the bottom, and it is a long way down.': 'Море снова спокойно. Золото на дне, а до дна далеко.',
+  'You sit with the lantern until it gutters out. Sometimes something takes the bait. ': 'Ты сидишь с фонарём, пока он не догорит. Иногда что-то берёт наживку. ',
+  'You hang in the water beside the lantern until it gutters out. Sometimes something takes the bait. ': 'Ты висишь в воде рядом с фонарём, пока он не догорит. Иногда что-то берёт наживку. ',
+  'You sit with the lantern until it gutters out. There is no shore to see it from. Sometimes something takes the bait. ': 'Ты сидишь с фонарём, пока он не догорит. Нет берега, с которого его было бы видно. Иногда что-то берёт наживку. ',
+  'You hang in the water beside the lantern until it gutters out. The big ones pass under you all night. You never reel anything in.': 'Ты висишь в воде рядом с фонарём, пока он не догорит. Громадины всю ночь проходят под тобой. Ты так ничего и не вытаскиваешь.',
+  'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.': 'Ты гребёшь, пока вода не станет просто водой. Здесь ты больше не рыбачишь. Иногда по вечерам закат смотрит на тебя в ответ.',
+  'You swim for the shore and reach it. Every morning you wake in the water again, above the gold. You can always come back for it, it said.': 'Ты плывёшь к берегу и добираешься до него. Каждое утро ты снова просыпаешься в воде, над золотом. «Ты всегда можешь за ним вернуться», — сказала рыбка.',
+  'You cut it. The red sun goes down for everyone. There is no shore in any direction. You row anyway, for a while.': 'Ты перерезаешь леску. Красное солнце заходит для всех. Берега нет ни с одной стороны. Ты всё равно гребёшь — какое-то время.',
+  'You cut it. The red sun goes down for everyone. You swim for a while.': 'Ты перерезаешь леску. Красное солнце заходит для всех. Какое-то время ты плывёшь.',
+  'You stay. ': 'Ты остаёшься. ',
+  'The seat behind you is empty again. ': 'Место позади тебя снова пустое. ',
+  'You stay, in the water. ': 'Ты остаёшься — в воде. ',
+  'The gold is where you left it. So is everything else. ': 'Золото там, где ты его оставил. Как и всё остальное. ',
+  'there is no bottom.': 'дна нет.',
+  'The gold is somewhere below. ': 'Золото где-то внизу. ',
+  'the big ones let you pass. There is no bottom.': 'громадины пропускают тебя. Дна нет.',
+  'You wanted nothing. It showed you anyway. You row until the water is only water. Some evenings, the sunset looks back.': 'Ты ничего не хотел. Оно всё равно всё тебе показало. Ты гребёшь, пока вода не станет просто водой. Иногда по вечерам закат смотрит на тебя в ответ.',
+  'Somewhere far above, the sun is still shining on the sea. There is no boat on it.': 'Где-то далеко наверху солнце всё ещё светит над морем. Лодки на нём нет.',
+  'The golden fish slips out of the boat as you go in.': 'Золотая рыбка выскальзывает из лодки, пока ты заходишь внутрь.',
+  'The golden fish follows you in.': 'Золотая рыбка заплывает внутрь следом за тобой.',
+  'The seat behind you is empty now. It was your turn.': 'Место позади тебя теперь пустое. Настал твой черёд.',
+  'The water behind you is empty now. It was your turn.': 'Вода позади тебя теперь пуста. Настал твой черёд.',
+  'The knocking stops. Now it’s you on the inside.': 'Стук прекращается. Теперь внутри — ты.',
+  'You know the words already. You will say them.': 'Ты уже знаешь слова. Ты их скажешь.',
+  'The day does not end. You aren’t in it.': 'День не кончается. Тебя в нём нет.',
+  'You asked for nothing, and then for home. Home was the only thing it had.': 'Ты просил «ничего», а потом попросился домой. Дом — единственное, что у него было.',
+  'The golden fish dries in the bottom of the boat. It stops asking before you do.': 'Золотая рыбка сохнет на дне лодки. Она перестаёт просить раньше, чем ты.',
+  'The golden fish circles you all night, glowing less each time.': 'Золотая рыбка всю ночь кружит вокруг тебя и с каждым кругом светится слабее.',
+  'The lake keeps talking. You stop answering.': 'Озеро всё говорит. Ты больше не отвечаешь.',
+  'The sea keeps talking. You stop answering.': 'Море всё говорит. Ты больше не отвечаешь.',
+  'Someone breathes behind you all night. You do not turn around.': 'Всю ночь кто-то дышит у тебя за спиной. Ты не оборачиваешься.',
+  'The day never ends. It never begins either.': 'День не кончается никогда. Но и не начинается.',
+  'The knocking goes on all night. Nobody opens.': 'Стук не стихает всю ночь. Никто не открывает.',
+  'You asked for nothing twice. Here it is.': 'Ты дважды попросил «ничего». Вот оно.',
+  'There is someone in the stern. You do not ask. You row.': 'На корме кто-то есть. Ты не спрашиваешь. Ты гребёшь.',
+  'Someone swims behind you. You do not ask.': 'Кто-то плывёт за тобой. Ты не спрашиваешь.',
+  'The cabin goes dark. The knocking stops. You don’t go back to see why.': 'В избушке гаснет свет. Стук прекращается. Ты не возвращаешься узнать почему.',
+  'You lifted it over the side. It let you.': 'Ты опустил рыбку за борт. Она позволила.',
+  'You let it go. It let you.': 'Ты отпустил рыбку. Она позволила.',
+  'Dawn comes anyway. You did not ask for it.': 'Рассвет всё равно приходит. Ты его не просил.',
+  'Dawn comes anyway, over nothing.': 'Рассвет всё равно приходит — над пустым морем.',
+  'You can still hear them from the shore. You stop listening.': 'С берега их всё ещё слышно. Ты перестаёшь слушать.',
+  'You asked once for nothing. It kept count.': 'Один раз ты попросил «ничего». Оно вело счёт.',
+  'Twice you said nothing. The knife said it a third time.': 'Дважды ты сказал «ничего». В третий раз это сказал нож.',
+  'The golden fish stays with you. It is the only light that answers.': 'Золотая рыбка остаётся с тобой. Это единственный свет, который отвечает.',
+  'The lake keeps talking about him.': 'Озеро всё говорит о нём.',
+  'The day did not end. Now it will not begin.': 'День не кончился. Теперь он не начнётся.',
+  'The golden fish goes down with you. It knows the way.': 'Золотая рыбка опускается вместе с тобой. Она знает дорогу.',
+  'Someone comes down after you. You do not look back.': 'Кто-то спускается следом за тобой. Ты не оглядываешься.',
+  'It went over the side on its own. You let it.': 'Рыбка сама ушла за борт. Ты не стал мешать.',
+  'The golden fish went in with you. It had been in before.': 'Золотая рыбка оказалась внутри вместе с тобой. Она там уже бывала.',
+  'There is a bait in your pocket. It has an eye.': 'У тебя в кармане наживка. У неё есть глаз.',
+  'You asked for nothing.': 'Ты ничего не просил.',
+  'You asked for nothing, once. And for:': 'Один раз ты попросил «ничего». А ещё ты просил:',
+  'You asked for:': 'Ты просил:',
+  'Someone to sit with me': 'Кого-нибудь, кто посидит со мной',
+  'Take me where the fish are': 'Отвези меня туда, где рыба',
+  'A home on the shore': 'Дом на берегу',
+  'Make this day last forever': 'Пусть этот день останется навсегда',
+  'Let me hear the fish': 'Дай мне слышать рыб',
+  'A boat full of gold': 'Полную лодку золота',
+  'someone to sit with you': 'кого-нибудь, кто посидит с тобой',
+  'where the fish are': 'туда, где рыба',
+  'a home on the shore': 'дом на берегу',
+  'a day that never ends': 'день без конца',
+  'to hear the fish': 'слышать рыб',
+  'a boat full of gold': 'полную лодку золота',
+  'Everything you asked for. ': 'Всё, что ты просил. ',
+  ' And forever. Your words, not mine.': ' И навсегда. Твои слова, не мои.',
+  'You light the lantern. The shore does not.': 'Ты зажигаешь фонарь. Берег — нет.',
+  'You light the lantern.': 'Ты зажигаешь фонарь.',
+  'The sun sets the way suns do.': 'Солнце садится, как и положено солнцу.',
+  'The sun slips into the ': 'Солнце соскальзывает в ',
+  ' like a coin into a well.': ', как монета в колодец.',
+  'lake': 'озеро',
+  'sea': 'море',
+  'Something rises where the sun went down.': 'Там, где село солнце, что-то поднимается.',
+  'Something gold slips by you on the way down.': 'Что-то золотое проскальзывает мимо тебя по пути вниз.',
+  'Something gold circles you. It has time.': 'Что-то золотое кружит вокруг тебя. Ему некуда спешить.',
+  'Something gold circles the boat. It has time.': 'Что-то золотое кружит вокруг лодки. Ему некуда спешить.',
+  'The line goes slack.': 'Леска провисает.',
+  'You let the golden fish go.': 'Ты отпускаешь золотую рыбку.',
+  'You lift the golden fish over the side.': 'Ты опускаешь золотую рыбку за борт.',
+  'The float lands on something that is not water.': 'Поплавок ложится на что-то. Это не вода.',
+  'The lake stays glass.': 'Озеро стоит как стекло.',
+  'The water goes very still.': 'Вода совсем замирает.',
+  'The water goes very still. The fish in the boat does not.': 'Вода совсем замирает. Рыбка в лодке — нет.',
+  'The water goes very still again.': 'Вода снова замирает.',
+  'The water goes very still. The flame leans toward it.': 'Вода совсем замирает. Пламя клонится к ней.',
+  'The water goes very still. The flame leans toward the fish.': 'Вода совсем замирает. Пламя клонится к рыбке.',
+  'The water goes very still. The flame leans to your feet.': 'Вода совсем замирает. Пламя клонится к твоим ногам.',
+  'Someone knocks on the cabin door.': 'Кто-то стучит в дверь избушки.',
+  'The knocking again. Slower.': 'Опять стучат. Медленнее.',
+  'The line snapped.': 'Леска лопнула.',
+  'The line snapped. Let go when it pulls.': 'Леска лопнула. Отпускай, когда рыба рвётся.',
+  'It slipped away. Cast again.': 'Сорвалась. Забрасывай снова.',
+  'It slipped the hook.': 'Сорвалась с крючка.',
+  'Too early.': 'Рано.',
+  'Too early. Nothing was biting yet.': 'Рано. Ещё не клевало.',
+  'Test mode on': 'Тестовый режим включён',
+  'Test mode off': 'Тестовый режим выключен',
+  'Golden fish': 'Золотая рыбка',
+  'The lake': 'Озеро',
+  'The sea': 'Море',
+  'Nothing on the lake is moving except you.': 'На озере ничего не движется, кроме тебя.',
+  'The stranger’s bait. Cursed or blessed, he said. It has an eye.': 'Наживка того незнакомца. На беду или на удачу, сказал он. У неё есть глаз.',
+  'Something interesting, for once.': 'Хоть бы раз что-нибудь интересное.',
+  'First time out here. Look at that sun.': 'Первый раз здесь. Ты посмотри, какое солнце.',
+  'I could stay out here forever.': 'Я бы остался здесь навсегда.',
+  'Wait. Don’t gut me, fisherman.': 'Постой. Не потроши меня, рыбак.',
+  'Back out already? It doesn’t usually let go.': 'Уже снова здесь? Оно обычно не отпускает.',
+  'You cut the line last time. It’s the same line.': 'В прошлый раз ты перерезал леску. Леска всё та же.',
+  'You again. Or someone wearing you.': 'Опять ты. Или кто-то в твоей шкуре.',
+  'Something interesting, you said. Here I am.': 'Что-нибудь интересное — так ты сказал. Вот она я.',
+  'Put me back and I’ll grant you a wish. Three, if you’re patient.': 'Отпусти меня — исполню желание. А наберёшься терпения — три.',
+  'Let it go': 'Отпустить',
+  'Keep it': 'Оставить себе',
+  'You lift it into the boat. It is heavier than a fish.': 'Ты поднимаешь её в лодку. Она тяжелее, чем бывает рыба.',
+  'Cold hands. He had cold hands too.': 'Холодные руки. У него тоже были холодные руки.',
+  'Keep me, then. The wish comes anyway.': 'Что ж, оставь меня себе. Желание всё равно сбудется.',
+  'Kind. Nobody kind comes out this far alone.': 'Добрый ты. Никто из добрых не заплывает так далеко в одиночку.',
+  'First time here, you said. You said that last time too.': 'Первый раз здесь — так ты сказал. Ты и в прошлый раз так говорил.',
+  'First time here, you said. Nobody comes here twice.': 'Первый раз здесь — так ты сказал. Никто не бывает здесь дважды.',
+  'What would you like, fisherman?': 'Чего тебе надобно, рыбак?',
+  'Nothing': 'Ничего',
+  'Who?': 'Кого?',
+  'Doesn’t matter. Someone': 'Неважно. Кого-нибудь',
+  'Someone. You didn’t ask who.': 'Кого-нибудь. Ты не сказал, кого.',
+  'If they ask you anything, don’t answer.': 'Если тебя о чём-то спросят — не отвечай.',
+  'A home on the shore. One has just come free.': 'Дом на берегу. Один как раз освободился.',
+  'Every light out here is for someone. That one is for you.': 'Каждый огонь здесь горит для кого-то. Этот — для тебя.',
+  'A wish costs a little daylight. You said you could stay out here forever.': 'Желание стоит немного дневного света. Ты говорил, что остался бы здесь навсегда.',
+  'You’ll get to.': 'Останешься.',
+  'Where the fish are. I know a spot. Hold on to something.': 'Туда, где рыба. Знаю одно место. Держись крепче.',
+  'Here. I wouldn’t cast while it’s under you. It’s been waiting longer than you have.': 'Здесь. Я бы не забрасывала, пока оно под тобой. Оно ждёт дольше, чем ты.',
+  'Look how they all go the same way.': 'Смотри, все плывут в одну сторону.',
+  'Nothing. Nobody asks for nothing. I’ll ask again.': 'Ничего. Никто не просит «ничего». Я спрошу ещё раз.',
+  'You said you could stay out here forever. There’s time.': 'Ты говорил, что остался бы здесь навсегда. Время есть.',
+  'You cast anyway. Habit. Still wanting nothing?': 'Всё равно закинул. Привычка. Всё ещё ничего не хочешь?',
+  'You cast anyway. Habit. And this time?': 'Всё равно закинул. Привычка. А теперь чего?',
+  'Back again. Still wanting nothing?': 'Снова ты. Всё ещё ничего не хочешь?',
+  'Back so soon? I’d only just got down. And this time?': 'Уже вернулся? Я только до дна добралась. А теперь чего?',
+  'Don’t mind the knocking. They’re not trying to get in.': 'Не обращай внимания на стук. Они не пытаются войти.',
+  'Gold. A boat full of it': 'Золота. Полную лодку',
+  'That’s twice you’ve said forever. It’s a long time for a sun.': 'Ты уже второй раз говоришь «навсегда». Для солнца это долго.',
+  'This one is tired. I know one that never sets.': 'Это солнце устало. Я знаю другое, которое никогда не заходит.',
+  'Listen, then. They all say the same thing.': 'Что ж, слушай. Они все говорят одно и то же.',
+  'That was my first, too.': 'Это было и моё первое желание.',
+  'That was my second, too.': 'Это было и моё второе желание.',
+  ' This one costs the rest of the day.': ' За него ты отдашь остаток дня.',
+  'You’ll miss the sun. I’ll bring you another.': 'Ты будешь скучать по солнцу. Я принесу тебе другое.',
+  'Gold. A boat full of it.': 'Золота. Полную лодку.',
+  'Sorry. Gold is heavy. You can always come back for it.': 'Прости. Золото тяжёлое. Ты всегда можешь за ним вернуться.',
+  'Twice. Nobody asks for nothing twice. What are you?': 'Дважды. Никто не просит «ничего» дважды. Что ты такое?',
+  'Full already? It’s a little late for that.': 'Уже сыт? Поздновато спохватился.',
+  'Then the sun sets for free. You’ll miss it. I’ll bring you another.': 'Тогда солнце сядет даром. Ты будешь по нему скучать. Я принесу тебе другое.',
+  'Will you stay?': 'Ты останешься?',
+  'Yes': 'Да',
+  'Say nothing': 'Промолчать',
+  'He does not turn around.': 'Он не оборачивается.',
+  'He goes back to watching the horizon.': 'Он снова смотрит на горизонт.',
+  'The line goes taut. You did not feel a bite.': 'Леска натягивается. Поклёвки ты не почувствовал.',
+  'One wish left. You said forever, then asked for nothing twice.': 'Осталось одно желание. Ты сказал «навсегда», а потом дважды попросил «ничего».',
+  'It wants to see why.': 'Оно хочет разглядеть, зачем.',
+  'I’m right here, fisherman.': 'Я здесь, рыбак. Совсем рядом.',
+  'One wish left. But first, the sun I promised you.': 'Осталось одно желание. Но сначала — солнце, которое я тебе обещала.',
+  'You said forever. I passed that on.': 'Ты сказал «навсегда». Я передала.',
+  'You said forever, then you wished for it. I listened twice.': 'Ты сказал «навсегда», а потом ещё и загадал это. Я услышала оба раза.',
+  'You said forever. I listened.': 'Ты сказал «навсегда». Я услышала.',
+  'i could stay out here forever. i could stay out here forever.': 'я бы остался здесь навсегда. я бы остался здесь навсегда.',
+  'There it is. Forever, like you said.': 'Вот оно. Навсегда, как ты сказал.',
+  'That bait was never for fish. I should have said.': 'Та наживка была вовсе не для рыбы. Надо было тебе сказать.',
+  'Nobody rows this far to want nothing. So why are you here.': 'Никто не гребёт в такую даль, чтобы ничего не хотеть. Так зачем ты здесь.',
+  'You said you’d stay.': 'Ты сказал, что останешься.',
+  'Don’t answer it. Cut the line.': 'Не отвечай ей. Перережь леску.',
+  'You answered him. I did ask you not to.': 'Ты ему ответил. А я ведь просила не отвечать.',
+  'I’m sorry.': 'Прости.',
+  'I sat where you sit. I said what you said. Three times.': 'Я сидела на твоём месте. Говорила твои слова. Трижды.',
+  'I’d like to go home now. What would you like.': 'Я хочу домой. Чего тебе надобно.',
+  'Let me go home': 'Отпусти меня домой',
+  'Take the light away': 'Забери свет',
+  'Cut the line': 'Перерезать леску',
+  'Stay with him': 'Остаться с ним',
+  'Let me get my gold': 'Дай мне забрать моё золото',
+  'Home. Yes. Come inside.': 'Домой. Да. Заходи.',
+  'Thank you.': 'Спасибо.',
+  'As you wish. Without light you won’t have to see the teeth.': 'Как пожелаешь. Без света тебе не придётся видеть зубы.',
+  'Don’t leave me out here.': 'Не оставляй меня здесь.',
+  'Don’t leave me in the boat.': 'Не оставляй меня в лодке.',
+  'You reach for the knife in your belt.': 'Ты тянешься к ножу на поясе.',
+  'You reach for the knife on the gunwale.': 'Ты тянешься к ножу на борту.',
+  'No. Nobody cuts the—': 'Нет. Никто не перерезает ле—',
+  'Stay with him. Two wishes, one seat.': 'Остаться с ним. Два желания, одно место.',
+  'He said he’d stay with me.': 'Он сказал, что останется со мной.',
+  'He said a lot of things.': 'Мало ли что он говорил.',
+  'It’s all still down there. Nobody comes back up with it.': 'Золото всё там же, внизу. Никто не поднимается с ним наверх.',
+  'You say nothing.': 'Ты молчишь.',
+  'It waits. Then it goes dark in the bottom of the boat.': 'Она ждёт. Потом гаснет на дне лодки.',
+  'It waits. Then it splashes its tail once and goes down.': 'Она ждёт. Потом один раз бьёт хвостом и уходит в глубину.',
+  'Look at that sun.': 'Ты посмотри, какое солнце.',
+  'First time here.': 'Первый раз здесь.',
+  'We could stay out here forever.': 'Мы бы остались здесь навсегда.',
+  'Still there.': 'Всё ещё там.',
+  'It’s coming back.': 'Оно возвращается.',
+  'Don’t you want it to?': 'А ты разве не хочешь?',
+  'First time here. You said that last time.': 'Первый раз здесь. Ты и в прошлый раз так говорил.',
+  'You said.': 'Ты же сказал.',
+  'Cut the line.': 'Перережь леску.',
+  'Tap to cast': 'Нажми, чтобы забросить',
+  'Wait for the float to go under': 'Жди, пока поплавок уйдёт под воду',
+  'Tap now': 'Подсекай',
+  'Hold to reel. Let go when it pulls hard.': 'Держи, чтобы тянуть. Отпускай, когда рыба рвётся.',
+  'Hold to reel': 'Держи, чтобы тянуть',
+  '1 fish': '1 рыба',
+  ' fish': ' рыб',
+  'Endings found: ': 'Найдено концовок: ',
+  ' of ': ' из ',
+  'not found': 'не найдена',
+  'Unmute': 'Со звуком',
+  ' (test build)': ' (тестовая сборка)', // the test build tab title (build.js --test)
+};
+// The counter's plural forms: 1 рыба, 2-4 рыбы, 5+ рыб.
+const RU_FISH = ['рыба', 'рыбы', 'рыб'];
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const tr = s => (LANG === 'ru' && s && hasOwn(RU, s) ? RU[s] : s);
+const trJoin = parts => parts.map(tr).join('');
+function ruPlural(n, forms) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return forms[0];
+  return m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? forms[1] : forms[2];
+}
+// The HUD counter, the card's weight (a decimal comma in Russian) and the endings counter.
+const countText = n => (n <= 0 ? '' : LANG === 'ru' ? n + ' ' + ruPlural(n, RU_FISH) : n === 1 ? '1 fish' : n + ' fish');
+const kgText = w => (LANG === 'ru' ? w.toFixed(2).replace('.', ',') : w.toFixed(2)) + tr(' kg');
+const foundText = n => tr('Endings found: ') + n + tr(' of ') + ENDING_COUNT;
+
 // ---------------------------------------------------------------- state
 const WS = {};
 function resetWS() {
@@ -1005,10 +1332,21 @@ function stubUI() {
     log, choices: null,
     prompt: f('prompt'), caption: f('caption'), count: f('count'),
     card: f('card'), cardHide: f('cardHide'),
-    dlgShow: f('dlgShow'), dlgText() {}, dlgChoices(list) { this.choices = list; },
+    // The panel's text types out a character at a time: one 'dialogue' entry per line, grown in place as it
+    // types, so the log holds each line whole. Every menu is logged as a 'choices' entry of its labels.
+    dlgShow: f('dlgShow'),
+    dlgText(t) {
+      const e = log[log.length - 1];
+      if (e && e[0] === 'dialogue' && t.startsWith(e[1])) log[log.length - 1] = ['dialogue', t];
+      else if (t) log.push(['dialogue', t]);
+    },
+    dlgChoices(list) { this.choices = list; if (list) log.push(['choices', list.map(c => c.label)]); },
     dlgMore() {}, dlgBusy() {}, dlgHide: f('dlgHide'), thinkMore() {}, cardReady() {},
     // The thought bubble: logged as 'think' entries; its choices (the companion's question) go in choices.
-    think(text, opts) { log.push(['think', text, opts && opts.side || 'fisherman']); if (opts && opts.choices) { this.choices = opts.choices; this.thinkOwns = true; } },
+    think(text, opts) {
+      log.push(['think', text, opts && opts.side || 'fisherman']);
+      if (opts && opts.choices) { this.choices = opts.choices; this.thinkOwns = true; log.push(['choices', opts.choices.map(c => c.label)]); }
+    },
     thinkHide() { if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; } },
     title: f('title'), ending: f('ending'), endingHide: f('endingHide'), fade: f('fade'), colors() {},
   };
@@ -2329,8 +2667,12 @@ const WEIGHT_VOL = 0.22, WEIGHT_OUT = 2;
 // one under the bubble. A tapped choice is already the fisherman's line and is never echoed in his bubble
 // (bible, 4b): the tap closes the panel and runs its pick at once.
 const DLG = { q: [], cur: null, n: 0, done: null, wait: 0, active: false, run: 0 };
+// A line as the player reads it: its text and choice labels translated (tr). Its `who` stays English, since
+// fishSpeaking reads it; the label is translated where it is shown.
+const trChoice = c => Object.assign({}, c, { label: tr(c.label) });
+const trLine = L => (typeof L.text !== 'string' ? L : Object.assign({}, L, { text: tr(L.text), choices: L.choices && L.choices.map(trChoice) }));
 function dlgRun(lines, done) {
-  DLG.q = lines.slice(); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.run++;
+  DLG.q = lines.map(trLine); DLG.done = done || null; DLG.active = true; DLG.cur = null; DLG.wait = 0; DLG.run++;
   setPhase('dialog');
   dlgNext();
 }
@@ -2342,7 +2684,7 @@ function dlgNext() {
     DLG.cur = L; DLG.n = 0;
     if (L.bubble) { dlgBubble(L); return; }
     thinkHide();
-    UI.dlgShow(L.who || '', L.style || '');
+    UI.dlgShow(tr(L.who || ''), L.style || '');
     UI.dlgText('', L.mark);
     UI.dlgChoices(null);
     return;
@@ -2358,7 +2700,7 @@ function dlgBubble(L) {
   DLG.n = L.text.length; G.thinkUntil = 0;
   UI.dlgHide();
   const side = L.side || 'companion';
-  UI.think(L.text, { side, who: side === 'fisherman' ? L.who : '', mark: L.mark, choices: L.choices ? choiceList(L) : null, more: !L.choices });
+  UI.think(L.text, { side, who: side === 'fisherman' ? tr(L.who) : '', mark: L.mark, choices: L.choices ? choiceList(L) : null, more: !L.choices });
 }
 // The choice buttons for a line. A tap closes the panel (or the bubble) and runs the pick at once; the
 // label never shows in the bubble. A pick that did not start a new dlgRun lets the list continue.
@@ -2427,7 +2769,7 @@ const sunsetCine = refused => ({
   init(s) { s.y0 = WS.sunY; s.tr0 = WS.troubled; },
   update(t, dt, at, s) {
     at('snd', 0, () => SFX.swell());
-    at('cap', 0.4, () => cap(refused ? 'The sun sets the way suns do.' : 'The sun slips into the ' + placeWord() + ' like a coin into a well.', 4.8));
+    at('cap', 0.4, () => cap(refused ? 'The sun sets the way suns do.' : trJoin(['The sun slips into the ', placeWord(), ' like a coin into a well.']), 4.8));
     const k = clamp(t / 7.5, 0, 1);
     WS.sunY = lerp(s.y0, HY + 14, E.io(k));
     WS.mood = clamp((t - 1) / 7, 0, 1);
@@ -2652,7 +2994,7 @@ const comp = (text, extra) => Object.assign({ who: 'Companion', text, bubble: tr
 // The lake's one line (bible, section 4): a labelled whisper in the dialogue panel, shown from inside the red
 // cinematic. DLG is inactive there, so the text appears whole and the cinematic hides the panel itself.
 const placeWord = () => WS.sea > 0.5 ? 'sea' : 'lake'; // the lake, or the open sea after the fish wish
-function lakeWhisper(text) { UI.dlgShow(WS.sea > 0.5 ? 'The sea' : 'The lake', 'whisper'); UI.dlgText(text); }
+function lakeWhisper(text) { UI.dlgShow(tr(WS.sea > 0.5 ? 'The sea' : 'The lake'), 'whisper'); UI.dlgText(tr(text)); }
 function goldenScene() {
   G.bob = null;
   WS.goldFish = { x: 26, y: 240, a: 0, surf: 263 };
@@ -3037,7 +3379,7 @@ function freezeDay() { WS.frozen = 1; G.frozeT = G.t; untween(WS, 'sunY'); SFX.c
 // The lines that close a granted wish 2, then the sunset.
 function wish2Cost() {
   return [
-    fish((STORY.refused === 1 ? 'That was my first, too.' : 'That was my second, too.') + ' This one costs the rest of the day.'),
+    fish(trJoin([STORY.refused === 1 ? 'That was my first, too.' : 'That was my second, too.', ' This one costs the rest of the day.'])),
     fish('You’ll miss the sun. I’ll bring you another.'),
     { act: () => { goldenDive(); keptDim(2); } },
     { pause: 0.6 },
@@ -3137,8 +3479,8 @@ function redSequence() {
 const sentence = s => s.charAt(0).toUpperCase() + s.slice(1) + '.';
 // One line, up to 125 characters: the granted wishes in order, then always forever (bible, section 1).
 function recountLine() {
-  const parts = STORY.wishes.map(w => RECOUNT[w]);
-  return 'Everything you asked for. ' + parts.map(sentence).join(' ') + ' And forever. Your words, not mine.';
+  const parts = STORY.wishes.map(w => sentence(tr(RECOUNT[w])));
+  return tr('Everything you asked for. ') + parts.join(' ') + tr(' And forever. Your words, not mine.');
 }
 function wish3Choices() {
   const c = [
@@ -3267,7 +3609,8 @@ function endingBase(key, place, boat) {
   const t = END_BASES[key];
   const byPlace = t[place] || t.lake || t.sea;
   const cell = byPlace[boat] || byPlace.boat || byPlace.sunk;
-  return typeof cell === 'string' ? cell : cell[STORY.heard ? 'heard' : 'quiet'];
+  const v = typeof cell === 'string' || Array.isArray(cell) ? cell : cell[STORY.heard ? 'heard' : 'quiet'];
+  return Array.isArray(v) ? trJoin(v) : tr(v);
 }
 // Returns the sentence and the state it came from, so the asked-for line can avoid repeating a refusal.
 function endingExtra(key, place, boat) {
@@ -3275,7 +3618,7 @@ function endingExtra(key, place, boat) {
   for (const st of x.order) {
     if (!END_STATES[st]()) continue;
     const line = altLine(x.lines[st], place, boat);
-    if (line) return { line, state: st };
+    if (line) return { line: tr(line), state: st };
   }
   return { line: '', state: null };
 }
@@ -3284,13 +3627,13 @@ function endingExtra(key, place, boat) {
 // The labels are his own words, so they are listed one per line under the head rather than run into a sentence.
 const ASKED_SEP = '\n'; // #endAsked keeps the line breaks (white-space: pre-line)
 function askedLine(refusalSaid) {
-  const labels = STORY.wishes.map(w => WISH_LABELS[w]);
-  if (!labels.length) return refusalSaid ? '' : 'You asked for nothing.';
+  const labels = STORY.wishes.map(w => tr(WISH_LABELS[w]));
+  if (!labels.length) return refusalSaid ? '' : tr('You asked for nothing.');
   const head = STORY.refused === 1 && !refusalSaid ? 'You asked for nothing, once. And for:' : 'You asked for:';
-  return [head].concat(labels).join(ASKED_SEP);
+  return [tr(head)].concat(labels).join(ASKED_SEP);
 }
 // Stay after the forever wish: its extra line already says it will not get light, so the base drops STAY_DARK.
-const stayBase = (key, base) => key === 'stay' && has('forever') ? base.replace(' ' + STAY_DARK, '') : base;
+const stayBase = (key, base) => key === 'stay' && has('forever') ? base.replace(' ' + tr(STAY_DARK), '') : base;
 // Every Still water card (the silent variant too) ends with the bait still in his pocket: he will be the
 // stranger for the next one. The exception is situation 10, the lake with the boat sunk. No other ending gets it.
 const BAIT_END = 'There is a bait in your pocket. It has an eye.';
@@ -3299,9 +3642,9 @@ function composeEnding(id, variant) {
   const place = endingPlace(), boat = endingBoat(), key = variant === 'silent' ? 'silent' : id;
   const extra = endingExtra(key, place, boat);
   const parts = [stayBase(key, endingBase(key, place, boat)), extra.line];
-  if (hasPocket(id, place, boat)) parts.push(BAIT_END);
+  if (hasPocket(id, place, boat)) parts.push(tr(BAIT_END));
   const refusalSaid = extra.state === 'refused1' || extra.state === 'refused2';
-  return { id, variant: variant || '', title: ENDINGS[id].title, text: parts.filter(Boolean).join(' '), asked: askedLine(refusalSaid) };
+  return { id, variant: variant || '', title: tr(ENDINGS[id].title), text: parts.filter(Boolean).join(' '), asked: askedLine(refusalSaid) };
 }
 let sessionEndings = [];
 // The endings found, from storage and this session (the silent variant is saved as cut, so it counts as Still water).
@@ -3324,7 +3667,7 @@ function promptFor(p) {
   return '';
 }
 // The tutorial prompt is hidden while a thought bubble is up, so two texts never share the stage.
-function refreshPrompt() { UI.prompt(G.t < G.thinkUntil || !G.arrived ? '' : promptFor(G.phase)); }
+function refreshPrompt() { UI.prompt(G.t < G.thinkUntil || !G.arrived ? '' : tr(promptFor(G.phase))); }
 function setPhase(p) {
   G.phase = p; G.pt = 0;
   refreshPrompt();
@@ -3332,7 +3675,7 @@ function setPhase(p) {
 // Captions, with their end time tracked so the said lines can wait their turn.
 function cap(t, dur, style) {
   G.capUntil = G.t + (dur || 2.5);
-  UI.caption(t, dur, style);
+  UI.caption(tr(t), dur, style);
 }
 // The fisherman's lines (bible, Opening) in his thought bubble. A line that finds a caption on screen
 // waits in G.thinkPending and shows at the next beat (a cast landing or a card closing).
@@ -3350,7 +3693,7 @@ function thinkBeat(text) {
 // ignored for THINK_GRACE seconds and the ▾ marker lights only after that.
 const THINK_GRACE = 0.8;
 function thinkLine(text, side) {
-  UI.think(text, { who: side === 'fisherman' ? 'Fisherman' : '', side, more: false });
+  UI.think(tr(text), { who: side === 'fisherman' ? tr('Fisherman') : '', side, more: false });
   G.thinkUntil = Infinity; G.thinkAt = G.t; G.thinkMore = false;
   refreshPrompt();
 }
@@ -3511,7 +3854,9 @@ function land() {
   G.bob = null;
   setPhase('landing');
 }
-function showCard(f) { thinkHide(); setPhase('card'); G.cardReady = false; UI.card(f); SFX.caught(); }
+// The card as the player sees it: the name, line and voice translated, the weight formatted (kgText).
+const cardView = f => Object.assign({}, f, { name: tr(f.name), desc: tr(f.desc), voice: tr(f.voice), meta: kgText(f.weight) });
+function showCard(f) { thinkHide(); setPhase('card'); G.cardReady = false; UI.card(cardView(f)); SFX.caught(); }
 // The first half second of a card ignores taps (a reflex tap from the reel would close it unread); the
 // "Tap to continue" hint fades in once it can be closed.
 const CARD_GRACE = 0.5;
@@ -3856,7 +4201,7 @@ function makeUI() {
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
     title: $('title'), found: $('found'), foundList: $('foundList'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endFound: $('endFound'), endList: $('endList'),
-    again: $('again'), fade: $('fade'), mute: $('mute'), skip: $('skip'),
+    again: $('again'), fade: $('fade'), mute: $('mute'), skip: $('skip'), lang: $('lang'),
   };
   let capTimer = null;
   const rgb = (i, a) => 'rgba(' + (PALRGB[i * 3] | 0) + ',' + (PALRGB[i * 3 + 1] | 0) + ',' + (PALRGB[i * 3 + 2] | 0) + ',' + (a === undefined ? 1 : a) + ')';
@@ -3900,8 +4245,8 @@ function makeUI() {
     Object.keys(ENDINGS).forEach(id => {
       const s = document.createElement('span');
       const got = found.indexOf(id) >= 0;
-      s.textContent = got ? ENDINGS[id].title : '—';
-      if (!got) s.setAttribute('aria-label', 'not found');
+      s.textContent = got ? tr(ENDINGS[id].title) : '—';
+      if (!got) s.setAttribute('aria-label', tr('not found'));
       box.appendChild(s);
     });
   };
@@ -3967,13 +4312,13 @@ function makeUI() {
       if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; }
     },
     thinkRelayout() { if (this.thinkSide) thinkLayout(this.thinkSide); },
-    prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === 'Tap now'); },
+    prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === tr('Tap now')); },
     caption(t, dur, style) {
       el.caption.textContent = t; el.caption.className = 'shade on' + (style ? ' ' + style : '');
       clearTimeout(capTimer);
       capTimer = setTimeout(() => el.caption.classList.remove('on'), (dur || 2.5) * 1000);
     },
-    count(n) { el.count.textContent = n > 0 ? (n === 1 ? '1 fish' : n + ' fish') : ''; },
+    count(n) { el.count.textContent = countText(n); },
     card(f) {
       const s = f.spr, cv = el.cardFish;
       el.card.classList.remove('ready');
@@ -3986,7 +4331,7 @@ function makeUI() {
       cardSize = { w: cv.width, h: cv.height };
       cardScale();
       el.cardName.textContent = f.name;
-      el.cardMeta.textContent = f.weight.toFixed(2) + ' kg';
+      el.cardMeta.textContent = f.meta || kgText(f.weight);
       el.cardDesc.textContent = f.desc;
       el.cardVoice.textContent = f.voice || '';
       el.cardVoice.hidden = !f.voice;
@@ -4010,13 +4355,14 @@ function makeUI() {
     // found: the ids of the endings found so far. The counter, then the six titles in order, a dash for each unfound one.
     title(on, found) {
       el.title.classList.toggle('on', !!on);
+      el.lang.hidden = !on; // the language link only on the title
       const n = found ? found.length : 0;
-      el.found.textContent = n ? 'Endings found: ' + n + ' of ' + ENDING_COUNT : '';
+      el.found.textContent = n ? foundText(n) : '';
       endingList(el.foundList, n ? found : null);
     },
     ending(e, found) {
       el.endTitle.textContent = e.title; el.endText.textContent = e.text; el.endAsked.textContent = e.asked || '';
-      el.endFound.textContent = 'Endings found: ' + found.length + ' of ' + ENDING_COUNT;
+      el.endFound.textContent = foundText(found.length);
       endingList(el.endList, found);
       el.ending.classList.add('on');
       // Cast again wakes only once the card has faded in (AGAIN_DELAY), so a stray tap from the finale cannot
@@ -4046,9 +4392,44 @@ function makeUI() {
   return ui;
 }
 const CHOICE_GRACE = 0.4, AGAIN_DELAY = 1600;
+// The template's own text, in the page's language: the tab title, the labels and the title screen.
+const STATIC_TEXT = [
+  ['#stage', 'aria-label', 'Still Water, a short fishing tale'], ['#mute', '', 'Mute'], ['#skip', '', 'Skip fish'],
+  ['#thinkWho', '', 'Fisherman'], ['#card .hint', '', 'Tap to continue'], ['#title h1', '', 'Still Water'],
+  ['#title .sub', '', 'A short fishing tale'], ['#title .begin', '', 'Tap to begin'],
+  ['#title .how', '', 'Tap to cast. Tap when the float goes under. Hold to reel.'], ['#again', '', 'Cast again'],
+];
+function staticText() {
+  document.documentElement.lang = LANG;
+  document.title = tr('Still Water') + (TEST_BUILD ? tr(' (test build)') : '');
+  for (const [sel, attr, s] of STATIC_TEXT) {
+    const n = document.querySelector(sel);
+    if (n && attr) n.setAttribute(attr, tr(s)); else if (n) n.textContent = tr(s);
+  }
+}
+// The link to the other language's page (one page per language): the English page sits at the root with
+// ru/ below it, so from index.html or test.html it goes down to ru/, and from the Russian page back up to
+// ../, keeping the test page's name. Under file:// a folder does not open its index, so it is named. With a
+// ?lang override the page links to itself in the other language instead.
+const OTHER_LANG = { en: { code: 'ru', label: 'RU', name: 'Русский' }, ru: { code: 'en', label: 'EN', name: 'English' } };
+function langHref() {
+  const other = OTHER_LANG[LANG].code;
+  if (LANG !== DEFAULT_LANG) return '?lang=' + other;
+  const file = window.location.pathname.split('/').pop();
+  const page = /test\.html$/.test(file) ? file : window.location.protocol === 'file:' ? 'index.html' : '';
+  return (DEFAULT_LANG === 'ru' ? '../' : 'ru/') + page;
+}
+function langLink(a) {
+  const o = OTHER_LANG[LANG];
+  a.textContent = o.label; a.href = langHref();
+  a.setAttribute('hreflang', o.code); a.setAttribute('lang', o.code); a.setAttribute('aria-label', o.name);
+}
 function boot() {
+  LANG = pickLang();
+  staticText();
   try { REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (err) { REDUCED_MOTION = false; }
   UI = makeUI();
+  langLink(UI.el.lang);
   init();
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -4082,7 +4463,7 @@ function boot() {
   UI.fade(0, 1.6);
 
   stage.addEventListener('pointerdown', e => {
-    if (e.target.closest && e.target.closest('button')) return;
+    if (e.target.closest && e.target.closest('button, a')) return;
     e.preventDefault();
     const r = stage.getBoundingClientRect(); // the stage is scaled uniformly, so internal pixels map by ratio
     const ix = (e.clientX - r.left) / Math.max(1, r.width) * W, iy = (e.clientY - r.top) / Math.max(1, r.height) * H;
@@ -4106,7 +4487,7 @@ function boot() {
     if (TEST_BUILD && e.code === 'KeyT') { setTestMode(!TEST); return; }
     if (TEST_BUILD && e.code === 'KeyS' && TEST) { testCatch(); return; }
     if (e.code === 'Space' || e.code === 'Enter') {
-      if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
+      if (document.activeElement && /^(BUTTON|A)$/.test(document.activeElement.tagName)) return;
       e.preventDefault();
       press();
     }
@@ -4120,7 +4501,7 @@ function boot() {
     e.stopPropagation();
     SFX.setMuted(!SFX.muted); // before init, so a mute before the first tap starts the audio silent
     SFX.init(); SFX.resume();
-    UI.el.mute.textContent = SFX.muted ? 'Unmute' : 'Mute'; // the label is the action
+    UI.el.mute.textContent = tr(SFX.muted ? 'Unmute' : 'Mute'); // the label is the action
     UI.el.mute.blur();
   });
   UI.el.again.addEventListener('click', e => { e.stopPropagation(); if (UI.el.again.disabled) return; UI.el.again.blur(); UI.againOff(); restart(); });
@@ -4163,6 +4544,7 @@ if (IS_BROWSER) {
     OCEAN, spawnOceanShadow, spawnSeaShoal, bigRise, bigEnter, bigRestY, untween, bubble, boatLeft, WL,
     oceanCast, oceanTold, playCine, CINE_OCEAN,
     setCloudT(v) { cloudT = v; },
+    setLang(l) { LANG = LANGS.indexOf(l) >= 0 ? l : DEFAULT_LANG; }, tr, get LANG() { return LANG; },
   };
 }
 })();

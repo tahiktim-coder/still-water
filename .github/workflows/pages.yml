@@ -1,6 +1,9 @@
-# Publishes the game to GitHub Pages on every push to main:
-#   /             the release build (dist/index.html, no test mode)
-#   /test.html    the test build, with the Skip fish button on, for friends testing the story
+# Publishes the game to GitHub Pages on every push to main, one page per language:
+#   /                the English release build (no test mode)
+#   /test.html       the English test build, with the Skip fish button on, for friends testing the story
+#   /ru/             the Russian release build (node build.js --lang=ru)
+#   /ru/test.html    the Russian test build (node build.js --lang=ru --test)
+# The title of each page links to the other language's (ru/ from the root, ../ back).
 name: Deploy to GitHub Pages
 
 on:
@@ -28,12 +31,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build the site (release page and test page)
+      - name: Build the site (English and Russian, release and test pages)
         run: |
-          node build.js --test
-          mkdir -p site
-          cp dist/index.html site/index.html
-          cp tools/out/test.html site/test.html
+          node build.js --out=site/index.html
+          node build.js --test --out=site/test.html
+          node build.js --lang=ru --out=site/ru/index.html
+          node build.js --lang=ru --test --out=site/ru/test.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

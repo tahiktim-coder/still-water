@@ -4,11 +4,22 @@
 // Nothing), the companion's question (company only: Yes / Say nothing), wish 3 (home / dark /
 // cut / Stay with him if answered / Let me get my gold if gold / Nothing if refused twice). { tap: true } taps the companion once
 // per act during play, so his lines show up in the captions.
+// Then the Russian pass plays every plan again with LANG = 'ru': each must reach the same ending, and no text
+// the player sees (captions, bubbles, dialogue and its labels, menus, cards, the ending card, prompts) may
+// hold a Latin letter.
 const g = require('../src/game.js');
 g.init();
 const out = new Uint32Array(g.W * g.H);
 g.setOut(out);
 
+// Every text the player sees in one run, from the stub UI's log, and the ones holding a Latin letter.
+const shownText = l => {
+  if (l[0] === 'choices') return l[1];
+  if (l[0] === 'card') return [l[1].name, l[1].desc, l[1].voice, l[1].meta];
+  if (l[0] === 'ending') return [l[1].title, l[1].text, l[1].asked];
+  return ['caption', 'think', 'dialogue', 'prompt', 'dlgShow'].indexOf(l[0]) >= 0 ? [l[1]] : [];
+};
+const latinShown = log => [...new Set(log.flatMap(shownText).filter(t => t && /[A-Za-z]/.test(t)))];
 function play(plan, label, opts) {
   opts = opts || {};
   g.resetAll();
@@ -99,10 +110,13 @@ function play(plan, label, opts) {
   for (const s of opts.saysNot || []) if (said.some(x => x.indexOf(s) >= 0)) { ok = false; console.log('   unexpected line or caption: ' + s); }
   // Phase 19: a later run has two act 0 catches, and all four of his act 0 thoughts still show before the
   // still caption.
-  const stillAt = caps.findIndex(c => c.startsWith('The water goes very still'));
+  const stillRe = opts.ru ? /^Вода (совсем|снова) замирает/ : /^The water goes very still/;
+  const stillAt = caps.findIndex(c => stillRe.test(c));
   const thoughts = caps.slice(0, stillAt).filter(c => c.startsWith('(fisherman)')).length;
   if (stillAt < 0 || thoughts !== 4) { ok = false; console.log('   ' + thoughts + ' act 0 thoughts before the still caption, not 4'); }
   if (S.wishes.indexOf('forever') >= 0 && !ringGrew) { ok = false; console.log('   no ring grew while frozen'); }
+  const latin = latinShown(UI.log);
+  if (opts.ru && latin.length) { ok = false; console.log('   Latin letters on screen: ' + latin.join(' / ')); }
   return { ok, snaps, t, id: card ? card.id + (card.variant ? ':' + card.variant : '') : null, text: card ? card.text : '', asked: card ? card.asked : '' };
 }
 // Phase 16: the ending card's base is one of the bible's twenty situations (ending x lake/sea x boat/sunk, and
@@ -189,7 +203,7 @@ const plans = [
   [[0, 0, 0, 2, 0, 0], 'let go, company (someone), gold, yes -> home (lake, sunk, company)', 'The water behind you is empty now. It was your turn.', { base: 2 }],
 ];
 let ok = true, snapsAll = 0, tAll = 0;
-const seen = {};
+const seen = {}, enIds = [];
 for (const [plan, label, cardEnd, opts] of plans) {
   const r = play(plan, label, opts);
   ok = ok && r.ok;
@@ -198,12 +212,30 @@ for (const [plan, label, cardEnd, opts] of plans) {
   if (opts && opts.has && r.text.indexOf(opts.has) < 0) { ok = false; console.log('   card should contain: ' + opts.has); }
   if (opts && opts.base && !r.text.startsWith(BASES[opts.base])) { ok = false; console.log('   card should start with situation ' + opts.base + ': ' + BASES[opts.base]); }
   if (r.id) seen[r.id] = true;
+  enIds.push(r.id);
   if (r.id && !baitOk(r, opts)) { ok = false; console.log('   the bait sentence is ' + (r.id.startsWith('cut') && !(opts && opts.noPocket) ? 'missing from' : 'on') + ' the ' + r.id + ' card'); }
 }
 // One line per ending id (six, plus the silent variant of cut), then the verdict: every plan must end and
 // all six ids must have been seen.
 const need = ['home', 'dark', 'cut', 'stay', 'deep', 'swallowed', 'cut:silent'];
 for (const id of need) console.log('ending ' + id.padEnd(11) + (seen[id] ? 'reached' : 'MISSING'));
+// The Russian pass: the same plans, the same endings, and nothing Latin on screen. The English assertions on
+// lines and card text stay in the English pass; here the card is printed so it can be read.
+g.setLang('ru');
+const seenRu = {};
+let ruOk = true;
+plans.forEach(([plan, label, , opts], i) => {
+  const o = opts || {};
+  const r = play(plan, 'ru: ' + label, { ru: true, wait: o.wait, tap: o.tap });
+  if (r.id) seenRu[r.id] = true;
+  const same = r.id === enIds[i];
+  if (!same) console.log('   the Russian run should end as the English one: ' + enIds[i] + ', not ' + r.id);
+  ruOk = ruOk && r.ok && same;
+});
+for (const id of need) console.log('ru ending ' + id.padEnd(11) + (seenRu[id] ? 'reached' : 'MISSING'));
+if (need.some(id => !seenRu[id])) ruOk = false;
+console.log(ruOk ? 'RUSSIAN OK: ' + plans.length + ' runs, every ending reached, no Latin letter on screen' : 'RUSSIAN FAILED');
+ok = ok && ruOk;
 console.log('reel with a ' + 0.35 + ' s reaction: ' + snapsAll + ' snaps over ' + plans.length + ' runs (' + (snapsAll / plans.length).toFixed(2) + ' a run), mean run ' + (tAll / plans.length / 60).toFixed(2) + ' min');
 const missing = need.filter(id => !seen[id]);
 if (missing.length) ok = false;
