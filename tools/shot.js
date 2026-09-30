@@ -144,10 +144,10 @@ if (which === 'all' || which === 'deep_glint') shot('out_deep_glint.png', (ws, G
 // Phase 24, the zoom the player can follow: eight frames across the pull-back (far 0 to 1, the mountains
 // sinking in step), tiled four across into one contact sheet, each settled 1.6 s so a tracking ring is out;
 // the same for the swimmer (a sunk run at sea).
-const ZOOM_FARS = [0, 0.14, 0.28, 0.43, 0.57, 0.71, 0.86, 1], STRIP_COLS = 4, STRIP_SC = 2;
+const ZOOM_FARS = [0, 0.14, 0.28, 0.43, 0.57, 0.71, 0.86, 1], STRIP_COLS = 4, STRIP_SC2 = 2;
 // A contact sheet: one frame per entry, set up by frame(entry) after a reset, tiled four across at 2x.
-function strip(name, entries, frame, overlay) {
-  const H = g.H, rows = Math.ceil(entries.length / STRIP_COLS);
+function strip(name, entries, frame, overlay, sc) {
+  const STRIP_SC = sc || STRIP_SC2, H = g.H, rows = Math.ceil(entries.length / STRIP_COLS);
   const png = new PNG({ width: W * STRIP_SC * STRIP_COLS, height: H * STRIP_SC * rows });
   entries.forEach((e, k) => {
     g.resetAll();
@@ -248,3 +248,7 @@ function insideFrame(sunk) {
 }
 if (which === 'all' || which === 'inside_strip') strip('out_inside_strip.png', INSIDE_TS, insideFrame(false));
 if (which === 'all' || which === 'inside_sunk_strip') strip('out_inside_sunk_strip.png', INSIDE_SUNK_TS, insideFrame(true));
+// Phase 31: the Inside close shot at phone size (1x, eight beats each), to judge that the boat, the cabin
+// with its door and the two people read without magnification.
+if (which === 'all' || which === 'inside_1x') strip('out_inside_1x.png', INSIDE_TS, insideFrame(false), null, 1);
+if (which === 'all' || which === 'inside_sunk_1x') strip('out_inside_sunk_1x.png', INSIDE_SUNK_TS, insideFrame(true), null, 1);
