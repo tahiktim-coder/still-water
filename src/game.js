@@ -1870,23 +1870,33 @@ function bigShape(u, v) {
 // a is its presence (0 to 1 as it fades in from the deep): each shade step is dithered by it. In Swallowed the
 // shadow is the same fish as the head (phase 32): k (1 at rest, down to SHADOW_IN) draws it in toward the
 // breach point (px, py), its snout end, rising toward the surface as it goes, while the tail tips down into
-// the deep and is lost (the cut along u, dithered over CUT_SOFT) so only the head end is left under the speck;
-// dk (0 to 1) darkens it by up to BIG_DARK steps more.
-const BIG_DARK = 2, SHADOW_IN = 0.55, CUT_MIN = -0.4, CUT_SOFT = 0.35;
+// the deep and is lost so only the head end is left under the speck; dk (0 to 1) darkens it by up to BIG_DARK
+// steps more. The loss follows the silhouette, not a straight line: the fade front runs along the body (u)
+// bowed back by CUT_BOW toward the edges (v), broken by a little noise (CUT_NOISE), and inside the CUT_SOFT
+// ramp the shadow pales step by step instead of being cut, so the tail reads as going deeper.
+const BIG_DARK = 2, SHADOW_IN = 0.55, CUT_MIN = -0.4, CUT_SOFT = 0.6, CUT_BOW = 0.45, CUT_NOISE = 0.3;
+const CUT_FROM = 1 + CUT_BOW + CUT_NOISE / 2 + CUT_SOFT; // at k 1 the front is past every pixel of the tail
 function drawBigShadow(b) {
   const a = b.a === undefined ? 1 : b.a, k = b.k === undefined ? 1 : b.k, dk = (b.dk || 0) * BIG_DARK;
   if (a <= 0 || k <= 0) return;
   const bx = k < 1 ? b.px + (b.x - b.px) * k : b.x, by = k < 1 ? b.py + (b.y - b.py) * k * k : b.y;
-  const hw = b.w * 0.5 * k, hh = b.h * 0.5 * k, cut = k < 1 ? lerp(1 + CUT_SOFT, CUT_MIN, (1 - k) / (1 - SHADOW_IN)) : 9;
+  const hw = b.w * 0.5 * k, hh = b.h * 0.5 * k, cut = k < 1 ? lerp(CUT_FROM, CUT_MIN, (1 - k) / (1 - SHADOW_IN)) : 9;
   const y0 = Math.max(HY, Math.floor(by - hh * 1.5)), y1 = Math.min(H - 1, Math.ceil(by + hh * 1.5));
   const x0 = Math.max(0, Math.floor(bx - hw - 2)), x1 = Math.min(W - 1, Math.ceil(bx + hw + 2));
   for (let y = y0; y <= y1; y++) {
     const v = (y - by) / hh, rip = RIPX[y], row = y * W;
     for (let x = x0; x <= x1; x++) {
       const u = -(x + rip - bx) / hw, d = bigShape(u, v);
-      if (d <= 0 || (u > cut - CUT_SOFT && (cut - u) / CUT_SOFT < BAYER[((y & 3) << 2) | (x & 3)])) continue;
+      if (d <= 0) continue;
+      const bay = BAYER[((y & 3) << 2) | (x & 3)];
+      let fade = 1;
+      if (cut < 9) {
+        const uf = u + CUT_BOW * v * v + (vnoise(x * 0.3, y * 0.6, 29) - 0.5) * CUT_NOISE;
+        fade = clamp((cut - uf) / CUT_SOFT, 0, 1);
+        if (fade <= 0) continue;
+      }
       const i = row + x, f = FRAME[i];
-      if (f < 12) FRAME[i] = Math.max(0, f - Math.floor(((d > 0.7 ? 4 : d > 0.4 ? 3 : 2) + dk) * a + BAYER[((y & 3) << 2) | (x & 3)]));
+      if (f < 12) FRAME[i] = Math.max(0, f - Math.floor(((d > 0.7 ? 4 : d > 0.4 ? 3 : 2) + dk) * a * fade + bay));
     }
   }
 }
@@ -3560,14 +3570,18 @@ function oceanLeave() {
     fish('Look how they all go the same way.'),
   ].concat(costLines()), afterGrant1));
 }
-// The big one slides off left over 4 s, then the boat comes back to full size over 4 s while sea stays 1: an
-// empty horizon, the giant shapes still passing beneath, the shoal spawned. No caption about it.
+// The big one swims on the way it faces (right, head first) and down into the deep, fading as it goes, then
+// the boat comes back to full size while sea stays 1: an empty horizon, the giant shapes still passing
+// beneath, the shoal spawned. No caption about it.
 const CINE_OCEAN_BACK = {
   dur: OCEAN_RETURN * 2 + 0.6,
   init() {
     const b = OCEAN.big;
     SFX.weight(false);
-    if (b) tween(b, 'x', -b.w * 0.65, OCEAN_RETURN, E.in, () => { if (OCEAN.big === b) OCEAN.big = null; });
+    if (!b) return;
+    tween(b, 'x', W + b.w * 0.7, OCEAN_RETURN, E.in, () => { if (OCEAN.big === b) OCEAN.big = null; });
+    tween(b, 'y', b.y + 40, OCEAN_RETURN, E.io);
+    tween(b, 'a', 0, OCEAN_RETURN, E.in);
   },
   update(t, dt, at) {
     at('back', OCEAN_RETURN, () => {
@@ -4634,28 +4648,68 @@ function init() {
 }
 
 // ---------------------------------------------------------------- browser boot
-// The thought bubble's outline (bible, 4b): a scalloped loop of outward arcs, four along the top, three
-// along the bottom and one or two up each side, inset by the bulge so the bumps stay inside the box.
-function cloudPath(w, h, u) {
-  const b = Math.min(u * 1.5, h / 4);
-  const x0 = b, y0 = b, x1 = w - b, y1 = h - b;
-  const arcs = (ax, ay, bx, by, n, vert) => {
-    let s = '';
-    const c = Math.hypot(bx - ax, by - ay) / n, r = vert ? b + ',' + c / 2 : c / 2 + ',' + b;
-    for (let i = 1; i <= n; i++) s += 'A' + r + ' 0 0 1 ' + (ax + (bx - ax) * i / n).toFixed(1) + ',' + (ay + (by - ay) * i / n).toFixed(1);
-    return s;
+// The thought bubble (bible, 4b) is a solid pixel cloud on the game's own grid: a mask in game pixels (1 the
+// cloud, 2 the tail) with THINK_PAD cells round the gw by gh box. The cloud is the box inset 3 with a row
+// of bumps along the top, a smaller row along the bottom and one round each end; the tail is three pixel
+// circles (TAIL_PUFFS, radius 3, 2 and 1) stepping down from x tx toward the speaker (dir).
+const THINK_PAD = 2, THINK_GW = Math.round(W * 0.4), THINK_GUTTER = 16, BUMP_R = 5.5;
+const TAIL_PUFFS = [
+  { dx: 0, dy: 4, rows: ['..###..', '.#####.', '#######', '#######', '#######', '.#####.', '..###..'] },
+  { dx: 5, dy: 10, rows: ['.###.', '#####', '#####', '#####', '.###.'] },
+  { dx: 9, dy: 14, rows: ['.#.', '###', '.#.'] },
+];
+function thinkMask(gw, gh, tx, dir) {
+  const mw = gw + 2 * THINK_PAD, mh = gh + 18 + THINK_PAD, m = new Uint8Array(mw * mh);
+  const set = (x, y, v) => {
+    x += THINK_PAD; y += THINK_PAD;
+    if (x >= 0 && x < mw && y >= 0 && y < mh && !m[y * mw + x]) m[y * mw + x] = v;
   };
-  const side = y1 - y0 > u * 9 ? 2 : 1;
-  return 'M' + x0 + ',' + y0 + arcs(x0, y0, x1, y0, 4) + arcs(x1, y0, x1, y1, side, true) + arcs(x1, y1, x0, y1, 3) + arcs(x0, y1, x0, y0, side, true) + 'Z';
+  const disc = (cx, cy, r) => {
+    for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+      if ((x + 0.5 - cx) * (x + 0.5 - cx) + (y + 0.5 - cy) * (y + 0.5 - cy) <= r * r) set(x, y, 1);
+    }
+  };
+  for (let y = 3; y < gh - 3; y++) for (let x = 3; x < gw - 3; x++) set(x, y, 1);
+  const r = BUMP_R, nT = Math.max(3, Math.round(gw / 17)), nB = Math.max(3, nT - 1);
+  for (let i = 0; i < nT; i++) disc(r + 0.5 + (gw - 2 * r - 1) * i / (nT - 1), r + 0.3, r + (i % 2) * 0.8);
+  for (let i = 0; i < nB; i++) disc(r + 3 + (gw - 2 * r - 6) * i / (nB - 1), gh - r - 0.3, r - 0.4);
+  disc(r * 0.9, gh / 2, Math.min(r + 0.5, gh / 2)); disc(gw - r * 0.9, gh / 2, Math.min(r + 0.5, gh / 2));
+  for (const p of TAIL_PUFFS) {
+    const n = p.rows.length, h = (n - 1) / 2, cx = Math.round(tx + dir * p.dx);
+    p.rows.forEach((row, j) => { for (let i = 0; i < n; i++) if (row[i] === '#') set(cx - h + i, gh + p.dy - h + j, 2); });
+  }
+  return { m, mw, mh };
+}
+// The mask as SVG rects in game pixels, one run per row: cells with an empty 4-neighbour of their own kind
+// are the outline, the rest the fill.
+function thinkRects(k) {
+  const { m, mw, mh } = k, at = (x, y) => (x < 0 || y < 0 || x >= mw || y >= mh ? 0 : m[y * mw + x]);
+  let fill = '', line = '';
+  for (let y = 0; y < mh; y++) {
+    let x = 0;
+    while (x < mw) {
+      const v = at(x, y);
+      if (!v) { x++; continue; }
+      const edge = xx => at(xx - 1, y) !== v || at(xx + 1, y) !== v || at(xx, y - 1) !== v || at(xx, y + 1) !== v;
+      const e = edge(x);
+      let x1 = x + 1;
+      while (x1 < mw && at(x1, y) === v && edge(x1) === e) x1++;
+      const r = '<rect x="' + (x - THINK_PAD) + '" y="' + (y - THINK_PAD) + '" width="' + (x1 - x) + '" height="1"/>';
+      if (e) line += r; else fill += r;
+      x = x1;
+    }
+  }
+  return '<g class="fill">' + fill + '</g><g class="line">' + line + '</g>';
 }
 // Where each bubble sits, in internal pixels: its left edge, the y of its bottom edge, the x where the tail
 // leaves it, and which way the tail leans (-1 toward the fisherman's head, +1 toward the companion's).
-// The companion's question sits 18 px higher (yAsk) so its two 44 px buttons clear the fisherman's hat (y 218).
-// In the red (mood past 1) the eye hangs where his bubble would sit, so his bubble moves down to y 205 and
-// right of the disc (companionRed), clear of the eye and still above both heads.
+// The companion's question keeps his bubble where it is and puts its two buttons above it, in the sky, so they
+// never sit on the rod, the lantern or the tail. In the red (mood past 1) the eye hangs where his bubble would
+// sit, so his bubble moves down to y 205 and right of the disc (companionRed), clear of the eye and still
+// above both heads. thinkLayout keeps every bubble THINK_GUTTER CSS px inside the stage's right edge.
 const THINK_AT = {
   fisherman: { left: 122, y: 186, tail: 150, dir: -1 },
-  companion: { left: 100, y: 190, yAsk: 172, tail: 160, dir: 1 },
+  companion: { left: 100, y: 190, tail: 160, dir: 1 },
   companionRed: { left: 124, y: 205, tail: 168, dir: 1 },
 };
 const thinkAnchor = side => (WS.mood > 1 && THINK_AT[side + 'Red']) || THINK_AT[side];
@@ -4667,11 +4721,19 @@ function cardFishScale(w, h, stageW, panelW) {
   const u = stageW / 100;
   return clamp(Math.floor(Math.min((CARD_FISH_W * (panelW || 80 * u)) / w, (CARD_FISH_H * u) / h)), CARD_FISH_MIN, CARD_FISH_MAX);
 }
+// Russian typography on screen: a one-letter word (в, с, к, у, о, и, а, я) keeps the next word on its line,
+// and an em dash keeps the word before it, through a no-break space. Only the displayed text changes (the
+// UI sinks call it): tr, the logic and the sim see the plain strings. Two passes catch "и в дом".
+const NB_ONE = /(^|[\s («"])([вВсСкКуУоОиИаАяЯ]) /g;
+function nbsp(t) {
+  if (LANG !== 'ru' || !t) return t;
+  return t.replace(NB_ONE, '$1$2 ').replace(NB_ONE, '$1$2 ').replace(/ —/g, ' —');
+}
 function makeUI() {
   const $ = id => document.getElementById(id);
   const el = {
     stage: $('stage'), prompt: $('prompt'), caption: $('caption'), count: $('count'),
-    think: $('think'), thinkPath: $('thinkPath'), thinkTail1: $('thinkTail1'), thinkTail2: $('thinkTail2'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'), thinkMore: $('thinkMore'),
+    think: $('think'), thinkPix: $('thinkPix'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'), thinkMore: $('thinkMore'),
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
     title: $('title'), found: $('found'), foundList: $('foundList'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endFound: $('endFound'), endList: $('endList'),
@@ -4682,6 +4744,7 @@ function makeUI() {
   const mixWhite = (i, k) => 'rgb(' + [0, 1, 2].map(j => Math.round(PALRGB[i * 3 + j] + (255 - PALRGB[i * 3 + j]) * k)).join(',') + ')';
   // mark: the one line whose question mark is drawn wrong. Only that glyph gets a span; everything is text.
   const setText = (node, t, mark) => {
+    t = nbsp(t);
     node.textContent = t;
     if (!mark || !t.endsWith('?')) return;
     node.textContent = t.slice(0, -1);
@@ -4701,7 +4764,7 @@ function makeUI() {
     box.classList.add('cold');
     list.forEach(c => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'choice'; b.textContent = c.label;
+      b.type = 'button'; b.className = 'choice'; b.textContent = nbsp(c.label);
       b.addEventListener('click', ev => { ev.stopPropagation(); b.blur(); if (!ui.choicesCold()) c.cb(); });
       box.appendChild(b);
     });
@@ -4719,7 +4782,7 @@ function makeUI() {
     Object.keys(ENDINGS).forEach(id => {
       const s = document.createElement('span');
       const got = found.indexOf(id) >= 0;
-      s.textContent = got ? tr(ENDINGS[id].title) : '—';
+      s.textContent = got ? tr(ENDINGS[id].title) : '?'; // a neutral mark: a dash between titles read as punctuation
       if (!got) s.setAttribute('aria-label', tr('not found'));
       box.appendChild(s);
     });
@@ -4730,18 +4793,39 @@ function makeUI() {
     const sc = cardFishScale(cardSize.w, cardSize.h, el.stage.clientWidth, el.card.clientWidth);
     el.cardFish.style.width = cardSize.w * sc + 'px'; el.cardFish.style.height = cardSize.h * sc + 'px';
   };
-  const circle = (c, x, y, r) => { c.setAttribute('cx', x.toFixed(1)); c.setAttribute('cy', y.toFixed(1)); c.setAttribute('r', r.toFixed(1)); };
-  // The bubble's place and outline from the live stage size: W is fixed, so x turns into a constant
-  // percentage; H is not, so the bottom edge is recomputed from it.
+  // The bubble's place and cloud from the live stage size, all in whole game pixels (gp CSS px each): the
+  // width is THINK_GW, the height the measured text's rounded up, so the cloud always holds its text; its
+  // right edge stays THINK_GUTTER CSS px inside the stage. The cloud is drawn by thinkMask and thinkRects.
   const thinkLayout = side => {
-    const a = thinkAnchor(side), u = el.stage.clientWidth / 100;
-    const y = el.think.classList.contains('ask') && a.yAsk ? a.yAsk : a.y;
-    el.think.style.left = (a.left / W * 100).toFixed(2) + '%';
-    el.think.style.bottom = ((H - y) / H * 100).toFixed(2) + '%';
-    const w = el.think.clientWidth, h = el.think.clientHeight, tx = (a.tail - a.left) / W * 100 * u;
-    el.thinkPath.setAttribute('d', cloudPath(w, h, u));
-    circle(el.thinkTail1, tx, h + 1.7 * u, 1.3 * u);
-    circle(el.thinkTail2, tx + a.dir * 2.8 * u, h + 5.6 * u, 0.75 * u);
+    const a = thinkAnchor(side), gp = el.stage.clientWidth / W, gw = THINK_GW;
+    const left = Math.min(a.left, Math.floor(W - THINK_GUTTER / gp) - gw - 1);
+    el.think.style.width = gw * gp + 'px';
+    el.think.style.height = 'auto';
+    const gh = Math.max(12, Math.ceil(el.think.getBoundingClientRect().height / gp - 0.01));
+    el.think.style.height = gh * gp + 'px';
+    el.think.style.left = left * gp + 'px';
+    el.think.style.top = (a.y - gh) * gp + 'px';
+    el.think.style.bottom = 'auto';
+    const k = thinkMask(gw, gh, a.tail - left, a.dir), svg = el.thinkPix;
+    svg.setAttribute('viewBox', -THINK_PAD + ' ' + -THINK_PAD + ' ' + k.mw + ' ' + k.mh);
+    svg.style.left = -THINK_PAD * gp + 'px'; svg.style.top = -THINK_PAD * gp + 'px';
+    svg.style.width = k.mw * gp + 'px'; svg.style.height = k.mh * gp + 'px';
+    svg.innerHTML = thinkRects(k);
+  };
+  // Press Start 2P (.px) is drawn on an 8 px grid: its size is snapped to a whole multiple of 8 device px
+  // (from the CSS size, read afresh each time), and a title set nowrap (h1, h2) steps down until it fits
+  // its box with a 24 px gutter, so a long title never clips or crowds the edge.
+  const snapPx = () => {
+    const dpr = window.devicePixelRatio || 1, step = 8 / dpr;
+    el.stage.querySelectorAll('.px').forEach(n => {
+      n.style.fontSize = '';
+      let k = Math.max(1, Math.round((parseFloat(getComputedStyle(n).fontSize) || 8) * dpr / 8));
+      n.style.fontSize = k * step + 'px';
+      if (n.tagName !== 'H1' && n.tagName !== 'H2') return;
+      const box = n.parentElement, cs = getComputedStyle(box);
+      const room = Math.min(box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), el.stage.clientWidth - 48);
+      while (k > 1 && n.scrollWidth > room) { k--; n.style.fontSize = k * step + 'px'; }
+    });
   };
   const ui = {
     el, choices: null, thinkOwns: false, thinkSide: null, choicesAt: -9,
@@ -4786,9 +4870,10 @@ function makeUI() {
       if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; }
     },
     thinkRelayout() { if (this.thinkSide) thinkLayout(this.thinkSide); },
+    snapPx,
     prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === tr('Tap now')); },
     caption(t, dur, style) {
-      el.caption.textContent = t; el.caption.className = 'shade on' + (style ? ' ' + style : '');
+      el.caption.textContent = nbsp(t); el.caption.className = 'shade on' + (style ? ' ' + style : '');
       clearTimeout(capTimer);
       capTimer = setTimeout(() => el.caption.classList.remove('on'), (dur || 2.5) * 1000);
     },
@@ -4806,8 +4891,8 @@ function makeUI() {
       cardScale();
       el.cardName.textContent = f.name;
       el.cardMeta.textContent = f.meta || kgText(f.weight);
-      el.cardDesc.textContent = f.desc;
-      el.cardVoice.textContent = f.voice || '';
+      el.cardDesc.textContent = nbsp(f.desc);
+      el.cardVoice.textContent = nbsp(f.voice || '');
       el.cardVoice.hidden = !f.voice;
       el.card.classList.add('on');
     },
@@ -4835,10 +4920,11 @@ function makeUI() {
       endingList(el.foundList, n ? found : null);
     },
     ending(e, found) {
-      el.endTitle.textContent = e.title; el.endText.textContent = e.text; el.endAsked.textContent = e.asked || '';
+      el.endTitle.textContent = e.title; el.endText.textContent = nbsp(e.text); el.endAsked.textContent = nbsp(e.asked || '');
       el.endFound.textContent = foundText(found.length);
       endingList(el.endList, found);
       el.ending.classList.add('on');
+      snapPx(); // the title steps down to fit its line
       // Cast again wakes only once the card has faded in (AGAIN_DELAY), so a stray tap from the finale cannot
       // restart before the ending is read; until then it is disabled and out of the tab order.
       this.againOff();
@@ -4855,6 +4941,7 @@ function makeUI() {
     colors() {
       const s = document.documentElement.style;
       s.setProperty('--ui-panel', rgb(0, 0.86));
+      s.setProperty('--ui-panel-soft', rgb(0, 0.6)); // under Mute and the language link
       s.setProperty('--ui-solid', rgb(0));
       s.setProperty('--ui-edge', rgb(6));
       s.setProperty('--ui-ink', mixWhite(11, WS.mood > 1 ? 0.25 : 0.4));
@@ -4925,7 +5012,9 @@ function boot() {
     const sw = Math.floor(W * sc), sh = Math.floor(H * sc);
     stage.style.width = sw + 'px'; stage.style.height = sh + 'px';
     document.documentElement.style.setProperty('--u', sw / 100 + 'px');
+    document.documentElement.style.setProperty('--gp', sw / W + 'px');
     document.getElementById('prompt').style.bottom = ((34 / H) * 100).toFixed(2) + '%';
+    UI.snapPx();
     UI.dlgCap();
     UI.thinkRelayout();
     UI.fitChoices();
@@ -4933,6 +5022,13 @@ function boot() {
   }
   window.addEventListener('resize', resize);
   resize();
+  // The web fonts arrive after the first layout (display=swap), and the Cyrillic or italic subset only when
+  // first used: the bubble, the panel's cap, the two columns and the pixel sizes are measured again with the
+  // real metrics each time a load finishes.
+  if (document.fonts) {
+    if (document.fonts.ready) document.fonts.ready.then(resize, () => {});
+    if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', resize);
+  }
   resetAll();
   UI.fade(0, 1.6);
 

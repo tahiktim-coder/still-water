@@ -7,8 +7,12 @@
 <title>Still Water</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400..500;1,7..72,400&family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
+/* Two faces (chosen in a font lab over real frames, English and Russian, at phone sizes): Literata, a book serif
+   with a strong Cyrillic and an optical-size axis, for every sentence, choice, hint and counter; Press Start 2P,
+   a pixel face with a well-drawn Cyrillic, for the display tier only (the title, the ending title, the fish's
+   name and the speaker labels, the .px class), its size snapped to its 8 px grid in device pixels (snapPx). */
 :root {
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
@@ -16,13 +20,16 @@
   --page-bg: #0a1a33;
   --page-ink: #eaf7ff;
   --ui-panel: rgba(10, 26, 51, 0.86);
+  --ui-panel-soft: rgba(10, 26, 51, 0.6);
   --ui-solid: #0a1a33;
   --ui-edge: #3673b1;
   --ui-ink: #f1f9ff;
   --ui-dim: #99c4e7;
   --ui-accent: #e2aa2a;
   --u: 3.6px;
-  --font: 'Pixelify Sans', 'VT323', 'Courier New', ui-monospace, monospace;
+  --gp: 1px; /* one game pixel in CSS px, set by resize */
+  --font: Literata, 'PT Serif', Georgia, serif;
+  --font-px: 'Press Start 2P', ui-monospace, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --page-bg: #07142a; --page-ink: #eaf7ff; }
@@ -40,14 +47,15 @@ body {
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
-  font-family: var(--font);
-  /* Pixelify Sans joins fi and fl into ligatures that read as "Ash" and "Aoat" at game sizes. */
-  font-variant-ligatures: none; font-feature-settings: "liga" 0, "clig" 0;
+  font-family: var(--font); font-optical-sizing: auto; font-synthesis: none;
 }
+:root[lang="ru"] body { -webkit-hyphens: manual; hyphens: manual; }
+/* The pixel face: never faux-bolded, no tracking, and its full-cell space pulled in so two words do not look double-spaced. */
+.px { font-family: var(--font-px); font-weight: 400; letter-spacing: 0; word-spacing: -0.4em; text-transform: none; line-height: 1.25; }
 #wrap { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 #stage {
   position: relative; overflow: hidden; width: 216px; height: 384px;
-  font-size: calc(var(--u) * 4.4); line-height: 1.35; color: var(--ui-ink);
+  font-size: calc(var(--u) * 3.96); line-height: 1.45; color: var(--ui-ink);
   touch-action: none; cursor: pointer;
 }
 #c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: crisp-edges; image-rendering: pixelated; }
@@ -56,19 +64,21 @@ body {
   border: calc(var(--u) * 0.6) solid var(--ui-edge);
   box-shadow: 0 0 0 calc(var(--u) * 0.6) var(--ui-solid);
 }
-.shade { text-shadow: 0 0 calc(var(--u) * 1.4) var(--ui-solid), 0 calc(var(--u) * 0.35) 0 var(--ui-solid); }
+/* Loose text over the picture: a one-game-pixel hard drop in the palette's darkest index, and a halo round it. */
+.shade { text-shadow: 0 var(--gp) 0 var(--ui-solid), 0 0 calc(var(--gp) * 2) var(--ui-solid), 0 0 calc(var(--gp) * 4) var(--ui-solid); }
 
 #hud {
   position: absolute; z-index: 5; top: calc(var(--u) * 3); left: calc(var(--u) * 4); right: calc(var(--u) * 4);
   display: flex; justify-content: space-between; align-items: center;
-  font-size: max(10px, calc(var(--u) * 3.3)); pointer-events: none;
+  font-size: max(11px, calc(var(--u) * 2.97)); font-weight: 500; pointer-events: none;
 }
-#count { color: var(--ui-ink); opacity: 0.85; }
+#count { color: var(--ui-ink); opacity: 0.9; }
+/* Mute, the language link and Skip fish: the panel's fill at 60% under the frame, so a cloud behind them cannot eat the label. */
 #mute, #skip, #lang {
-  pointer-events: auto; font: inherit; color: var(--ui-ink); background: transparent; cursor: pointer;
+  pointer-events: auto; font: inherit; font-size: max(11px, calc(var(--u) * 2.97)); font-weight: 500; line-height: 1.2;
+  color: var(--ui-ink); background: var(--ui-panel-soft); cursor: pointer;
   min-height: max(44px, calc(var(--u) * 11)); min-width: 44px;
   border: calc(var(--u) * 0.45) solid var(--ui-edge); padding: calc(var(--u) * 0.6) calc(var(--u) * 1.8);
-  opacity: 0.8;
 }
 #skip { margin-left: calc(var(--u) * 1.5); border-style: dashed; }
 #skip[hidden] { display: none; }
@@ -80,18 +90,18 @@ body {
 
 #caption {
   position: absolute; z-index: 5; top: 11%; left: 9%; right: 9%; text-align: center;
-  font-size: calc(var(--u) * 4); color: var(--ui-ink);
+  font-size: calc(var(--u) * 3.6); color: var(--ui-ink); text-wrap: balance;
   opacity: 0; transition: opacity 0.9s ease; pointer-events: none;
 }
 #caption.on { opacity: 1; }
-#caption.whisper { color: var(--ui-dim); letter-spacing: 0.08em; }
+#caption.whisper { color: var(--ui-dim); letter-spacing: 0.04em; }
 #prompt {
   position: absolute; z-index: 5; left: 6%; right: 6%; bottom: 9%; text-align: center;
-  font-size: calc(var(--u) * 3.7); color: var(--ui-ink);
+  font-size: calc(var(--u) * 3.33); font-weight: 500; color: var(--ui-ink);
   opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
 }
 #prompt.on { opacity: 0.92; }
-#prompt.urgent { font-weight: 600; font-size: calc(var(--u) * 4.6); animation: blink 0.36s steps(2, jump-none) infinite; }
+#prompt.urgent { font-size: calc(var(--u) * 4.14); animation: blink 0.36s steps(2, jump-none) infinite; }
 
 #dialog {
   position: absolute; z-index: 6; left: 4%; right: 4%; bottom: calc(var(--u) * 4);
@@ -101,10 +111,10 @@ body {
   pointer-events: none;
 }
 #dialog.on { opacity: 1; transform: none; pointer-events: auto; }
-#who { flex: 0 0 auto; font-weight: 600; font-size: max(10px, calc(var(--u) * 3.4)); color: var(--ui-accent); margin-bottom: calc(var(--u) * 1.2); }
-#text { flex: 0 1 auto; min-height: 2.7em; overflow-y: auto; max-width: 34em; }
+#who { flex: 0 0 auto; font-size: max(8px, calc(var(--u) * 2.72)); color: var(--ui-accent); margin-bottom: calc(var(--u) * 1.2 + var(--gp)); }
+#text { flex: 0 1 auto; min-height: 2.9em; overflow-y: auto; max-width: 34em; line-height: 1.45; text-wrap: pretty; }
 #dialog.narr #text, #dialog.whisper #text { color: var(--ui-dim); }
-#dialog.whisper #text { letter-spacing: 0.08em; }
+#dialog.whisper #text { letter-spacing: 0.04em; }
 #text .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
 #dialog.red #who { color: var(--ui-dim); }
 #dialog.red.on #text { animation: shiver 0.14s steps(2, jump-none) infinite; }
@@ -116,47 +126,56 @@ body {
 #choices.grid { display: grid; grid-template-columns: 1fr 1fr; }
 /* The first moments after buttons appear: a tap meant to finish the line must not pick one. */
 #choices.cold .choice, #thinkChoices.cold .choice { pointer-events: none; }
-#choices.many .choice { padding: calc(var(--u) * 1.05) calc(var(--u) * 2.4); font-size: calc(var(--u) * 4); }
+#choices.many .choice { padding: calc(var(--u) * 1.05) calc(var(--u) * 2.4); font-size: calc(var(--u) * 3.6); }
+/* The choices are his own words: the book face at 500, so they read as tappable above the prose. */
 .choice {
-  font: inherit; text-align: left; color: var(--ui-ink); background: transparent; cursor: pointer;
+  font: inherit; font-weight: 500; line-height: 1.3; text-align: left; color: var(--ui-ink); background: transparent; cursor: pointer;
   min-height: max(44px, calc(var(--u) * 11));
   border: calc(var(--u) * 0.5) solid var(--ui-edge);
   padding: calc(var(--u) * 1.7) calc(var(--u) * 2.8);
 }
 .choice:hover { background: var(--ui-edge); color: var(--ui-solid); }
-#more { position: absolute; right: calc(var(--u) * 3.2); bottom: calc(var(--u) * 1.4); opacity: 0; color: var(--ui-accent); }
-#more.on { opacity: 0.9; animation: nudge 0.9s steps(2, jump-none) infinite; }
+/* The 'more' marker: a 5 by 3 game-pixel triangle drawn in CSS, so no glyph falls back to a system font. */
+.pxmore {
+  position: absolute; width: calc(var(--gp) * 5); height: calc(var(--gp) * 3); background: var(--ui-accent); opacity: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 33.34%, 80% 33.34%, 80% 66.67%, 60% 66.67%, 60% 100%, 40% 100%, 40% 66.67%, 20% 66.67%, 20% 33.34%, 0 33.34%);
+}
+#more { right: calc(var(--u) * 3.2); bottom: calc(var(--u) * 2); }
+#more.on, #thinkMore.on { opacity: 0.9; animation: nudge 0.9s steps(2, jump-none) infinite; }
 
-/* The thought bubble (bible, 4b): a thin comic bubble over the stage in the UI ink, near-transparent, with a
-   scalloped SVG outline drawn in currentColor and a tail of two circles toward whoever is thinking. Its
-   position is set from internal pixels by UI.think; #thinkChoices is the companion's question only. */
+/* The thought bubble (bible, 4b): a solid pixel cloud on the game's own grid, drawn by thinkLayout as SVG rects
+   in game pixels (#thinkPix): a one-game-pixel outline in the ink, the palette's darkest index at 80% inside, and
+   three shrinking pixel circles as the tail toward whoever is thinking. Its box is sized from the measured
+   text, in whole game pixels; #thinkChoices is the companion's question only, above the bubble. */
 #think {
-  position: absolute; z-index: 6; width: 40%; color: var(--ui-ink);
-  padding: calc(var(--u) * 2.4) calc(var(--u) * 2.8) calc(var(--u) * 2.2);
-  font-size: max(12px, calc(var(--u) * 3.1)); line-height: 1.3; text-align: center;
+  position: absolute; z-index: 6; color: var(--ui-ink);
+  padding: calc(var(--u) * 2.4) calc(var(--u) * 2.8) calc(var(--u) * 3.2);
+  font-size: max(12px, calc(var(--u) * 2.79)); line-height: 1.45; text-align: center;
   opacity: 0; transition: opacity 0.35s ease; pointer-events: none;
 }
 #think.on { opacity: 1; }
 #think.ask { pointer-events: auto; }
-#thinkSvg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: var(--ui-solid); fill-opacity: 0.55; stroke: currentColor; stroke-width: 1px; }
+#thinkPix { position: absolute; overflow: visible; shape-rendering: crispEdges; pointer-events: none; }
+#thinkPix .fill { fill: var(--ui-solid); fill-opacity: 0.8; }
+#thinkPix .line { fill: var(--ui-ink); fill-opacity: 0.9; }
+/* The speaker's tab sits on the top outline, on its own solid plate, so the outline never runs through the letters. */
 #thinkWho {
-  position: absolute; top: calc(var(--u) * -1.3); left: calc(var(--u) * 4);
-  padding: 0 calc(var(--u) * 0.7); font-size: max(10px, calc(var(--u) * 2.4)); line-height: 1.1; color: var(--ui-dim);
-  background: var(--ui-solid);
+  position: absolute; top: calc(var(--gp) * -4); left: calc(var(--gp) * 7);
+  padding: var(--gp) calc(var(--gp) * 2); font-size: 8px; line-height: 1; color: var(--ui-dim);
+  background: var(--ui-solid); box-shadow: 0 0 0 var(--gp) var(--ui-ink);
 }
 #thinkWho[hidden] { display: none; }
-#thinkText { position: relative; }
+#thinkText { position: relative; text-wrap: balance; }
 #thinkText .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
 #thinkChoices {
-  position: absolute; left: -12%; right: -12%; top: 100%; margin-top: calc(var(--u) * 8);
+  position: absolute; left: -12%; right: -12%; bottom: 100%; margin-bottom: calc(var(--gp) * 6);
   display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--u) * 1.2);
 }
 #thinkChoices[hidden] { display: none; }
-#thinkChoices .choice { flex: 1 1 auto; text-align: center; padding: calc(var(--u) * 0.7) calc(var(--u) * 1.6); font-size: calc(var(--u) * 4); background: var(--ui-panel); }
+#thinkChoices .choice { flex: 1 1 auto; text-align: center; padding: calc(var(--u) * 0.7) calc(var(--u) * 1.6); font-size: calc(var(--u) * 3.6); background: var(--ui-panel); }
 #thinkChoices .choice:hover { background: var(--ui-edge); }
-/* The same ▾ 'more' marker as the panel's, inside the bubble's lower right, for a bubble that waits for a tap. */
-#thinkMore { position: absolute; right: calc(var(--u) * 2.4); bottom: calc(var(--u) * 0.6); opacity: 0; font-size: calc(var(--u) * 2.6); line-height: 1; color: var(--ui-accent); }
-#thinkMore.on { opacity: 0.9; animation: nudge 0.9s steps(2, jump-none) infinite; }
+/* The same 'more' marker as the panel's, inside the bubble's lower right, for a bubble that waits for a tap. */
+#thinkMore { right: calc(var(--gp) * 8); bottom: calc(var(--gp) * 3); }
 
 #card {
   position: absolute; z-index: 6; left: 10%; right: 10%; top: 27%;
@@ -165,11 +184,12 @@ body {
 }
 #card.on { opacity: 1; transform: none; }
 #cardFish { display: block; margin: 0 auto calc(var(--u) * 3); image-rendering: crisp-edges; image-rendering: pixelated; }
-#cardName { font-weight: 600; font-size: calc(var(--u) * 5.2); }
-#cardMeta { color: var(--ui-dim); font-size: max(10px, calc(var(--u) * 3.4)); margin-top: calc(var(--u) * 0.6); }
-#cardDesc { margin: calc(var(--u) * 2.4) 0 0; }
-#cardVoice { margin: calc(var(--u) * 2) 0 0; color: var(--ui-accent); }
-#card .hint { margin-top: calc(var(--u) * 3); font-size: max(10px, calc(var(--u) * 3.1)); color: var(--ui-dim); opacity: 0; transition: opacity 0.3s ease; }
+#cardName { font-size: calc(var(--u) * 4.16); line-height: 1.35; }
+#cardMeta { color: var(--ui-dim); font-size: max(11px, calc(var(--u) * 3.06)); margin-top: calc(var(--u) * 1); }
+#cardDesc { margin: calc(var(--u) * 2.4) 0 0; text-wrap: pretty; }
+#cardVoice { margin: calc(var(--u) * 2) 0 0; color: var(--ui-accent); font-style: italic; text-wrap: pretty; }
+#card .hint { margin-top: calc(var(--u) * 3); font-size: max(11px, calc(var(--u) * 2.79)); color: var(--ui-dim); opacity: 0; transition: opacity 0.3s ease; }
+:root[lang="ru"] #cardMeta, :root[lang="ru"] #card .hint { font-size: max(12px, calc(var(--u) * 3.06)); }
 #card.ready .hint { opacity: 1; }
 
 #title {
@@ -177,18 +197,17 @@ body {
   text-align: center; opacity: 0; transition: opacity 1.1s ease; pointer-events: none;
 }
 #title.on { opacity: 1; }
-#title h1 {
-  margin: 20% 0 0; font-size: calc(var(--u) * 13.5); font-weight: 600; line-height: 1; letter-spacing: 0.01em;
-  color: var(--ui-ink);
-}
-#title .sub { margin: calc(var(--u) * 2.6) 0 0; font-size: max(10px, calc(var(--u) * 4.2)); color: var(--ui-dim); }
-#title .begin { position: absolute; bottom: 21%; left: 0; right: 0; margin: 0; font-size: max(10px, calc(var(--u) * 4.6)); animation: breathe 2.6s ease-in-out infinite; }
-#title .how { position: absolute; bottom: 15%; left: 10%; right: 10%; margin: 0; font-size: max(10px, calc(var(--u) * 3.3)); color: var(--ui-dim); }
-#title .found { position: absolute; bottom: 8.5%; left: 0; right: 0; margin: 0; font-size: max(10px, calc(var(--u) * 3.1)); color: var(--ui-accent); }
-/* The six ending titles in order under the counter, a dash for each one not found yet. */
-.endlist { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 calc(var(--u) * 2.6); margin: 0; font-size: max(10px, calc(var(--u) * 2.9)); }
+#title h1 { margin: 20% 0 0; font-size: calc(var(--u) * 8.5); line-height: 1.1; white-space: nowrap; color: var(--ui-ink); }
+#title .sub { margin: calc(var(--u) * 3.4) 0 0; font-size: max(11px, calc(var(--u) * 3.78)); color: var(--ui-dim); }
+#title .begin { position: absolute; bottom: 21%; left: 0; right: 0; margin: 0; font-size: max(11px, calc(var(--u) * 4.14)); font-weight: 500; animation: breathe 2.6s ease-in-out infinite; }
+#title .how { position: absolute; bottom: 15%; left: 10%; right: 10%; margin: 0; font-size: max(11px, calc(var(--u) * 2.97)); font-weight: 500; color: var(--ui-dim); text-wrap: balance; }
+#title .found { position: absolute; bottom: 9.5%; left: 0; right: 0; margin: 0; font-size: max(11px, calc(var(--u) * 2.79)); font-weight: 500; color: var(--ui-accent); }
+/* The seven ending titles in order under the counter, a middot between them and a ? for each one not found yet. */
+.endlist { margin: 0; font-size: max(11px, calc(var(--u) * 2.61)); line-height: 1.35; text-wrap: balance; }
+.endlist span { white-space: nowrap; }
+.endlist span + span::before { content: '\00b7'; padding: 0 calc(var(--u) * 1.3); }
 .endlist:empty { display: none; }
-#title .endlist { position: absolute; bottom: 3%; left: 8%; right: 8%; color: var(--ui-dim); }
+#title .endlist { position: absolute; bottom: 2.5%; left: 7%; right: 7%; font-weight: 500; color: var(--ui-dim); }
 
 #fade { position: absolute; z-index: 8; inset: 0; background: #000; opacity: 1; pointer-events: none; transition: opacity 0.6s ease; }
 
@@ -199,13 +218,13 @@ body {
   opacity: 0; transition: opacity 1.6s ease; pointer-events: none;
 }
 #ending.on { opacity: 1; pointer-events: auto; }
-#ending h2 { margin: 0; font-size: calc(var(--u) * 10); font-weight: 600; line-height: 1.05; color: #fff; }
-#endText { margin: calc(var(--u) * 4) 0 0; color: #f3ece4; max-width: 30em; }
-#endAsked { margin: calc(var(--u) * 2.4) 0 0; color: #f3ece4; max-width: 30em; white-space: pre-line; }
-#endFound { margin: calc(var(--u) * 4) 0 0; font-size: max(10px, calc(var(--u) * 3.2)); color: #c9b9a8; }
+#ending h2 { margin: 0; font-size: calc(var(--u) * 6.4); line-height: 1.2; white-space: nowrap; color: #fff; }
+#endText { margin: calc(var(--u) * 4) 0 0; color: #f3ece4; max-width: 30em; line-height: 1.5; text-wrap: balance; }
+#endAsked { margin: calc(var(--u) * 2.4) 0 0; color: #f3ece4; max-width: 30em; line-height: 1.5; white-space: pre-line; }
+#endFound { margin: calc(var(--u) * 4) 0 0; font-size: max(11px, calc(var(--u) * 2.88)); color: #c9b9a8; }
 #endList { margin-top: calc(var(--u) * 1.2); color: #a8998a; }
 #again {
-  margin-top: calc(var(--u) * 5); font: inherit; color: #fff; background: transparent; cursor: pointer;
+  margin-top: calc(var(--u) * 5); font: inherit; font-weight: 500; color: #fff; background: transparent; cursor: pointer;
   min-height: max(44px, calc(var(--u) * 11));
   border: calc(var(--u) * 0.6) solid #fff; padding: calc(var(--u) * 1.8) calc(var(--u) * 5);
 }
@@ -214,7 +233,7 @@ body {
 
 @keyframes blink { 50% { opacity: 0.35; } }
 @keyframes shiver { 50% { transform: translate(0.05em, -0.04em); } }
-@keyframes nudge { 50% { transform: translateY(0.15em); } }
+@keyframes nudge { 50% { transform: translateY(var(--gp)); } }
 @keyframes breathe { 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) {
   #prompt.urgent, #dialog.red.on #text, #more.on, #thinkMore.on, #title .begin { animation: none; }
@@ -229,28 +248,28 @@ body {
     <div id="caption" class="shade" aria-live="polite"></div>
     <div id="prompt" class="shade"></div>
     <div id="think" aria-live="polite">
-      <svg id="thinkSvg" aria-hidden="true"><path id="thinkPath" d=""/><circle id="thinkTail1" r="0"/><circle id="thinkTail2" r="0"/></svg>
-      <div id="thinkWho" hidden>Fisherman</div>
+      <svg id="thinkPix" aria-hidden="true"></svg>
+      <div id="thinkWho" class="px" hidden>Fisherman</div>
       <div id="thinkText" class="shade"></div>
       <div id="thinkChoices" hidden></div>
-      <div id="thinkMore" aria-hidden="true">&#9662;</div>
+      <div id="thinkMore" class="pxmore" aria-hidden="true"></div>
     </div>
     <div id="card" class="panel" aria-live="polite">
       <canvas id="cardFish" width="8" height="8"></canvas>
-      <div id="cardName"></div>
+      <div id="cardName" class="px"></div>
       <div id="cardMeta"></div>
       <p id="cardDesc"></p>
       <p id="cardVoice" hidden></p>
       <div class="hint">Tap to continue</div>
     </div>
     <div id="dialog" class="panel" aria-live="polite">
-      <div id="who"></div>
+      <div id="who" class="px"></div>
       <div id="text"></div>
       <div id="choices" hidden></div>
-      <div id="more" aria-hidden="true">&#9662;</div>
+      <div id="more" class="pxmore" aria-hidden="true"></div>
     </div>
     <div id="title" class="shade">
-      <h1>Still Water</h1>
+      <h1 class="px">Still Water</h1>
       <p class="sub shade">A short fishing tale</p>
       <p class="begin">Tap to begin</p>
       <p class="how shade">Tap to cast. Tap when the float goes under. Hold to reel.</p>
@@ -258,8 +277,8 @@ body {
       <p class="endlist" id="foundList"></p>
     </div>
     <div id="fade"></div>
-    <div id="ending" aria-live="polite">
-      <h2 id="endTitle"></h2>
+    <div id="ending" class="shade" aria-live="polite">
+      <h2 id="endTitle" class="px"></h2>
       <p id="endText"></p>
       <p id="endAsked"></p>
       <p id="endFound"></p>
@@ -1950,21 +1969,29 @@ function bigShape(u, v) {
   const p = lerp(0.14, 0.72, tt), notch = 0.55 * tt * tt * tt;
   return av < p && av > notch ? 0.3 + 0.3 * (1 - av / p) : 0;
 }
-const BIG_DARK = 2, SHADOW_IN = 0.55, CUT_MIN = -0.4, CUT_SOFT = 0.35;
+const BIG_DARK = 2, SHADOW_IN = 0.55, CUT_MIN = -0.4, CUT_SOFT = 0.6, CUT_BOW = 0.45, CUT_NOISE = 0.3;
+const CUT_FROM = 1 + CUT_BOW + CUT_NOISE / 2 + CUT_SOFT; // at k 1 the front is past every pixel of the tail
 function drawBigShadow(b) {
   const a = b.a === undefined ? 1 : b.a, k = b.k === undefined ? 1 : b.k, dk = (b.dk || 0) * BIG_DARK;
   if (a <= 0 || k <= 0) return;
   const bx = k < 1 ? b.px + (b.x - b.px) * k : b.x, by = k < 1 ? b.py + (b.y - b.py) * k * k : b.y;
-  const hw = b.w * 0.5 * k, hh = b.h * 0.5 * k, cut = k < 1 ? lerp(1 + CUT_SOFT, CUT_MIN, (1 - k) / (1 - SHADOW_IN)) : 9;
+  const hw = b.w * 0.5 * k, hh = b.h * 0.5 * k, cut = k < 1 ? lerp(CUT_FROM, CUT_MIN, (1 - k) / (1 - SHADOW_IN)) : 9;
   const y0 = Math.max(HY, Math.floor(by - hh * 1.5)), y1 = Math.min(H - 1, Math.ceil(by + hh * 1.5));
   const x0 = Math.max(0, Math.floor(bx - hw - 2)), x1 = Math.min(W - 1, Math.ceil(bx + hw + 2));
   for (let y = y0; y <= y1; y++) {
     const v = (y - by) / hh, rip = RIPX[y], row = y * W;
     for (let x = x0; x <= x1; x++) {
       const u = -(x + rip - bx) / hw, d = bigShape(u, v);
-      if (d <= 0 || (u > cut - CUT_SOFT && (cut - u) / CUT_SOFT < BAYER[((y & 3) << 2) | (x & 3)])) continue;
+      if (d <= 0) continue;
+      const bay = BAYER[((y & 3) << 2) | (x & 3)];
+      let fade = 1;
+      if (cut < 9) {
+        const uf = u + CUT_BOW * v * v + (vnoise(x * 0.3, y * 0.6, 29) - 0.5) * CUT_NOISE;
+        fade = clamp((cut - uf) / CUT_SOFT, 0, 1);
+        if (fade <= 0) continue;
+      }
       const i = row + x, f = FRAME[i];
-      if (f < 12) FRAME[i] = Math.max(0, f - Math.floor(((d > 0.7 ? 4 : d > 0.4 ? 3 : 2) + dk) * a + BAYER[((y & 3) << 2) | (x & 3)]));
+      if (f < 12) FRAME[i] = Math.max(0, f - Math.floor(((d > 0.7 ? 4 : d > 0.4 ? 3 : 2) + dk) * a * fade + bay));
     }
   }
 }
@@ -3463,7 +3490,10 @@ const CINE_OCEAN_BACK = {
   init() {
     const b = OCEAN.big;
     SFX.weight(false);
-    if (b) tween(b, 'x', -b.w * 0.65, OCEAN_RETURN, E.in, () => { if (OCEAN.big === b) OCEAN.big = null; });
+    if (!b) return;
+    tween(b, 'x', W + b.w * 0.7, OCEAN_RETURN, E.in, () => { if (OCEAN.big === b) OCEAN.big = null; });
+    tween(b, 'y', b.y + 40, OCEAN_RETURN, E.io);
+    tween(b, 'a', 0, OCEAN_RETURN, E.in);
   },
   update(t, dt, at) {
     at('back', OCEAN_RETURN, () => {
@@ -4396,21 +4426,56 @@ function init() {
   resetWS();
 }
 
-function cloudPath(w, h, u) {
-  const b = Math.min(u * 1.5, h / 4);
-  const x0 = b, y0 = b, x1 = w - b, y1 = h - b;
-  const arcs = (ax, ay, bx, by, n, vert) => {
-    let s = '';
-    const c = Math.hypot(bx - ax, by - ay) / n, r = vert ? b + ',' + c / 2 : c / 2 + ',' + b;
-    for (let i = 1; i <= n; i++) s += 'A' + r + ' 0 0 1 ' + (ax + (bx - ax) * i / n).toFixed(1) + ',' + (ay + (by - ay) * i / n).toFixed(1);
-    return s;
+const THINK_PAD = 2, THINK_GW = Math.round(W * 0.4), THINK_GUTTER = 16, BUMP_R = 5.5;
+const TAIL_PUFFS = [
+  { dx: 0, dy: 4, rows: ['..###..', '.#####.', '#######', '#######', '#######', '.#####.', '..###..'] },
+  { dx: 5, dy: 10, rows: ['.###.', '#####', '#####', '#####', '.###.'] },
+  { dx: 9, dy: 14, rows: ['.#.', '###', '.#.'] },
+];
+function thinkMask(gw, gh, tx, dir) {
+  const mw = gw + 2 * THINK_PAD, mh = gh + 18 + THINK_PAD, m = new Uint8Array(mw * mh);
+  const set = (x, y, v) => {
+    x += THINK_PAD; y += THINK_PAD;
+    if (x >= 0 && x < mw && y >= 0 && y < mh && !m[y * mw + x]) m[y * mw + x] = v;
   };
-  const side = y1 - y0 > u * 9 ? 2 : 1;
-  return 'M' + x0 + ',' + y0 + arcs(x0, y0, x1, y0, 4) + arcs(x1, y0, x1, y1, side, true) + arcs(x1, y1, x0, y1, 3) + arcs(x0, y1, x0, y0, side, true) + 'Z';
+  const disc = (cx, cy, r) => {
+    for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+      if ((x + 0.5 - cx) * (x + 0.5 - cx) + (y + 0.5 - cy) * (y + 0.5 - cy) <= r * r) set(x, y, 1);
+    }
+  };
+  for (let y = 3; y < gh - 3; y++) for (let x = 3; x < gw - 3; x++) set(x, y, 1);
+  const r = BUMP_R, nT = Math.max(3, Math.round(gw / 17)), nB = Math.max(3, nT - 1);
+  for (let i = 0; i < nT; i++) disc(r + 0.5 + (gw - 2 * r - 1) * i / (nT - 1), r + 0.3, r + (i % 2) * 0.8);
+  for (let i = 0; i < nB; i++) disc(r + 3 + (gw - 2 * r - 6) * i / (nB - 1), gh - r - 0.3, r - 0.4);
+  disc(r * 0.9, gh / 2, Math.min(r + 0.5, gh / 2)); disc(gw - r * 0.9, gh / 2, Math.min(r + 0.5, gh / 2));
+  for (const p of TAIL_PUFFS) {
+    const n = p.rows.length, h = (n - 1) / 2, cx = Math.round(tx + dir * p.dx);
+    p.rows.forEach((row, j) => { for (let i = 0; i < n; i++) if (row[i] === '#') set(cx - h + i, gh + p.dy - h + j, 2); });
+  }
+  return { m, mw, mh };
+}
+function thinkRects(k) {
+  const { m, mw, mh } = k, at = (x, y) => (x < 0 || y < 0 || x >= mw || y >= mh ? 0 : m[y * mw + x]);
+  let fill = '', line = '';
+  for (let y = 0; y < mh; y++) {
+    let x = 0;
+    while (x < mw) {
+      const v = at(x, y);
+      if (!v) { x++; continue; }
+      const edge = xx => at(xx - 1, y) !== v || at(xx + 1, y) !== v || at(xx, y - 1) !== v || at(xx, y + 1) !== v;
+      const e = edge(x);
+      let x1 = x + 1;
+      while (x1 < mw && at(x1, y) === v && edge(x1) === e) x1++;
+      const r = '<rect x="' + (x - THINK_PAD) + '" y="' + (y - THINK_PAD) + '" width="' + (x1 - x) + '" height="1"/>';
+      if (e) line += r; else fill += r;
+      x = x1;
+    }
+  }
+  return '<g class="fill">' + fill + '</g><g class="line">' + line + '</g>';
 }
 const THINK_AT = {
   fisherman: { left: 122, y: 186, tail: 150, dir: -1 },
-  companion: { left: 100, y: 190, yAsk: 172, tail: 160, dir: 1 },
+  companion: { left: 100, y: 190, tail: 160, dir: 1 },
   companionRed: { left: 124, y: 205, tail: 168, dir: 1 },
 };
 const thinkAnchor = side => (WS.mood > 1 && THINK_AT[side + 'Red']) || THINK_AT[side];
@@ -4419,11 +4484,16 @@ function cardFishScale(w, h, stageW, panelW) {
   const u = stageW / 100;
   return clamp(Math.floor(Math.min((CARD_FISH_W * (panelW || 80 * u)) / w, (CARD_FISH_H * u) / h)), CARD_FISH_MIN, CARD_FISH_MAX);
 }
+const NB_ONE = /(^|[\s («"])([вВсСкКуУоОиИаАяЯ]) /g;
+function nbsp(t) {
+  if (LANG !== 'ru' || !t) return t;
+  return t.replace(NB_ONE, '$1$2 ').replace(NB_ONE, '$1$2 ').replace(/ —/g, ' —');
+}
 function makeUI() {
   const $ = id => document.getElementById(id);
   const el = {
     stage: $('stage'), prompt: $('prompt'), caption: $('caption'), count: $('count'),
-    think: $('think'), thinkPath: $('thinkPath'), thinkTail1: $('thinkTail1'), thinkTail2: $('thinkTail2'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'), thinkMore: $('thinkMore'),
+    think: $('think'), thinkPix: $('thinkPix'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'), thinkMore: $('thinkMore'),
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
     title: $('title'), found: $('found'), foundList: $('foundList'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endFound: $('endFound'), endList: $('endList'),
@@ -4433,6 +4503,7 @@ function makeUI() {
   const rgb = (i, a) => 'rgba(' + (PALRGB[i * 3] | 0) + ',' + (PALRGB[i * 3 + 1] | 0) + ',' + (PALRGB[i * 3 + 2] | 0) + ',' + (a === undefined ? 1 : a) + ')';
   const mixWhite = (i, k) => 'rgb(' + [0, 1, 2].map(j => Math.round(PALRGB[i * 3 + j] + (255 - PALRGB[i * 3 + j]) * k)).join(',') + ')';
   const setText = (node, t, mark) => {
+    t = nbsp(t);
     node.textContent = t;
     if (!mark || !t.endsWith('?')) return;
     node.textContent = t.slice(0, -1);
@@ -4449,7 +4520,7 @@ function makeUI() {
     box.classList.add('cold');
     list.forEach(c => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'choice'; b.textContent = c.label;
+      b.type = 'button'; b.className = 'choice'; b.textContent = nbsp(c.label);
       b.addEventListener('click', ev => { ev.stopPropagation(); b.blur(); if (!ui.choicesCold()) c.cb(); });
       box.appendChild(b);
     });
@@ -4465,7 +4536,7 @@ function makeUI() {
     Object.keys(ENDINGS).forEach(id => {
       const s = document.createElement('span');
       const got = found.indexOf(id) >= 0;
-      s.textContent = got ? tr(ENDINGS[id].title) : '—';
+      s.textContent = got ? tr(ENDINGS[id].title) : '?'; // a neutral mark: a dash between titles read as punctuation
       if (!got) s.setAttribute('aria-label', tr('not found'));
       box.appendChild(s);
     });
@@ -4476,16 +4547,33 @@ function makeUI() {
     const sc = cardFishScale(cardSize.w, cardSize.h, el.stage.clientWidth, el.card.clientWidth);
     el.cardFish.style.width = cardSize.w * sc + 'px'; el.cardFish.style.height = cardSize.h * sc + 'px';
   };
-  const circle = (c, x, y, r) => { c.setAttribute('cx', x.toFixed(1)); c.setAttribute('cy', y.toFixed(1)); c.setAttribute('r', r.toFixed(1)); };
   const thinkLayout = side => {
-    const a = thinkAnchor(side), u = el.stage.clientWidth / 100;
-    const y = el.think.classList.contains('ask') && a.yAsk ? a.yAsk : a.y;
-    el.think.style.left = (a.left / W * 100).toFixed(2) + '%';
-    el.think.style.bottom = ((H - y) / H * 100).toFixed(2) + '%';
-    const w = el.think.clientWidth, h = el.think.clientHeight, tx = (a.tail - a.left) / W * 100 * u;
-    el.thinkPath.setAttribute('d', cloudPath(w, h, u));
-    circle(el.thinkTail1, tx, h + 1.7 * u, 1.3 * u);
-    circle(el.thinkTail2, tx + a.dir * 2.8 * u, h + 5.6 * u, 0.75 * u);
+    const a = thinkAnchor(side), gp = el.stage.clientWidth / W, gw = THINK_GW;
+    const left = Math.min(a.left, Math.floor(W - THINK_GUTTER / gp) - gw - 1);
+    el.think.style.width = gw * gp + 'px';
+    el.think.style.height = 'auto';
+    const gh = Math.max(12, Math.ceil(el.think.getBoundingClientRect().height / gp - 0.01));
+    el.think.style.height = gh * gp + 'px';
+    el.think.style.left = left * gp + 'px';
+    el.think.style.top = (a.y - gh) * gp + 'px';
+    el.think.style.bottom = 'auto';
+    const k = thinkMask(gw, gh, a.tail - left, a.dir), svg = el.thinkPix;
+    svg.setAttribute('viewBox', -THINK_PAD + ' ' + -THINK_PAD + ' ' + k.mw + ' ' + k.mh);
+    svg.style.left = -THINK_PAD * gp + 'px'; svg.style.top = -THINK_PAD * gp + 'px';
+    svg.style.width = k.mw * gp + 'px'; svg.style.height = k.mh * gp + 'px';
+    svg.innerHTML = thinkRects(k);
+  };
+  const snapPx = () => {
+    const dpr = window.devicePixelRatio || 1, step = 8 / dpr;
+    el.stage.querySelectorAll('.px').forEach(n => {
+      n.style.fontSize = '';
+      let k = Math.max(1, Math.round((parseFloat(getComputedStyle(n).fontSize) || 8) * dpr / 8));
+      n.style.fontSize = k * step + 'px';
+      if (n.tagName !== 'H1' && n.tagName !== 'H2') return;
+      const box = n.parentElement, cs = getComputedStyle(box);
+      const room = Math.min(box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), el.stage.clientWidth - 48);
+      while (k > 1 && n.scrollWidth > room) { k--; n.style.fontSize = k * step + 'px'; }
+    });
   };
   const ui = {
     el, choices: null, thinkOwns: false, thinkSide: null, choicesAt: -9,
@@ -4524,9 +4612,10 @@ function makeUI() {
       if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; }
     },
     thinkRelayout() { if (this.thinkSide) thinkLayout(this.thinkSide); },
+    snapPx,
     prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === tr('Tap now')); },
     caption(t, dur, style) {
-      el.caption.textContent = t; el.caption.className = 'shade on' + (style ? ' ' + style : '');
+      el.caption.textContent = nbsp(t); el.caption.className = 'shade on' + (style ? ' ' + style : '');
       clearTimeout(capTimer);
       capTimer = setTimeout(() => el.caption.classList.remove('on'), (dur || 2.5) * 1000);
     },
@@ -4544,8 +4633,8 @@ function makeUI() {
       cardScale();
       el.cardName.textContent = f.name;
       el.cardMeta.textContent = f.meta || kgText(f.weight);
-      el.cardDesc.textContent = f.desc;
-      el.cardVoice.textContent = f.voice || '';
+      el.cardDesc.textContent = nbsp(f.desc);
+      el.cardVoice.textContent = nbsp(f.voice || '');
       el.cardVoice.hidden = !f.voice;
       el.card.classList.add('on');
     },
@@ -4571,10 +4660,11 @@ function makeUI() {
       endingList(el.foundList, n ? found : null);
     },
     ending(e, found) {
-      el.endTitle.textContent = e.title; el.endText.textContent = e.text; el.endAsked.textContent = e.asked || '';
+      el.endTitle.textContent = e.title; el.endText.textContent = nbsp(e.text); el.endAsked.textContent = nbsp(e.asked || '');
       el.endFound.textContent = foundText(found.length);
       endingList(el.endList, found);
       el.ending.classList.add('on');
+      snapPx(); // the title steps down to fit its line
       this.againOff();
       againTimer = setTimeout(() => {
         againTimer = null;
@@ -4589,6 +4679,7 @@ function makeUI() {
     colors() {
       const s = document.documentElement.style;
       s.setProperty('--ui-panel', rgb(0, 0.86));
+      s.setProperty('--ui-panel-soft', rgb(0, 0.6)); // under Mute and the language link
       s.setProperty('--ui-solid', rgb(0));
       s.setProperty('--ui-edge', rgb(6));
       s.setProperty('--ui-ink', mixWhite(11, WS.mood > 1 ? 0.25 : 0.4));
@@ -4654,7 +4745,9 @@ function boot() {
     const sw = Math.floor(W * sc), sh = Math.floor(H * sc);
     stage.style.width = sw + 'px'; stage.style.height = sh + 'px';
     document.documentElement.style.setProperty('--u', sw / 100 + 'px');
+    document.documentElement.style.setProperty('--gp', sw / W + 'px');
     document.getElementById('prompt').style.bottom = ((34 / H) * 100).toFixed(2) + '%';
+    UI.snapPx();
     UI.dlgCap();
     UI.thinkRelayout();
     UI.fitChoices();
@@ -4662,6 +4755,10 @@ function boot() {
   }
   window.addEventListener('resize', resize);
   resize();
+  if (document.fonts) {
+    if (document.fonts.ready) document.fonts.ready.then(resize, () => {});
+    if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', resize);
+  }
   resetAll();
   UI.fade(0, 1.6);
 
