@@ -68,6 +68,20 @@ body {
 }
 /* Loose text over the picture: a one-game-pixel hard drop in the palette's darkest index, and a halo round it. */
 .shade { text-shadow: 0 var(--gp) 0 var(--ui-solid), 0 0 calc(var(--gp) * 2) var(--ui-solid), 0 0 calc(var(--gp) * 4) var(--ui-solid); }
+/* Small loose lines that can sit on a bright cloud or its reflection (the title's subtitle, how-to and found
+   lines, the captions): a plate of the
+   palette's darkest index at partial opacity behind the words, its ends stepped two game pixels in, like the
+   bubble's corners. hugPlate sizes the box to the widest balanced line, so the plate hugs the words. */
+.plate { position: relative; isolation: isolate; padding: 0 calc(var(--gp) * 4); }
+.plate::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; background: var(--ui-solid); opacity: 0.6;
+  clip-path: polygon(calc(var(--gp) * 2) 0, calc(100% - var(--gp) * 2) 0, calc(100% - var(--gp) * 2) var(--gp), calc(100% - var(--gp)) var(--gp),
+    calc(100% - var(--gp)) calc(var(--gp) * 2), 100% calc(var(--gp) * 2), 100% calc(100% - var(--gp) * 2), calc(100% - var(--gp)) calc(100% - var(--gp) * 2),
+    calc(100% - var(--gp)) calc(100% - var(--gp)), calc(100% - var(--gp) * 2) calc(100% - var(--gp)), calc(100% - var(--gp) * 2) 100%, calc(var(--gp) * 2) 100%,
+    calc(var(--gp) * 2) calc(100% - var(--gp)), var(--gp) calc(100% - var(--gp)), var(--gp) calc(100% - var(--gp) * 2), 0 calc(100% - var(--gp) * 2),
+    0 calc(var(--gp) * 2), var(--gp) calc(var(--gp) * 2), var(--gp) var(--gp), calc(var(--gp) * 2) var(--gp));
+}
+.plate:empty::before { display: none; }
 
 #hud {
   position: absolute; z-index: 5; top: calc(var(--u) * 3); left: calc(var(--u) * 4); right: calc(var(--u) * 4);
@@ -91,7 +105,7 @@ body {
 #mute:focus-visible, #skip:focus-visible, #lang:focus-visible, .choice:focus-visible, #again:focus-visible { outline: calc(var(--u) * 0.6) solid var(--ui-accent); outline-offset: calc(var(--u) * 0.5); }
 
 #caption {
-  position: absolute; z-index: 5; top: 11%; left: 9%; right: 9%; text-align: center;
+  position: absolute; z-index: 5; top: 11%; left: 0; right: 0; width: 82%; margin: 0 auto; text-align: center;
   font-size: calc(var(--u) * 3.6); color: var(--ui-ink); text-wrap: balance;
   opacity: 0; transition: opacity 0.9s ease; pointer-events: none;
 }
@@ -201,15 +215,20 @@ body {
 #title.on { opacity: 1; }
 #title h1 { margin: 20% 0 0; font-size: calc(var(--u) * 8.5); line-height: 1.1; white-space: nowrap; color: var(--ui-ink); }
 #title .sub { margin: calc(var(--u) * 3.4) 0 0; font-size: max(11px, calc(var(--u) * 3.78)); color: var(--ui-dim); }
-#title .begin { position: absolute; bottom: 21%; left: 0; right: 0; margin: 0; font-size: max(11px, calc(var(--u) * 4.14)); font-weight: 500; animation: breathe 2.6s ease-in-out infinite; }
-#title .how { position: absolute; bottom: 15%; left: 10%; right: 10%; margin: 0; font-size: max(11px, calc(var(--u) * 2.97)); font-weight: 500; color: var(--ui-dim); text-wrap: balance; }
-#title .found { position: absolute; bottom: 9.5%; left: 0; right: 0; margin: 0; font-size: max(11px, calc(var(--u) * 2.79)); font-weight: 500; color: var(--ui-accent); }
+/* 'Tap to begin' is bigger and breathes, so it takes a stronger shade instead of a plate: a one-game-pixel outline
+   in the darkest index and a soft halo. The how-to hangs from its foot (at 79%), so a longer wrap
+   grows down, never into it. */
+#title .begin { position: absolute; bottom: 21%; left: 0; right: 0; margin: 0; font-size: max(11px, calc(var(--u) * 4.14)); font-weight: 500; animation: breathe 2.6s ease-in-out infinite;
+  text-shadow: var(--gp) 0 0 var(--ui-solid), calc(var(--gp) * -1) 0 0 var(--ui-solid), 0 var(--gp) 0 var(--ui-solid), 0 calc(var(--gp) * -1) 0 var(--ui-solid),
+    0 0 calc(var(--gp) * 4) var(--ui-solid); }
+#title .how { position: absolute; top: calc(79% + var(--gp) * 2); left: 0; right: 0; width: max(80%, 282px); margin: 0 auto; font-size: max(11px, calc(var(--u) * 2.97)); font-weight: 500; color: var(--ui-dim); text-wrap: balance; }
+#title .found { position: absolute; bottom: 9.5%; left: 0; right: 0; width: 86%; margin: 0 auto; font-size: max(11px, calc(var(--u) * 2.79)); font-weight: 500; color: var(--ui-accent); }
 /* The seven ending titles in order under the counter, a middot between them and a ? for each one not found yet. */
 .endlist { margin: 0; font-size: max(11px, calc(var(--u) * 2.61)); line-height: 1.35; text-wrap: balance; }
 .endlist span { white-space: nowrap; }
 .endlist span + span::before { content: '\00b7'; padding: 0 calc(var(--u) * 1.3); }
 .endlist:empty { display: none; }
-#title .endlist { position: absolute; bottom: 2.5%; left: 7%; right: 7%; font-weight: 500; color: var(--ui-dim); }
+#title .endlist { position: absolute; bottom: 2.5%; left: 0; right: 0; width: 86%; margin: 0 auto; font-weight: 500; color: var(--ui-dim); }
 
 #fade { position: absolute; z-index: 8; inset: 0; background: #000; opacity: 1; pointer-events: none; transition: opacity 0.6s ease; }
 
@@ -236,7 +255,7 @@ body {
 @keyframes blink { 50% { opacity: 0.35; } }
 @keyframes shiver { 50% { transform: translate(0.05em, -0.04em); } }
 @keyframes nudge { 50% { transform: translateY(var(--gp)); } }
-@keyframes breathe { 50% { opacity: 0.45; } }
+@keyframes breathe { 50% { opacity: 0.7; } }
 @media (prefers-reduced-motion: reduce) {
   #prompt.urgent, #dialog.red.on #text, #more.on, #thinkMore.on, #title .begin { animation: none; }
 }
@@ -247,7 +266,7 @@ body {
   <div id="stage" aria-label="Still Water, a short fishing tale">
     <canvas id="c" width="216" height="384"></canvas>
     <div id="hud"><span id="count" class="shade" aria-live="polite"></span><span id="hudButtons"><a id="lang" href="ru/" hreflang="ru" lang="ru" hidden>RU</a><button id="mute" type="button">Mute</button><button id="skip" type="button" hidden>Skip fish</button></span></div>
-    <div id="caption" class="shade" aria-live="polite"></div>
+    <div id="caption" class="shade plate" aria-live="polite"></div>
     <div id="prompt" class="shade"></div>
     <div id="think" aria-live="polite">
       <svg id="thinkPix" aria-hidden="true"></svg>
@@ -272,11 +291,11 @@ body {
     </div>
     <div id="title" class="shade">
       <h1 class="px">Still Water</h1>
-      <p class="sub shade">A short fishing tale</p>
+      <p class="sub shade plate">A short fishing tale</p>
       <p class="begin">Tap to begin</p>
-      <p class="how shade">Tap to cast. Tap when the float goes under. Hold to reel.</p>
-      <p class="found" id="found"></p>
-      <p class="endlist" id="foundList"></p>
+      <p class="how shade plate">Tap to cast. Tap when the float goes under. Hold to reel.</p>
+      <p class="found plate" id="found"></p>
+      <p class="endlist plate" id="foundList"></p>
     </div>
     <div id="fade"></div>
     <div id="ending" class="shade" aria-live="polite">

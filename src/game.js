@@ -510,9 +510,11 @@ const COMP_LEAP = sprite([
   '...0........',
 ]);
 // Phase 23: at phone size the 12 px frame read as a speck, so the leap stamps it at 2x (nearest neighbour)
-// on a higher arc, with a fading trail of three earlier positions in dark ramp indices.
+// on a higher arc, with a trail of three earlier positions: solid afterimages of the leap frame, each one
+// ramp step further toward the sky (v), the oldest drawn first so each nearer one covers it. Undithered, so
+// at phone size they read as a stepped wake behind him, not as noise.
 const LEAP_ARC = 52; // how high the parabola rises above the straight line from the seat to the disc
-const LEAP_TRAIL = [{ dp: 0.06, v: 2, a: 0.6 }, { dp: 0.12, v: 3, a: 0.38 }, { dp: 0.18, v: 4, a: 0.2 }];
+const LEAP_TRAIL = [{ dp: 0.05, v: 3 }, { dp: 0.1, v: 5 }, { dp: 0.15, v: 7 }];
 function scale2(s) {
   const w = s.w * 2, h = s.h * 2, data = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) data[y * w + x] = s.data[(y >> 1) * s.w + (x >> 1)];
@@ -2236,16 +2238,22 @@ function plotR(x, y, v, wl, noRefl) {
   const yr = 2 * wl - 1 - y;
   if (yr >= HY && yr < H) plot(x + RIPX[yr], yr, refl(v));
 }
-// ra, when given, dithers the reflection to about that fraction of its pixels (the golden fish's is faint).
-function stampR(s, x0, y0, wl, alpha, flip, ra) {
+// calm (the golden fish): the reflection drawn the way the mirror draws a lit thing, whole rows with every
+// CALM_GAP-th row left out where the ripple breaks it, each pixel shifted by that row's ripple and taken one
+// step down the gold ramp (reflCalm), so it reads as a dimmer fish in the water, not as scattered gold.
+const CALM_GAP = 3;
+const reflCalm = v => (v >= 13 && v <= 16 ? Math.max(13, v - 1) : refl(v));
+function stampR(s, x0, y0, wl, alpha, flip, calm) {
   for (let j = 0; j < s.h; j++) {
     const y = y0 + j;
     if (y >= wl) break;
+    const yr = 2 * wl - 1 - y, rowR = calm && yr >= HY && yr < H && (yr - wl) % CALM_GAP !== CALM_GAP - 1;
     for (let i = 0; i < s.w; i++) {
       const v = s.data[j * s.w + (flip ? s.w - 1 - i : i)];
       if (v === 255) continue;
       if (alpha !== undefined && alpha < 1 && hash2(i, j, 7) > alpha) continue;
-      plotR(x0 + i, y, v, wl, ra !== undefined && hash2(i, j, 13) > ra);
+      plotR(x0 + i, y, v, wl, calm);
+      if (rowR) plot(x0 + i + RIPX[yr], yr, reflCalm(v));
     }
   }
 }
@@ -2462,7 +2470,7 @@ function drawCompanion(t, bx, dy) {
     const tr = LEAP_TRAIL[k], q = p - tr.dp;
     if (q <= 0 || p >= 1) continue; // no trail on the ground, and none once he rides the disc
     const c = leapXY(q, bx, dy);
-    stampSolidR(s, Math.round(c.x - s.w / 2), Math.round(c.y - s.h / 2), leapWL(q), tr.v, tr.a);
+    stampSolidR(s, Math.round(c.x - s.w / 2), Math.round(c.y - s.h / 2), leapWL(q), tr.v);
   }
   const c = leapXY(p, bx, dy);
   stampR(s, Math.round(c.x - s.w / 2), Math.round(c.y - s.h / 2), leapWL(p));
@@ -2484,12 +2492,8 @@ function clingAt() {
 const leapWL = p => Math.round(lerp(WL, HY, p));
 // A sprite's silhouette in one index, Bayer-dithered to alpha in screen space (the leap's trail, an even
 // ghost rather than noise), reflected like any sprite.
-function stampSolidR(s, x0, y0, wl, v, alpha) {
-  for (let j = 0; j < s.h; j++) for (let i = 0; i < s.w; i++) {
-    const x = x0 + i, y = y0 + j;
-    if (s.data[j * s.w + i] === 255 || BAYER[((y & 3) << 2) | (x & 3)] > alpha) continue;
-    plotR(x, y, v, wl);
-  }
+function stampSolidR(s, x0, y0, wl, v) {
+  for (let j = 0; j < s.h; j++) for (let i = 0; i < s.w; i++) if (s.data[j * s.w + i] !== 255) plotR(x0 + i, y0 + j, v, wl);
 }
 function drawBobber() {
   const b = G.bob;
@@ -2555,7 +2559,6 @@ function drawKeptFish(t, bx, dy) {
   stampR(speaking && mouthOpen(t) ? KEPT_OPEN : KEPT, x0, y0, WL, a);
   if (speaking && Math.random() < 0.12) sparkle(x0 + Math.random() * KEPT.w, y0 + Math.random() * KEPT.h);
 }
-const GOLD_REFL_A = 0.4;
 function drawGoldFish(t) {
   const g = WS.goldFish;
   const a = g ? g.a * clamp(1 - (WS.far - 0.3) / 0.3, 0, 1) : 0; // out on the ocean it is out of sight too
@@ -2563,7 +2566,7 @@ function drawGoldFish(t) {
   const talking = fishSpeaking() && mouthOpen(t);
   const s = talking ? GOLD_OPEN : GOLD;
   const x0 = Math.round(g.x), y0 = Math.round(g.y + Math.sin(t * 2.1) * 1.5);
-  stampR(s, x0, y0, g.surf, a, false, GOLD_REFL_A); // a faint reflection, so it reads as one fish, not two
+  stampR(s, x0, y0, g.surf, a, false, true); // a calm, darker, row-broken reflection, so it reads as one fish, not two
   if (a > 0.6 && Math.random() < 0.25) sparkle(x0 + Math.random() * s.w, y0 + Math.random() * s.h);
 }
 function drawLanding() {
@@ -4861,6 +4864,23 @@ function makeUI() {
       while (k > 1 && n.scrollWidth > room) { k--; n.style.fontSize = k * step + 'px'; }
     });
   };
+  // A plate (.plate) hugs its words: the box is set to the widest line as laid out (balanced), plus its padding.
+  const hugPlate = n => {
+    n.style.width = '';
+    if (!n.textContent) return;
+    const r = document.createRange(), rows = new Map();
+    if (!r.getClientRects) return; // jsdom has no layout
+    r.selectNodeContents(n);
+    for (const q of r.getClientRects()) {
+      const k = Math.round(q.top), o = rows.get(k);
+      rows.set(k, o ? [Math.min(o[0], q.left), Math.max(o[1], q.right)] : [q.left, q.right]);
+    }
+    let w = 0;
+    rows.forEach(([a, b]) => { w = Math.max(w, b - a); });
+    const cs = getComputedStyle(n);
+    n.style.width = Math.ceil(w + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2) + 'px';
+  };
+  const hugPlates = () => el.stage.querySelectorAll('.plate').forEach(hugPlate);
   const ui = {
     el, choices: null, thinkOwns: false, thinkSide: null, choicesAt: -9,
     choicesCold() { return G.t - this.choicesAt < CHOICE_GRACE; },
@@ -4904,10 +4924,11 @@ function makeUI() {
       if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; }
     },
     thinkRelayout() { if (this.thinkSide) thinkLayout(this.thinkSide); },
-    snapPx,
+    snapPx, hugPlates,
     prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === tr('Tap now')); },
     caption(t, dur, style) {
-      el.caption.textContent = nbsp(t); el.caption.className = 'shade on' + (style ? ' ' + style : '');
+      el.caption.textContent = nbsp(t); el.caption.className = 'shade plate on' + (style ? ' ' + style : '');
+      hugPlate(el.caption);
       clearTimeout(capTimer);
       capTimer = setTimeout(() => el.caption.classList.remove('on'), (dur || 2.5) * 1000);
     },
@@ -4952,6 +4973,7 @@ function makeUI() {
       const n = found ? found.length : 0;
       el.found.textContent = n ? foundText(n) : '';
       endingList(el.foundList, n ? found : null);
+      hugPlate(el.found); hugPlate(el.foundList);
     },
     ending(e, found) {
       el.endTitle.textContent = e.title; el.endText.textContent = nbsp(e.text); el.endAsked.textContent = nbsp(e.asked || '');
@@ -5049,6 +5071,7 @@ function boot() {
     document.documentElement.style.setProperty('--gp', sw / W + 'px');
     document.getElementById('prompt').style.bottom = ((34 / H) * 100).toFixed(2) + '%';
     UI.snapPx();
+    UI.hugPlates();
     UI.dlgCap();
     UI.thinkRelayout();
     UI.fitChoices();
