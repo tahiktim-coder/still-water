@@ -264,6 +264,7 @@ function insideFrame(sunk) {
   return secs => {
     const ws = g.WS;
     redSky(ws); ws.cabin = 1; ws.companion = 0; g.G.bob = { x: 101, y: g.HY + 5, taut: true };
+    ws.goldFish = { x: 90, y: g.HY - 24, a: 1, surf: g.HY + 1 }; // the released sky fish where the red rise hangs it (SUNX - 14)
     if (sunk) { ws.gold = 1; ws.boatSunk = 1; }
     g.playCine(g.CINE_INSIDE);
     for (let i = 0; i < Math.round(secs * 60); i++) g.update(1 / 60);

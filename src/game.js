@@ -849,7 +849,7 @@ function buildFarBoats() {
   const boat = boatZoomSource(), swim = swimZoomSource();
   BOAT_ZOOM = FAR_SCALES.map(sc => zoomFrame(boat, sc));
   SWIM_ZOOM = FAR_SCALES.map(sc => zoomFrame(swim, sc));
-  IN_BOAT = INSIDE_SS.map(sc => topLit(zoomFrame(boat, sc))); // Inside: screen sizes, stamped at 1 px per pixel
+  IN_BOAT = INSIDE_SS.map(sc => topLit(zoomFrame(boat, sc))); // Inside: sizes, stamped at the foreground's pixel size (artA)
   IN_SWIM = INSIDE_SS.map(sc => topLit(zoomFrame(swim, sc)));
   IN_EMPTY = topLit(zoomFrame(boatZoomSource(true), INSIDE_SS[INSIDE_SS.length - 1]));
   BOAT_SPECK = speckOf(['.000.', '00000'], 2);
@@ -2431,7 +2431,7 @@ function drawFisherman(t, bx, dy) {
 }
 const DIVE_SWITCH = 0.02; // Deep: the view swaps to the shape from beneath once the horizon has risen a little
 function drawBoatGroup(t) {
-  if (G.inside) return; // Inside: drawn after the push-in, at full resolution (drawInsideClose)
+  if (G.inside) return; // Inside: drawn after the push-in, crisp (drawInsideClose)
   if (!farLive()) { drawFarBoat(); return; }
   drawBoatLive(t);
 }
@@ -2693,7 +2693,7 @@ function glowTint(cx, cy, r, acc, str) {
     if (d2 >= r2) continue;
     let k = 1 - d2 / r2;
     k = k * k * str;
-    k = Math.floor(k * 5 + BAYER[((y & 3) << 2) | (x & 3)]) / 5;
+    k = Math.floor(k * 5 + (VIEW.z !== 1 ? 0.5 : BAYER[((y & 3) << 2) | (x & 3)])) / 5; // Inside: solid rings, like the backdrop
     if (k <= 0) continue;
     const i = y * W + x, p = OUT32[i];
     const pr = p & 255, pg = (p >>> 8) & 255, pb = (p >>> 16) & 255;
@@ -2716,9 +2716,10 @@ function applyGlows(t) {
   if (WS.dive > DIVE_SWITCH && G.deepGold) glowTint(G.deepGold.x, G.deepGold.y, DEEP_GOLD_GLOW, 16, WS.glint > 0 ? 0.9 : 0.55);
   const cab = WS.cabin * WS.cabinLit * (1 - WS.cabinKnock) * (1 - WS.sea) * (1 - WS.dive); // the window's glow is fixed to the shore, which the dive leaves
   if (cab > 0.4) {
-    const wx = G.inside ? WIN_G.x : CABIN_X + 2.5, wy = G.inside ? WIN_G.y : CABIN_Y + 7; // Inside: the close cabin's window
-    glowTint(wx, wy + s, 7, 17, 0.55 * cab); // the sky (and the cabin in it) slides down with the upper jaw
-    glowTint(wx, 2 * HY - 1 - wy - s, 5, 17, 0.35 * cab);
+    const iw = G.inside && G.inside.swap > 0.5 ? insideWin() : null; // Inside: the close cabin's window, as it grows
+    const wx = iw ? iw.x : CABIN_X + 2.5, wy = iw ? iw.y : CABIN_Y + 7, wr = iw ? WIN_GLOW * (1 + (G.inside.a - 1) * 0.5) : 7;
+    glowTint(wx, wy + s, wr, 17, 0.55 * cab); // the sky (and the cabin in it) slides down with the upper jaw
+    glowTint(wx, 2 * HY - 1 - wy - s, wr - 2, 17, 0.35 * cab);
   }
   const door = WS.cabin * WS.door * (1 - WS.sea);
   if (door > 0.5) { glowTint(DOOR_G.x, DOOR_G.y, DOOR_GLOW, 17, 0.7 * door); glowTint(DOOR_G.x, 2 * HY - 1 - DOOR_G.y, DOOR_GLOW - 2, 17, 0.4 * door); }
@@ -3893,29 +3894,42 @@ function endInside() {
 }
 const INSIDE_LOOK = -7;              // pupilDx toward the cabin, left of the disc
 // Phase 31: only the background zooms (sky, clouds, mountains, water, the eye: pushView after the composite);
-// the cabin, the boat and the two people are drawn after it at full resolution (drawInsideClose), placed by
-// the same mapping, screen = (world - VIEW origin) * zoom, so nothing in front is ever enlarged pixel by pixel.
-const SHORE_AX = 100, PUSH_Z = 2.6;  // the boat's anchor at the shore, just off the foot under the cabin; the final zoom
-const INSIDE_SS = [1, 0.94, 0.88, 0.82, 0.76, 0.71, 0.66, 0.62]; // the boat's screen size over the drift, from the full boat
+// the cabin, the boat and the two people are drawn after it crisply (drawInsideClose), placed by the same
+// mapping, screen = (world - VIEW origin) * zoom, never resampled with the background.
+// Phase 32, the push frames the door: a gentler zoom (PUSH_Z 2) of a background flattened into calm solid
+// bands (flatView, an out-of-focus backdrop), and a foreground that comes closer than it (a dolly: the shore
+// nears faster than the mountains), ending at FG_A screen pixels per sprite pixel, the same grain as the
+// backdrop, so the close cabin is near a third of the frame and the two people at its door are the subject.
+const SHORE_AX = 112, PUSH_Z = 2, FG_A = 2; // the boat's anchor at the shore, right of the bank under the cabin; the final zoom; the foreground's final pixel size
+const INSIDE_SS = [1, 0.94, 0.88, 0.82, 0.76, 0.71, 0.66, 0.62]; // the boat's size over the drift, from the full boat (times artA)
 const SS_END = INSIDE_SS[INSIDE_SS.length - 1];
 const LIVE_K = 1 / 8;                // the live group drifts until the push reaches this, then the crisp ladder takes over
-const SWAP_Z = 1.6, SWAP_DUR = 0.3;  // the small cabin hands over to the close one as the zoom passes 1.6
+// The foreground's pixel size: 1 while the live group drifts, then up to FG_A by the end of the push.
+const artA = k => lerp(1, FG_A, clamp((k - LIVE_K) / (1 - LIVE_K), 0, 1));
+const SWAP_K = 0.25, SWAP_DUR = 0.3; // the small cabin hands over to the close one as the push passes SWAP_K
 const CAB_AX = CABIN_X + CABIN_ROWS[0].length / 2, CAB_BY = CABIN_Y + CABIN_ROWS.length; // both cabins' foot, bottom centre
-// A close-cabin pixel (column, row) in world coordinates: the close cabin is the small one seen at PUSH_Z.
-const cabW = (px, py) => ({ x: CAB_AX + (px - CLOSE_CABIN.w / 2) / PUSH_Z, y: CAB_BY + (py - CLOSE_CABIN.h) / PUSH_Z });
-const DOOR_G = cabW(21, 17.5), WIN_G = cabW(8.5, 15.5), DOOR_GLOW = 7;
-const IN_CAM = { x: DOOR_G.x + 12, y: DOOR_G.y }; // the push-in's target: the door, with the shore and the boat in frame
+// The close cabin in world pixels per sprite pixel: the small cabin's own size (a third) until the hand-over,
+// then growing about its foot to FG_A / PUSH_Z (three times the small cabin) by the end of the push.
+const CAB_WS = FG_A / PUSH_Z;
+const cabWs = k => lerp(CABIN_ROWS[0].length / CLOSE_CABIN.w, CAB_WS, E.io(clamp((k - SWAP_K) / (1 - SWAP_K), 0, 1)));
+// A close-cabin pixel (column, row) in world coordinates, at the end of the push or at a given scale.
+const cabW = (px, py, s = CAB_WS) => ({ x: CAB_AX + (px - CLOSE_CABIN.w / 2) * s, y: CAB_BY + (py - CLOSE_CABIN.h) * s });
+const DOOR_G = cabW(21, 17.5), DOOR_GLOW = 13, WIN_PX = { x: 8.5, y: 15.5 }, WIN_GLOW = 7;
+// Where the push-in leaves the door on screen, as fractions of the frame: on the left third, a little below
+// the middle, so the walk from the boat to the door fills the frame's width and the eye stays above it.
+const IN_FRAME = { x: 1 / 3, y: 0.56 };
 const IN = {
   drift: 0.2, driftDur: 5, knockGap: 1.4, walk: 5.3, walkDur: 2.8, step: 0.5, open: 8.4, appear: 8.8, out: 9.3, outDur: 0.8,
   enter: 9.7, enterDur: 0.45, close: 10.5, down: 10.7, downDur: 1.4, row: 12.2, rowDur: 0.9, cast: 13.2,
   castDur: 0.5, under: 11.9, underDur: 1.4, knocks: [14.1, 14.55, 15], fade: 16.5, dur: 17.6,
 };
-const SWAP_T = IN.drift + IN.driftDur * Math.sqrt((SWAP_Z - 1) / (PUSH_Z - 1) / 2); // E.io inverted below one half
+const ioInv = k => (k < 0.5 ? Math.sqrt(k / 2) : 1 - Math.sqrt(2 * (1 - k)) / 2); // E.io inverted
+const SWAP_T = IN.drift + IN.driftDur * ioInv(SWAP_K);
 // The walkers' feet, in world coordinates: at the boat's seat (or, sunk, in the water where he swam), on the
-// bank beside the boat, beside the door, in the doorway, past it, and (sunk) under the water.
-const W_SEAT = { x: SHORE_AX - 5, y: HY - 2 }, W_SWIM = { x: SHORE_AX - 3, y: HY + 3 }, W_SHORE = { x: SHORE_AX - 13, y: HY - 1 };
-const W_SIDE = cabW(29, 24), W_DOOR = cabW(21, 23), W_PASS = cabW(35, 24), W_UNDER = { x: SHORE_AX - 4, y: HY + 7 };
-const ROW_DX = 4, ROW_DY = 3, CAST_SX = -30, CAST_SY = 14, CAST_ARC = 12; // rowing out (world); the cast (screen)
+// bank beside the boat's bow, beside the door, in the doorway, past it, and (sunk) under the water.
+const W_SEAT = { x: SHORE_AX - 14, y: HY - 4 }, W_SWIM = { x: SHORE_AX - 10, y: HY + 6 }, W_SHORE = { x: SHORE_AX - 25, y: HY - 1 };
+const W_SIDE = cabW(29, 24), W_DOOR = cabW(21, 23), W_PASS = cabW(33, 24), W_UNDER = { x: SHORE_AX - 17, y: HY + 16 };
+const ROW_DX = 4, ROW_DY = 3, CAST_SX = -56, CAST_SY = 26, CAST_ARC = 22; // rowing out (world); the cast (screen)
 const span = (t, a, d) => clamp((t - a) / d, 0, 1);
 function walkPose(p, a, b, t) {
   return { x: lerp(a.x, b.x, p), y: lerp(a.y, b.y, p), f: p > 0 && p < 1 ? ((t * 6) | 0) & 1 : 2, flip: b.x > a.x };
@@ -3947,7 +3961,7 @@ function insidePose(t, s) {
   let boat = 'man';
   if (t >= IN.walk) boat = s.sunk ? null : t < IN.down + IN.downDur ? 'empty' : 'other';
   return {
-    sunk: s.sunk, k, live: k < LIVE_K, ss: lerp(1, SS_END, k), boat, swap: span(t, SWAP_T - SWAP_DUR / 2, SWAP_DUR),
+    sunk: s.sunk, k, a: artA(k), live: k < LIVE_K, ss: lerp(1, SS_END, k), boat, swap: span(t, SWAP_T - SWAP_DUR / 2, SWAP_DUR),
     man: insideMan(t, s.sunk), other: insideOther(t, s.sunk),
     ax: lerp(s.ax0, SHORE_AX, k) + ROW_DX * row, wl: lerp(WL, HY, k) + ROW_DY * row, cast: span(t, IN.cast, IN.castDur),
   };
@@ -3958,19 +3972,20 @@ const insideSwap = () => (G.inside ? G.inside.swap : 0);
 // writes straight into IDX after the zoom, with its reflection mirrored about its own waterline row and
 // shifted by the zoomed ripple (the one reflection drawn by hand: the sky buffer it would come from is zoomed).
 const sxW = x => (x - VIEW.x0) * VIEW.z, syW = y => (y - VIEW.y0) * VIEW.z;
-let HYS = HY;
+let HYS = HY, GR = 1; // the screen waterline row; the foreground's grain (its pixel size, rounded)
 function putS(x, y, v) { if (x >= 0 && x < W && y >= 0 && y < H) IDX[y * W + x] = v; }
 const ripS = y => Math.round(RIPX[clamp((VIEW.y0 + y / VIEW.z) | 0, 0, H - 1)] * VIEW.z);
 function putR(x, y, v, wl) {
   if (y >= wl) return; // masked by the surface
   putS(x, y, v);
   const yr = 2 * wl - 1 - y;
-  if (yr >= HYS && yr < H && ((yr - wl) & 3) !== 2) putS(x + ripS(yr), yr, reflS(v));
+  if (yr >= HYS && yr < H && (((yr - wl) / GR | 0) & 3) !== 2) putS(x + ripS(yr), yr, reflS(v));
 }
-// Paler than the thing and broken every fourth row, so a dark figure on the bright shore water reads once.
+// Paler than the thing and broken every fourth row (of its own grain), so a dark figure on the bright shore
+// water reads once.
 const reflS = v => (v >= 12 ? v : ci(v + 3));
-// sc below 1 shrinks by nearest cells (the close cabin while the zoom is still short of PUSH_Z); a, the
-// cross-fade, dithers on screen cells.
+// sc scales by nearest cells (below 1 the close cabin just after the hand-over, above 1 the foreground coming
+// closer, exactly FG_A at the end of the push); a, the cross-fade, dithers on screen cells.
 function stampS(s, x0, y0, wl, a = 1, flip = false, sc = 1) {
   const w = Math.round(s.w * sc), h = Math.round(s.h * sc);
   for (let j = 0; j < h; j++) {
@@ -3992,12 +4007,16 @@ function lineS(x, y) {
 function drawInsideClose(t) {
   const I = G.inside;
   HYS = Math.round(syW(HY));
+  GR = Math.max(1, Math.round(I.a));
   if (I.live) drawLiveShifted(t, I);
   drawCloseCabin(I);
   if (!I.live && I.boat) drawCloseBoat(I);
-  drawWalker(I.other, WALK_OTHER);
-  drawWalker(I.man, WALK_MAN);
-  for (const a of ASH) putS(Math.round(a.x), Math.round(a.y), 10); // the ash falls in front of it all, crisp
+  drawWalker(I.other, WALK_OTHER, I.a);
+  drawWalker(I.man, WALK_MAN, I.a);
+  for (const a of ASH) { // the ash falls in front of it all, crisp, in the foreground's grain
+    const x = Math.round(a.x), y = Math.round(a.y);
+    for (let j = 0; j < GR; j++) for (let i = 0; i < GR; i++) putS(x + i, y + j, 10);
+  }
 }
 // Before the ladder the live group is drawn as always and moved, not scaled, to where the mapping puts it.
 function drawLiveShifted(t, I) {
@@ -4015,28 +4034,33 @@ function drawLiveShifted(t, I) {
 const closeCabin = () => WS.door > 0.5 ? CLOSE_OPEN : WS.cabinLit < 0.5 || WS.cabinKnock > 0.5 ? CLOSE_DARK : CLOSE_CABIN;
 function drawCloseCabin(I) {
   if (I.swap <= 0 || WS.cabin <= 0) return;
-  const s = closeCabin(), sc = Math.min(1, VIEW.z / PUSH_Z);
+  const s = closeCabin(), sc = VIEW.z * cabWs(I.k);
   stampS(s, Math.round(sxW(CAB_AX) - s.w * sc / 2), Math.round(syW(CAB_BY) - s.h * sc), HYS, I.swap, false, sc);
 }
+// The close cabin's window in world coordinates at the current push (the glow follows the cabin as it grows).
+const insideWin = () => cabW(WIN_PX.x, WIN_PX.y, cabWs(G.inside.k));
 function ladderAt(ss) {
   let best = 0;
   for (let i = 1; i < INSIDE_SS.length; i++) if (Math.abs(INSIDE_SS[i] - ss) < Math.abs(INSIDE_SS[best] - ss)) best = i;
   return best;
 }
 function drawCloseBoat(I) {
-  const f = I.boat !== 'man' ? IN_EMPTY : (I.sunk ? IN_SWIM : IN_BOAT)[ladderAt(I.ss)];
-  const wl = Math.round(syW(I.wl)), x0 = Math.round(sxW(I.ax)) - f.ax, y0 = wl - f.wl;
+  const f = I.boat !== 'man' ? IN_EMPTY : (I.sunk ? IN_SWIM : IN_BOAT)[ladderAt(I.ss)], a = I.a;
+  const wl = Math.round(syW(I.wl)), x0 = Math.round(sxW(I.ax) - f.ax * a), y0 = wl - Math.round(f.wl * a);
   G.tip = null;
-  stampS(f, x0, y0, wl);
-  if (I.boat === 'other') drawOtherSeated(x0 + f.ax + Math.floor((18 - BOAT.w / 2) * SS_END), wl - Math.round(6 * SS_END), wl, I.cast);
+  stampS(f, x0, y0, wl, 1, false, a);
+  if (I.boat === 'other') drawOtherSeated(x0 + Math.round((f.ax + Math.floor((18 - BOAT.w / 2) * SS_END)) * a), wl - Math.round(6 * SS_END * a), wl, I.cast, a);
 }
 // Whoever was inside, in the stern seat with the rod out at rest, and the cast: a thin arc from the rod tip
 // out onto the water, then the line settling with the float on it.
-function drawOtherSeated(x, bottom, wl, q) {
-  const s = OTHER_SEAT, y0 = bottom - s.h + 1;
-  stampS(s, x, y0, wl);
-  const hx = x + 1, hy = y0 + 6, L = ROD_LEN * SS_END, cx = Math.cos(REST_A), cy = Math.sin(REST_A);
-  for (let k = 0; k <= L * 2; k++) putR(Math.round(hx + cx * k / 2), Math.round(hy + cy * k / 2), 0, wl);
+function drawOtherSeated(x, bottom, wl, q, a) {
+  const s = OTHER_SEAT, y0 = bottom - Math.round(s.h * a) + 1;
+  stampS(s, x, y0, wl, 1, false, a);
+  const hx = x + a, hy = y0 + 6 * a, L = ROD_LEN * SS_END * a, cx = Math.cos(REST_A), cy = Math.sin(REST_A);
+  for (let k = 0; k <= L * 2; k++) { // the rod, as thick as the grain
+    const rx = Math.round(hx + cx * k / 2), ry = Math.round(hy + cy * k / 2);
+    for (let j = 0; j < GR; j++) for (let i = 0; i < GR; i++) putR(rx + i, ry + j, 0, wl);
+  }
   if (q > 0) drawInsideCast(Math.round(hx + cx * L), Math.round(hy + cy * L), q);
 }
 const bez = (a, c, b, u) => (1 - u) * (1 - u) * a + 2 * (1 - u) * u * c + u * u * b;
@@ -4045,31 +4069,128 @@ function drawInsideCast(tx, ty, q) {
   const lx = tx + CAST_SX, ly = HYS + CAST_SY, cx = (tx + lx) / 2;
   const cy = q < 1 ? Math.min(ty, ly) - CAST_ARC : (ty + ly) / 2 + 3, m = Math.round(60 * q);
   for (let k = 0; k <= m; k++) lineS(bez(tx, cx, lx, k / 60), bez(ty, cy, ly, k / 60));
-  if (q >= 1) { putS(lx, ly, 12); putS(lx + 1, ly, 12); }
+  if (q >= 1) for (let j = 0; j < GR; j++) for (let i = 0; i < 2 * GR; i++) putS(lx + i, ly + j, 12); // the float
   INSIDE_LAND = { x: VIEW.x0 + lx / VIEW.z, y: VIEW.y0 + ly / VIEW.z };
 }
-function drawWalker(p, set) {
+function drawWalker(p, set, a) {
   if (!p) return;
   const s = set[p.flip ? 1 : 0][p.f], fx = Math.round(sxW(p.x)), fy = Math.round(syW(p.y));
-  stampS(s, fx - (s.w >> 1), fy - s.h + 1, HYS, 1, p.flip);
+  stampS(s, fx - Math.round(s.w * a / 2), fy - Math.round(s.h * a) + 1, HYS, 1, p.flip, a);
 }
-// The push-in: the background (everything composed so far) resampled from a shrinking rectangle (nearest
-// neighbour, one pass); VIEW maps the foreground and the glows, which come after, into it.
+// The push-in: the background (everything composed so far) is flattened (flatView) and resampled from a
+// shrinking rectangle (nearest neighbour); VIEW maps the foreground and the glows, which come after, into it.
+// The flattening dissolves in from FLAT_FROM of the push over FLAT_IN, while the zoom is still small (before
+// it the dither is at its own size and nothing is flattened, which also spares the pass over the whole frame).
 const VIEW = { z: 1, x0: 0, y0: 0 };
-let ZBUF = null, ZXS = null;
+const FLAT_FROM = 0.1, FLAT_IN = 0.2; // the dissolve, in push
+let ZBUF = null, ZFLAT = null, ZXS = null;
 function pushView() {
   const k = WS.push;
   if (k <= 0) { VIEW.z = 1; VIEW.x0 = 0; VIEW.y0 = 0; return; }
   const z = lerp(1, PUSH_Z, k), w = W / z, h = H / z;
+  const cx = DOOR_G.x + (0.5 - IN_FRAME.x) * W / PUSH_Z, cy = DOOR_G.y + (0.5 - IN_FRAME.y) * H / PUSH_Z;
   VIEW.z = z;
-  VIEW.x0 = clamp(lerp(W / 2, IN_CAM.x, k) - w / 2, 0, W - w);
-  VIEW.y0 = clamp(lerp(H / 2, IN_CAM.y, k) - h / 2, 0, H - h);
-  if (!ZBUF || ZBUF.length !== IDX.length) { ZBUF = new Uint8Array(IDX.length); ZXS = new Int32Array(W); }
+  VIEW.x0 = clamp(lerp(W / 2, cx, k) - w / 2, 0, W - w);
+  VIEW.y0 = clamp(lerp(H / 2, cy, k) - h / 2, 0, H - h);
+  if (!ZBUF || ZBUF.length !== IDX.length) {
+    ZBUF = new Uint8Array(IDX.length); ZFLAT = new Uint8Array(IDX.length); ZXS = new Int32Array(W);
+  }
   ZBUF.set(IDX);
+  const f = (k - FLAT_FROM) / FLAT_IN;
+  const xa = VIEW.x0 | 0, xb = Math.min(W - 1, Math.ceil(VIEW.x0 + w)), ya = VIEW.y0 | 0, yb = Math.min(H - 1, Math.ceil(VIEW.y0 + h));
+  if (f > 0) flatView(xa, xb, ya, yb);
   for (let x = 0; x < W; x++) ZXS[x] = Math.min(W - 1, (VIEW.x0 + x / z) | 0);
   for (let y = 0; y < H; y++) {
-    const r = Math.min(H - 1, (VIEW.y0 + y / z) | 0) * W, o = y * W;
-    for (let x = 0; x < W; x++) IDX[o + x] = ZBUF[r + ZXS[x]];
+    const r = Math.min(H - 1, (VIEW.y0 + y / z) | 0) * W, o = y * W, b = (y & 3) << 2;
+    if (f >= 1) for (let x = 0; x < W; x++) IDX[o + x] = ZFLAT[r + ZXS[x]];
+    else for (let x = 0; x < W; x++) IDX[o + x] = (BAYER[b | (x & 3)] < f ? ZFLAT : ZBUF)[r + ZXS[x]];
+  }
+}
+// The out-of-focus backdrop, one pass over the source rectangle into ZFLAT. Each pixel looks at the ramp
+// pixels (0 to 11) of its 4 by 4 neighbourhood (one whole Bayer tile, so any dither level is counted
+// exactly), from running sums kept per column and slid along the row: their mean M and variance. Where the
+// variance is low (at most FLAT_VAR: a dithered mix of neighbouring tones, or a flat area) the pixel takes M,
+// rounded, so a mix turns into solid bands that change where it passes one half, the same for every pixel of
+// it. Where it is high there is an edge or a line (a ridge, the eye's line, the pupil) and the pixel stays,
+// unless it is a lone speck (no side neighbour shares its index: a sparkle, a stray dot). An accent (12 and
+// up) stays where a side neighbour is an accent too, so shapes (the sky fish, outline and all) stay whole and
+// a dithered reflection or a sparkle, whose pixels touch only at corners, melts into the tone round it.
+const FLAT_VAR = 1;
+let FLAT_CS = null, FLAT_CQ = null, FLAT_CN = null;
+// By an edge (a high variance), the window is read again, keeping only the pixels within two steps of this
+// one (its side of the edge): their mean, then the mean of those within FLAT_FAM of it, rounded; the pixel
+// takes it if it is within a step, so a dithered band running up to a ridge or the eye's line is as solid as
+// it is in the open, and the line itself stays. FAM_N is how many pixels were on its side.
+const FLAT_FAM = 1.5, FLAT_LONE = 3;
+let FAM_N = 0;
+function family(B, x, y, v) {
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0; // how many of the window are v - 2 .. v + 2
+  const x0 = x > 0 ? x - 1 : 0, x1 = x < W - 2 ? x + 2 : W - 1, y0 = y > 0 ? y - 1 : 0, y1 = y < H - 2 ? y + 2 : H - 1;
+  for (let j = y0; j <= y1; j++) {
+    const r = j * W;
+    for (let i = x0; i <= x1; i++) {
+      const d = B[r + i] - v;
+      if (d === 0) b2++; else if (d === 1) b3++; else if (d === -1) b1++; else if (d === 2) b4++; else if (d === -2) b0++;
+    }
+  }
+  if (v + 1 > 11) b3 = 0; // never an accent
+  if (v + 2 > 11) b4 = 0;
+  const n = b0 + b1 + b2 + b3 + b4;
+  FAM_N = n;
+  const m = v + (2 * (b4 - b0) + b3 - b1) / n;
+  let s2 = 0, n2 = 0;
+  if (Math.abs(v - 2 - m) <= FLAT_FAM) { s2 -= 2 * b0; n2 += b0; }
+  if (Math.abs(v - 1 - m) <= FLAT_FAM) { s2 -= b1; n2 += b1; }
+  if (Math.abs(v - m) <= FLAT_FAM) n2 += b2;
+  if (Math.abs(v + 1 - m) <= FLAT_FAM) { s2 += b3; n2 += b3; }
+  if (Math.abs(v + 2 - m) <= FLAT_FAM) { s2 += 2 * b4; n2 += b4; }
+  const tone = n2 ? v + Math.round(s2 / n2) : v; // s2 is relative to v
+  return Math.abs(tone - v) <= 1 ? tone : v;
+}
+function lone(p, x, y) { // the rounded mean of a pixel's ramp side neighbours (itself if it has none)
+  let s = 0, n = 0;
+  const add = u => { if (u < 12) { s += u; n++; } };
+  if (x > 0) add(ZBUF[p - 1]);
+  if (x < W - 1) add(ZBUF[p + 1]);
+  if (y > 0) add(ZBUF[p - W]);
+  if (y < H - 1) add(ZBUF[p + W]);
+  return n ? Math.round(s / n) : ZBUF[p];
+}
+function flatView(xa, xb, ya, yb) {
+  const B = ZBUF;
+  if (!FLAT_CS || FLAT_CS.length !== W) { FLAT_CS = new Int32Array(W); FLAT_CQ = new Int32Array(W); FLAT_CN = new Int32Array(W); }
+  const cs = FLAT_CS, cq = FLAT_CQ, cn = FLAT_CN, xl = Math.max(0, xa - 1), xr = Math.min(W - 1, xb + 2);
+  const colAdd = (r, d) => { // one row of the columns comes in (d 1) or leaves (d -1)
+    for (let x = xl; x <= xr; x++) { const u = B[r + x]; if (u < 12) { cs[x] += d * u; cq[x] += d * u * u; cn[x] += d; } }
+  };
+  cs.fill(0); cq.fill(0); cn.fill(0);
+  for (let j = -1; j <= 2; j++) colAdd(clamp(ya + j, 0, H - 1) * W, 1);
+  for (let y = ya; y <= yb; y++) {
+    if (y > ya) { colAdd(clamp(y - 2, 0, H - 1) * W, -1); colAdd(Math.min(H - 1, y + 2) * W, 1); }
+    const r1 = y * W, up = y > 0 ? -W : 0, dn = y < H - 1 ? W : 0;
+    let s = 0, q = 0, n = 0;
+    for (let x = xa - 2; x < xa + 2; x++) if (x >= 0) { s += cs[x]; q += cq[x]; n += cn[x]; } // the first step drops xa - 2 (never summed: 0)
+    for (let x = xa; x <= xb; x++) {
+      const o = x - 2, i = x + 2;
+      if (o >= 0) { s -= cs[o]; q -= cq[o]; n -= cn[o]; }
+      if (i < W) { s += cs[i]; q += cq[i]; n += cn[i]; }
+      const p = r1 + x, v = B[p];
+      let out = v;
+      if (n > 0) {
+        const m = s / n;
+        if (v < 12 && q / n - m * m <= FLAT_VAR) out = Math.round(m);
+        else if (v >= 12) { // an accent stays if a side neighbour is one too (its shape), and melts if it is alone
+          if (!((x > 0 && B[p - 1] >= 12) || (x < W - 1 && B[p + 1] >= 12) || (up !== 0 && B[p + up] >= 12) || (dn !== 0 && B[p + dn] >= 12))) out = Math.round(m);
+        } else {
+          const sides = (x > 0 && B[p - 1] === v) + (x < W - 1 && B[p + 1] === v) + (up !== 0 && B[p + up] === v) + (dn !== 0 && B[p + dn] === v);
+          if (sides < 2) { // by an edge, a dithered or lone pixel (one inside a patch or along a line stays)
+            out = family(B, x, y, v); // the tone of its own side of the edge
+            if (sides === 0 && FAM_N < FLAT_LONE) out = lone(p, x, y); // a lone speck there (a sparkle): the tone round it
+          }
+        }
+      }
+      ZFLAT[p] = out;
+    }
   }
 }
 function insideKnock(v) { SFX.knock(v); WS.cabinKnock = 1; tween(WS, 'cabinKnock', 0, KNOCK_BLINK, E.lin); }
