@@ -2695,7 +2695,9 @@ function glowTint(cx, cy, r, acc, str) {
     k = k * k * str;
     k = Math.floor(k * 5 + (VIEW.z !== 1 ? 0.5 : BAYER[((y & 3) << 2) | (x & 3)])) / 5; // Inside: solid rings, like the backdrop
     if (k <= 0) continue;
-    const i = y * W + x, p = OUT32[i];
+    const i = y * W + x;
+    if (G.inside && FIGM[i]) continue; // Inside: the walkers stay silhouettes
+    const p = OUT32[i];
     const pr = p & 255, pg = (p >>> 8) & 255, pb = (p >>> 16) & 255;
     const nr = Math.min(255, pr + (cr - pr) * k * 0.55 + cr * k * 0.3) | 0;
     const ng = Math.min(255, pg + (cg - pg) * k * 0.55 + cg * k * 0.3) | 0;
@@ -3893,6 +3895,10 @@ function endInside() {
   dlgRun([red('Of course. They’ve been waiting to get out.')], () => playCine(CINE_INSIDE, () => showEnding('inside')));
 }
 const INSIDE_LOOK = -7;              // pupilDx toward the cabin, left of the disc
+// The released sky fish fades out as the eye turns to the cabin, while the push is still small (its dither at
+// its own size, before the backdrop flattens): enlarged it would land on the boat and read as a kept fish in
+// it, and fight the door for the eye.
+const SKY_FISH_AT = 0.5, SKY_FISH_FADE = 1;
 // Phase 31: only the background zooms (sky, clouds, mountains, water, the eye: pushView after the composite);
 // the cabin, the boat and the two people are drawn after it crisply (drawInsideClose), placed by the same
 // mapping, screen = (world - VIEW origin) * zoom, never resampled with the background.
@@ -3906,7 +3912,8 @@ const SS_END = INSIDE_SS[INSIDE_SS.length - 1];
 const LIVE_K = 1 / 8;                // the live group drifts until the push reaches this, then the crisp ladder takes over
 // The foreground's pixel size: 1 while the live group drifts, then up to FG_A by the end of the push.
 const artA = k => lerp(1, FG_A, clamp((k - LIVE_K) / (1 - LIVE_K), 0, 1));
-const SWAP_K = 0.25, SWAP_DUR = 0.3; // the small cabin hands over to the close one as the push passes SWAP_K
+const SWAP_K = 0.25; // the small cabin hands over to the close one as the push passes SWAP_K, in one frame (a dithered
+// cross-fade of the two read as speckle, the enlarged-dither look the backdrop filter removes)
 const CAB_AX = CABIN_X + CABIN_ROWS[0].length / 2, CAB_BY = CABIN_Y + CABIN_ROWS.length; // both cabins' foot, bottom centre
 // The close cabin in world pixels per sprite pixel: the small cabin's own size (a third) until the hand-over,
 // then growing about its foot to FG_A / PUSH_Z (three times the small cabin) by the end of the push.
@@ -3919,16 +3926,18 @@ const DOOR_G = cabW(21, 17.5), DOOR_GLOW = 13, WIN_PX = { x: 8.5, y: 15.5 }, WIN
 // the middle, so the walk from the boat to the door fills the frame's width and the eye stays above it.
 const IN_FRAME = { x: 1 / 3, y: 0.56 };
 const IN = {
-  drift: 0.2, driftDur: 5, knockGap: 1.4, walk: 5.3, walkDur: 2.8, step: 0.5, open: 8.4, appear: 8.8, out: 9.3, outDur: 0.8,
-  enter: 9.7, enterDur: 0.45, close: 10.5, down: 10.7, downDur: 1.4, row: 12.2, rowDur: 0.9, cast: 13.2,
+  drift: 0.2, driftDur: 5, knockGap: 1.4, walk: 5.3, walkDur: 2.8, step: 0.5, open: 8.4, appear: 8.8, out: 9.6, outDur: 0.8,
+  enter: 9.95, enterDur: 0.45, close: 10.6, down: 10.8, downDur: 1.4, row: 12.2, rowDur: 0.9, cast: 13.2,
   castDur: 0.5, under: 11.9, underDur: 1.4, knocks: [14.1, 14.55, 15], fade: 16.5, dur: 17.6,
 };
 const ioInv = k => (k < 0.5 ? Math.sqrt(k / 2) : 1 - Math.sqrt(2 * (1 - k)) / 2); // E.io inverted
 const SWAP_T = IN.drift + IN.driftDur * ioInv(SWAP_K);
 // The walkers' feet, in world coordinates: at the boat's seat (or, sunk, in the water where he swam), on the
-// bank beside the boat's bow, beside the door, in the doorway, past it, and (sunk) under the water.
+// bank beside the boat's bow, beside the door, in the doorway, past it, and (sunk) under the water. He waits
+// just past the cabin's right corner, on the glare (against the log wall a dark figure is lost), and the other
+// passes him in front, a step lower, on the way down to the bank.
 const W_SEAT = { x: SHORE_AX - 14, y: HY - 4 }, W_SWIM = { x: SHORE_AX - 10, y: HY + 6 }, W_SHORE = { x: SHORE_AX - 25, y: HY - 1 };
-const W_SIDE = cabW(29, 24), W_DOOR = cabW(21, 23), W_PASS = cabW(33, 24), W_UNDER = { x: SHORE_AX - 17, y: HY + 16 };
+const W_SIDE = cabW(33.5, 24), W_DOOR = cabW(21, 23), W_PASS = cabW(37.5, 25), W_UNDER = { x: SHORE_AX - 17, y: HY + 16 };
 const ROW_DX = 4, ROW_DY = 3, CAST_SX = -56, CAST_SY = 26, CAST_ARC = 22; // rowing out (world); the cast (screen)
 const span = (t, a, d) => clamp((t - a) / d, 0, 1);
 function walkPose(p, a, b, t) {
@@ -3961,7 +3970,7 @@ function insidePose(t, s) {
   let boat = 'man';
   if (t >= IN.walk) boat = s.sunk ? null : t < IN.down + IN.downDur ? 'empty' : 'other';
   return {
-    sunk: s.sunk, k, a: artA(k), live: k < LIVE_K, ss: lerp(1, SS_END, k), boat, swap: span(t, SWAP_T - SWAP_DUR / 2, SWAP_DUR),
+    sunk: s.sunk, k, a: artA(k), live: k < LIVE_K, ss: lerp(1, SS_END, k), boat, swap: t >= SWAP_T ? 1 : 0,
     man: insideMan(t, s.sunk), other: insideOther(t, s.sunk),
     ax: lerp(s.ax0, SHORE_AX, k) + ROW_DX * row, wl: lerp(WL, HY, k) + ROW_DY * row, cast: span(t, IN.cast, IN.castDur),
   };
@@ -3978,6 +3987,7 @@ const ripS = y => Math.round(RIPX[clamp((VIEW.y0 + y / VIEW.z) | 0, 0, H - 1)] *
 function putR(x, y, v, wl) {
   if (y >= wl) return; // masked by the surface
   putS(x, y, v);
+  if (FIG_ON && x >= 0 && x < W && y >= 0 && y < H) FIGM[y * W + x] = 1;
   const yr = 2 * wl - 1 - y;
   if (yr >= HYS && yr < H && (((yr - wl) / GR | 0) & 3) !== 2) putS(x + ripS(yr), yr, reflS(v));
 }
@@ -3988,12 +3998,34 @@ const reflS = v => (v >= 12 ? v : ci(v + 3));
 // closer, exactly FG_A at the end of the push); a, the cross-fade, dithers on screen cells.
 function stampS(s, x0, y0, wl, a = 1, flip = false, sc = 1) {
   const w = Math.round(s.w * sc), h = Math.round(s.h * sc);
+  if (sc < 1) { stampDown(s, x0, y0, wl, flip, sc, w, h); return; }
   for (let j = 0; j < h; j++) {
     const y = y0 + j, sj = Math.min(s.h - 1, (j / sc) | 0) * s.w;
     for (let i = 0; i < w; i++) {
       const si = Math.min(s.w - 1, (i / sc) | 0), v = s.data[sj + (flip ? s.w - 1 - si : si)];
       if (v === 255 || (a < 1 && BAYER[((y & 3) << 2) | ((x0 + i) & 3)] >= a)) continue;
       putR(x0 + i, y, v, wl);
+    }
+  }
+}
+// Shrunk (the close cabin just after the hand-over): each screen cell takes the commonest index of the
+// sprite pixels it covers (the darker on a tie, an accent counted thrice), and is solid if any of them is, so the outline and the roof's
+// edge never drop out of a column or row the way a nearest sample drops them (it read as speckle).
+const DOWN_N = new Uint8Array(256);
+function stampDown(s, x0, y0, wl, flip, sc, w, h) {
+  for (let j = 0; j < h; j++) {
+    const ja = Math.floor(j / sc), jb = Math.min(s.h, Math.max(ja + 1, Math.floor((j + 1) / sc)));
+    for (let i = 0; i < w; i++) {
+      const ia = Math.floor(i / sc), ib = Math.min(s.w, Math.max(ia + 1, Math.floor((i + 1) / sc)));
+      let best = 255, bn = 0;
+      for (let y = ja; y < jb; y++) for (let x = ia; x < ib; x++) {
+        const v = s.data[y * s.w + (flip ? s.w - 1 - x : x)];
+        if (v === 255) continue;
+        const n = DOWN_N[v] += v >= 12 ? 3 : 1; // an accent (the lit window) outweighs the logs round it
+        if (n > bn || (n === bn && v < best)) { best = v; bn = n; }
+      }
+      for (let y = ja; y < jb; y++) for (let x = ia; x < ib; x++) DOWN_N[s.data[y * s.w + (flip ? s.w - 1 - x : x)]] = 0;
+      if (best !== 255) putR(x0 + i, y0 + j, best, wl);
     }
   }
 }
@@ -4008,11 +4040,14 @@ function drawInsideClose(t) {
   const I = G.inside;
   HYS = Math.round(syW(HY));
   GR = Math.max(1, Math.round(I.a));
+  if (FIGM.length !== W * H) FIGM = new Uint8Array(W * H);
   if (I.live) drawLiveShifted(t, I);
   drawCloseCabin(I);
   if (!I.live && I.boat) drawCloseBoat(I);
-  drawWalker(I.other, WALK_OTHER, I.a);
-  drawWalker(I.man, WALK_MAN, I.a);
+  FIGM.fill(0);
+  const pair = [[I.other, WALK_OTHER], [I.man, WALK_MAN]]; // the nearer (lower) one in front: the other passes him in front
+  if (I.man && I.other && I.other.y > I.man.y) pair.reverse();
+  for (const [p, set] of pair) drawWalker(p, set, I.a);
   for (const a of ASH) { // the ash falls in front of it all, crisp, in the foreground's grain
     const x = Math.round(a.x), y = Math.round(a.y);
     for (let j = 0; j < GR; j++) for (let i = 0; i < GR; i++) putS(x + i, y + j, 10);
@@ -4072,10 +4107,15 @@ function drawInsideCast(tx, ty, q) {
   if (q >= 1) for (let j = 0; j < GR; j++) for (let i = 0; i < 2 * GR; i++) putS(lx + i, ly + j, 12); // the float
   INSIDE_LAND = { x: VIEW.x0 + lx / VIEW.z, y: VIEW.y0 + ly / VIEW.z };
 }
+// The walkers are silhouettes against the light: their pixels go into FIGM, which the glows skip, so the
+// open doorway's light never washes a figure in it (or beside it) into a see-through ghost.
+let FIGM = new Uint8Array(0), FIG_ON = false;
 function drawWalker(p, set, a) {
   if (!p) return;
   const s = set[p.flip ? 1 : 0][p.f], fx = Math.round(sxW(p.x)), fy = Math.round(syW(p.y));
+  FIG_ON = true;
   stampS(s, fx - Math.round(s.w * a / 2), fy - Math.round(s.h * a) + 1, HYS, 1, p.flip, a);
+  FIG_ON = false;
 }
 // The push-in: the background (everything composed so far) is flattened (flatView) and resampled from a
 // shrinking rectangle (nearest neighbour); VIEW maps the foreground and the glows, which come after, into it.
@@ -4207,6 +4247,7 @@ const CINE_INSIDE = {
     if (I.live) WS.boatX = s.bx0 + I.ax - s.ax0; // the live group drifts first, then the ladder takes over
     if (t >= s.nextKnock && t < IN.walk + IN.walkDur - 0.3) { s.nextKnock += IN.knockGap; insideKnock(0.4); }
     if (s.sunk && t >= s.ring && t < IN.drift + IN.driftDur) { s.ring += 0.8; ring(I.ax, I.wl + 1, false, 0.6, true); }
+    at('skyFish', SKY_FISH_AT, () => goldFishFade(SKY_FISH_FADE)); // the released sky fish leaves the frame to the door
     at('open', IN.open, () => { WS.door = 1; SFX.creak(0.6); });
     at('close', IN.close, () => { WS.door = 0; SFX.knock(0.7); G.hbGap = 1e9; });
     at('row', IN.row, () => { if (!s.sunk) SFX.row(); });
