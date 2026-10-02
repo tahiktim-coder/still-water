@@ -4943,60 +4943,70 @@ function nbsp(t) {
   if (LANG !== 'ru' || !t) return t;
   return t.replace(NB_ONE, '$1$2 ').replace(NB_ONE, '$1$2 ').replace(/ —/g, ' —').replace(NB_TAIL, ' $1');
 }
-// The title's pixel lettering (chosen in a logo lab: 'soft'). Hand-made letters drawn as SVG rects, one glyph
-// pixel to one game pixel, so set on a whole game-pixel column and row (placeLogo) the name sits on the
-// canvas's own grid; it recolours with the mood through the UI's CSS variables: the letters in the ink, a
-// one-pixel ring round them in --ui-edge (the ramp's middle index), which all but vanishes on the sky and holds
-// the letters over a bright cloud. Each glyph is a one-pixel skeleton set a column heavier, so the stems are two
-// game pixels and the bars one. Rows: 0 the cap top, 4 the x-height, 11 the baseline, 12 to 14 the descender;
-// each glyph is [its first row, its rows]. Enough glyphs for 'Still Water' and 'Тихий омут'.
+// The title's pixel lettering (chosen in a logo lab: 'soft', redrawn larger). Hand-made letters drawn as SVG
+// rects, one glyph pixel to one game pixel, so set on a whole game-pixel column and row (placeLogo) the name
+// sits on the canvas's own grid; it recolours with the mood through the UI's CSS variables: the letters in the
+// ink, a one-pixel ring in --ui-edge (the ramp's middle index) on their upper and left sides, and a one-pixel
+// hard drop in the darkest index under and right of every lit pixel, so the name holds over a lit cloud. Each
+// glyph is a one-pixel skeleton set a column heavier, so the stems are two game pixels and the bars one. Rows:
+// 0 the cap top (a cap height of 17), 6 the x-height, 16 the baseline, 17 to 21 the descender; each glyph is
+// [its first row, its rows]. Enough glyphs for 'Still Water' and 'Тихий омут'.
 const LOGO_GLYPHS = {
-  S: [0, ['.#####.', '#.....#', '#......', '#......', '.#.....', '..###..', '.....#.', '......#', '......#', '......#', '#.....#', '.#####.']],
-  W: [0, ['#.......#', '#.......#', '#.......#', '#.......#', '#...#...#', '#...#...#', '#...#...#', '#...#...#', '#...#...#', '#...#...#', '#...#...#', '.###.###.']],
-  t: [1, ['.#..', '.#..', '.#..', '####', '.#..', '.#..', '.#..', '.#..', '.#..', '.#..', '..##']],
-  i: [1, ['.#.', '.#.', '...', '##.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '..#']],
-  l: [0, ['##.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '..#']],
-  a: [4, ['.####.', '.....#', '.....#', '.#####', '#....#', '#....#', '#...##', '.###.#']],
-  e: [4, ['.####.', '#....#', '#....#', '######', '#.....', '#.....', '#.....', '.####.']],
-  r: [4, ['#..##', '#.#..', '##...', '#....', '#....', '#....', '#....', '#....']],
-  'Т': [0, ['#######', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...']],
-  'и': [4, ['#....#', '#....#', '#...##', '#..#.#', '#.#..#', '##...#', '#....#', '#....#']],
-  'й': [1, ['.#..#.', '..##..', '......', '#....#', '#....#', '#...##', '#..#.#', '#.#..#', '##...#', '#....#', '#....#']],
-  'х': [4, ['#....#', '#....#', '.#..#.', '..##..', '..##..', '.#..#.', '#....#', '#....#']],
-  'о': [4, ['.####.', '#....#', '#....#', '#....#', '#....#', '#....#', '#....#', '.####.']],
-  'м': [4, ['#.....#', '##...##', '#.#.#.#', '#..#..#', '#.....#', '#.....#', '#.....#', '#.....#']],
-  'у': [4, ['#....#', '#....#', '#....#', '#....#', '#....#', '#....#', '#...##', '.###.#', '.....#', '.....#', '.####.']],
-  'т': [4, ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..']],
+  S: [0, ['..######.', '.#......#', '#.......#', '#........', '#........', '#........', '.#.......', '..##.....', '....####.', '........#', '.........#', '.........#', '.........#', '.........#', '#........#', '#.......#.', '.#######..']],
+  W: [0, ['#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '.####.####.']],
+  t: [2, ['.#....', '.#....', '.#....', '.#....', '#####.', '.#....', '.#....', '.#....', '.#....', '.#....', '.#....', '.#....', '.#....', '..#...', '...##.']],
+  i: [2, ['.#.', '.#.', '...', '...', '##.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '..#']],
+  l: [0, ['##.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '..#']],
+  a: [6, ['.######.', '.......#', '.......#', '.......#', '.#######', '#......#', '#......#', '#......#', '#......#', '#.....##', '.#####.#']],
+  e: [6, ['.######.', '#......#', '#......#', '#......#', '########', '#.......', '#.......', '#.......', '#.......', '#......#', '.######.']],
+  r: [6, ['#...###', '#..#...', '#.#....', '##.....', '#......', '#......', '#......', '#......', '#......', '#......', '#......']],
+  'Т': [0, ['###########', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....', '.....#.....']],
+  'и': [6, ['#......#', '#......#', '#......#', '#.....##', '#....#.#', '#...#..#', '#..#...#', '#.#....#', '##.....#', '#......#', '#......#']],
+  'й': [1, ['.#....#.', '..####..', '........', '........', '........', '#......#', '#......#', '#......#', '#.....##', '#....#.#', '#...#..#', '#..#...#', '#.#....#', '##.....#', '#......#', '#......#']],
+  'х': [6, ['#.....#', '#.....#', '.#...#.', '.#...#.', '..#.#..', '...#...', '..#.#..', '.#...#.', '.#...#.', '#.....#', '#.....#']],
+  'о': [6, ['.######.', '#......#', '#......#', '#......#', '#......#', '#......#', '#......#', '#......#', '#......#', '#......#', '.######.']],
+  'м': [6, ['#.......#', '##.....##', '#.#...#.#', '#..#.#..#', '#...#...#', '#.......#', '#.......#', '#.......#', '#.......#', '#.......#', '#.......#']],
+  'у': [6, ['#......#', '#......#', '#......#', '#......#', '#......#', '#......#', '#......#', '#......#', '#......#', '#.....##', '.#####.#', '.......#', '.......#', '.......#', '#......#', '.######.']],
+  'т': [6, ['#######', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...']],
 };
-const LOGO_ROWS = 15, LOGO_GAP = 2, LOGO_SPACE = 4, LOGO_ROW = 42; // LOGO_ROW: the cap top, in game rows
-// The name as an SVG string and its size in game pixels (one pixel of padding round the letters for the ring).
+const LOGO_ROWS = 22, LOGO_GAP = 2, LOGO_SPACE = 6, LOGO_ROW = 38; // LOGO_ROW: the cap top, in game rows
+// The name as an SVG string and its size in game pixels (one pixel of padding round the letters for the ring
+// and the drop).
 function logoSVG(text) {
-  const on = new Set();
+  const on = new Set(), key = (x, y) => x + ',' + y;
   let x = 0;
   for (const ch of text) {
     const g = LOGO_GLYPHS[ch];
     if (!g) { x += ch === ' ' ? LOGO_SPACE : 5 + LOGO_GAP; continue; }
     let w = 0;
     g[1].forEach((row, j) => {
-      for (let i = 0; i < row.length; i++) if (row[i] === '#') { on.add((x + i) + ',' + (g[0] + j)); on.add((x + i + 1) + ',' + (g[0] + j)); }
+      for (let i = 0; i < row.length; i++) if (row[i] === '#') { on.add(key(x + i, g[0] + j)); on.add(key(x + i + 1, g[0] + j)); }
       w = Math.max(w, row.length);
     });
     x += w + 1 + LOGO_GAP;
   }
   const w = Math.max(0, x - LOGO_GAP), W2 = w + 3, H2 = LOGO_ROWS + 2;
-  const ring = new Set();
-  for (const k of on) {
-    const [cx, cy] = k.split(',').map(Number);
-    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) if (!on.has((cx + dx) + ',' + (cy + dy))) ring.add((cx + dx) + ',' + (cy + dy));
-  }
+  // The drop first (under and right of every lit pixel), then the ring in the upper and left cells it left.
+  const drop = new Set(), ring = new Set();
+  const around = (dirs, out, skip) => {
+    for (const k of on) {
+      const [cx, cy] = k.split(',').map(Number);
+      for (const [dx, dy] of dirs) {
+        const n = key(cx + dx, cy + dy);
+        if (!on.has(n) && !(skip && skip.has(n))) out.add(n);
+      }
+    }
+  };
+  around([[1, 0], [0, 1], [1, 1]], drop);
+  around([[0, -1], [-1, 0]], ring, drop);
   // Each row's runs as rects, shifted by the padding.
   const rects = cells => {
     let r = '';
     for (let y = -1; y <= LOGO_ROWS; y++) {
       for (let x0 = -1; x0 <= w + 1; x0++) {
-        if (!cells.has(x0 + ',' + y)) continue;
+        if (!cells.has(key(x0, y))) continue;
         let x1 = x0;
-        while (cells.has((x1 + 1) + ',' + y)) x1++;
+        while (cells.has(key(x1 + 1, y))) x1++;
         r += '<rect x="' + (x0 + 1) + '" y="' + (y + 1) + '" width="' + (x1 - x0 + 1) + '" height="1"/>';
         x0 = x1;
       }
@@ -5005,7 +5015,8 @@ function logoSVG(text) {
   };
   const svg = '<svg viewBox="0 0 ' + W2 + ' ' + H2 + '" shape-rendering="crispEdges" aria-hidden="true" focusable="false"' +
     ' style="width:calc(var(--gp) * ' + W2 + ');height:calc(var(--gp) * ' + H2 + ')">' +
-    '<g style="fill:var(--ui-edge)">' + rects(ring) + '</g><g style="fill:var(--ui-ink)">' + rects(on) + '</g></svg>';
+    '<g style="fill:var(--ui-edge)">' + rects(ring) + '</g><g style="fill:var(--ui-solid)">' + rects(drop) + '</g>' +
+    '<g style="fill:var(--ui-ink)">' + rects(on) + '</g></svg>';
   return { svg, w: W2, h: H2 };
 }
 // The slabs (the quiet slab of the UI lab): a 5 by 5 game-pixel box with its four corner pixels cut, its ring
@@ -5061,20 +5072,28 @@ function makeUI() {
     box.classList.add('cold');
     list.forEach(c => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'choice'; b.textContent = nbsp(c.label);
+      b.type = 'button'; b.className = 'choice';
+      const lb = document.createElement('span'); // the words, whose first line the marker (::before) centres on
+      lb.className = 'lb'; lb.textContent = nbsp(c.label);
+      b.appendChild(lb);
       b.addEventListener('click', ev => { ev.stopPropagation(); b.blur(); if (!ui.choicesCold()) c.cb(); });
       box.appendChild(b);
     });
   };
-  // The choices stay one column of plain rows: the question may scroll to make room for them, and only when
-  // that would leave less than two lines of it in view (a short stage, four or more answers) do they go into
-  // two columns.
+  // The panel never reaches above the waterline (dlgCap). The choices stay one column of plain rows while at
+  // least two lines of the question (or all of a shorter one) stay in view above them; when they would not, the
+  // panel first tightens its padding (#dialog.tight, rows still 44 px), and only then do four or more answers
+  // go into a two by two grid of plates (#choices.grid).
   const fitChoices = () => {
     el.choices.classList.remove('grid');
-    if (el.choices.hidden || !el.choices.classList.contains('many')) return;
+    el.dlg.classList.remove('tight');
+    if (el.choices.hidden) return;
     const lh = parseFloat(getComputedStyle(el.text).lineHeight) || 0;
-    const need = Math.min(el.text.scrollHeight, lh * 2) - 1;
-    if (el.text.clientHeight < need || el.dlg.scrollHeight > el.dlg.clientHeight + 1) el.choices.classList.add('grid');
+    const cramped = () => el.text.clientHeight < Math.min(el.text.scrollHeight, lh * 2) - 1 ||
+      el.dlg.scrollHeight > el.dlg.clientHeight + 1;
+    if (!cramped()) return;
+    el.dlg.classList.add('tight');
+    if (cramped() && el.choices.classList.contains('many')) el.choices.classList.add('grid');
   };
   // The endings found as pips (filled when found) and the short count; the whole sentence is their name.
   const pips = (box, found) => {
@@ -5100,9 +5119,10 @@ function makeUI() {
   };
   // The bubble's place and cloud from the live stage size, all in whole game pixels (gp CSS px each): the
   // width is THINK_GW, widened in steps up to THINK_GW_MAX while the text would take more than THINK_LINES
-  // lines; the height is the measured content's, rounded up, so the cloud always holds its text (and the
-  // companion's two answers); its right edge stays THINK_GUTTER CSS px inside the stage. The cloud is drawn by
-  // thinkMask and thinkRects.
+  // lines; the height is the measured text's, rounded up, so the cloud always holds its text; its right edge
+  // stays THINK_GUTTER CSS px inside the stage. The cloud is drawn by thinkMask and thinkRects. The companion's
+  // two answers sit outside it, on a slab above it in the sky (#thinkChoices), its left edge on the cloud's
+  // and pulled left by whole game pixels if it would pass the same gutter.
   const thinkLayout = side => {
     const a = thinkAnchor(side), gp = el.stage.clientWidth / W;
     const lh = parseFloat(getComputedStyle(el.thinkText).lineHeight) || 0;
@@ -5125,6 +5145,12 @@ function makeUI() {
     svg.style.left = -THINK_PAD * gp + 'px'; svg.style.top = -THINK_PAD * gp + 'px';
     svg.style.width = k.mw * gp + 'px'; svg.style.height = k.mh * gp + 'px';
     svg.innerHTML = thinkRects(k);
+    const ask = el.thinkChoices;
+    ask.style.left = '0px';
+    if (!ask.hidden) {
+      const over = left * gp + ask.getBoundingClientRect().width - (el.stage.clientWidth - THINK_GUTTER);
+      if (over > 0) ask.style.left = -Math.ceil(over / gp) * gp + 'px';
+    }
   };
   // The title's pixel name, in the page's language, on a whole game-pixel column (centred) and row (LOGO_ROW).
   const placeLogo = () => {
@@ -5179,16 +5205,16 @@ function makeUI() {
     cardReady() { el.card.classList.add('ready'); },
     dlgBusy(on) { if (on) el.dlg.setAttribute('aria-busy', 'true'); else el.dlg.removeAttribute('aria-busy'); },
     fitChoices, fitTitles, hugCaption,
-    // The dialogue panel and the catch card never reach the companion: their cap is the stage below his head
-    // (at his seat, or floating once the boat has sunk), less the panel's bottom margin. Set on resize and with
-    // every menu.
+    // The dialogue panel never reaches the waterline (HY), so the boat, the man and the golden fish stay in view
+    // on the shortest stage, nor the companion (at his seat, or floating once the boat has sunk): its cap is the
+    // stage below whichever of the two sits lower, less its bottom margin. Set on resize and with every menu.
     dlgCap() {
-      const top = compY(boatSinkPx()) - 4;
+      const top = Math.max(HY, compY(boatSinkPx()) - 4);
       el.stage.style.setProperty('--dlg-max', 'min(46%, calc(' + ((H - top) / H * 100).toFixed(2) + '% - var(--gp) * 6))');
     },
     inDialog(t) { return !!(t && t.closest && t.closest('#dialog.on')); },
     // The thought bubble (bible, 4b): opts.side 'fisherman' (default) or 'companion', opts.mark the wrong
-    // question mark, opts.choices the answers inside it as rows (the companion's question), opts.more the ▾
+    // question mark, opts.choices the answers on a slab above it (the companion's question), opts.more the ▾
     // marker in the lower right for a bubble that waits for a tap (every bubble does). No bubble has a label.
     think(text, opts) {
       opts = opts || {};
@@ -5301,7 +5327,9 @@ function makeUI() {
       s.setProperty('--ui-pale', mixWhite(11, 0.7)); // the ending's words: the ink's own hue, paler, to read on black
       s.setProperty('--ui-row', mixWhite(10, 0.3)); // a choice at rest, one ramp step above the dim line colour
       s.setProperty('--ui-dim', mixWhite(9, 0.2));
-      s.setProperty('--ui-accent', WS.mood > 1 ? mixWhite(15, 0.45) : rgb(15)); // the ▾ and labels stay visible on the red panel
+      // The speaker labels, the ▾ and the choice markers: the gold, or in the red the blood palette's bright
+      // accent (16) lifted toward white, so they read clearly on the near-black panel.
+      s.setProperty('--ui-accent', WS.mood > 1 ? mixWhite(16, RED_LABEL_LIFT) : rgb(15));
       document.body.style.background = rgb(0);
       // The slabs: the box (index 0 ringed by 1), the raised button (1 ringed by 2), its focus (1 ringed by the
       // ink) and a focused row (1, no ring). Rebuilt only when one of their colours changes.
@@ -5317,7 +5345,7 @@ function makeUI() {
   };
   return ui;
 }
-const CHOICE_GRACE = 0.4, AGAIN_DELAY = 1600;
+const CHOICE_GRACE = 0.4, AGAIN_DELAY = 1600, RED_LABEL_LIFT = 0.15;
 // The template's own text, in the page's language: the tab title, the description, the labels and the title.
 const STATIC_TEXT = [
   ['#stage', 'aria-label', 'Still Water, a short fishing tale'], ['meta[name="description"]', 'content', 'A short fishing tale'],

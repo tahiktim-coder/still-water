@@ -69,11 +69,13 @@ body {
 /* Loose text over the picture (the prompt, 'Tap to begin'): a one-game-pixel outline in the darkest index. */
 .shade { text-shadow: var(--gp) 0 0 var(--ui-solid), calc(var(--gp) * -1) 0 0 var(--ui-solid), 0 var(--gp) 0 var(--ui-solid), 0 calc(var(--gp) * -1) 0 var(--ui-solid),
   0 calc(var(--gp) * 2) 0 var(--ui-solid); }
-/* The pixel markers: a 2 by 3 game-pixel triangle pointing right for a choice, a 5 by 3 one pointing down for
-   'more' (the panel, the bubble and the catch card), drawn with clip-path so no glyph falls back to a system font. */
-.choice::before, #again::before {
-  content: ''; position: absolute; top: 50%; margin-top: calc(var(--gp) * -1.5); width: calc(var(--gp) * 2); height: calc(var(--gp) * 3);
-  clip-path: polygon(0 0, 50% 0, 50% 33.34%, 100% 33.34%, 100% 66.67%, 50% 66.67%, 50% 100%, 0 100%);
+/* The pixel markers, drawn with clip-path so no glyph falls back to a system font: a 3 by 5 game-pixel triangle
+   pointing right in the label colour before every choice (the panel, the companion's slab, Cast again), 3 game
+   pixels before its words and centred on their first line; a 5 by 3 one pointing down for 'more' (the panel,
+   the bubble and the catch card). */
+.choice .lb::before, #again::before {
+  content: ''; position: absolute; width: calc(var(--gp) * 3); height: calc(var(--gp) * 5); background: var(--ui-accent);
+  clip-path: polygon(0 0, 33.34% 0, 33.34% 20%, 66.67% 20%, 66.67% 40%, 100% 40%, 100% 60%, 66.67% 60%, 66.67% 80%, 33.34% 80%, 33.34% 100%, 0 100%);
 }
 .pxmore, #card::after {
   position: absolute; width: calc(var(--gp) * 5); height: calc(var(--gp) * 3); background: var(--ui-accent); opacity: 0;
@@ -145,28 +147,36 @@ body {
 #dialog.narr #text, #dialog.whisper #text { color: var(--ui-dim); }
 #dialog.whisper #text { letter-spacing: 0.04em; }
 #text .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
-#dialog.red #who { color: var(--ui-dim); }
 #dialog.red.on #text { animation: shiver 0.14s steps(2, jump-none) infinite; }
-/* The choices: plain rows, their words flush with the line's, each a 44 px target with no gap between them. */
-#choices { flex: 0 0 auto; display: flex; flex-direction: column; gap: 0; margin: calc(var(--gp) * 2) 0 0 calc(var(--gp) * -5); }
+/* The choices: plain rows, each marker on the line's left edge and every row's words indented the same 6 game
+   pixels past it, each row a 44 px target with no gap between them. */
+#choices { flex: 0 0 auto; display: flex; flex-direction: column; gap: 0; margin: calc(var(--gp) * 2) 0 0; }
 #choices[hidden] { display: none; }
-/* While buttons show, the question may scroll so the buttons fit; only when one column of them would leave
-   less than two lines of the question do they sit in two columns (fitChoices). */
+/* The panel stays below the waterline (dlgCap). While buttons show, the question may scroll so the buttons fit;
+   when that would leave less than two lines of it, the panel tightens (#dialog.tight), and if four or more
+   rows still do not fit they become a two by two grid of plates, each a slab one step lighter than the panel
+   (--row), equal widths, the words wrapping inside beside the marker (fitChoices). */
 #dialog.choosing #text { min-height: 0; }
-#choices.grid { display: grid; grid-template-columns: 1fr 1fr; }
+#dialog.tight { padding: calc(var(--gp) * 4) calc(var(--gp) * 5); }
+#dialog.tight #who { margin-bottom: calc(var(--gp) * 2); }
+#dialog.tight #choices { margin-top: var(--gp); }
+#choices.grid { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--gp) * 2); margin-top: calc(var(--gp) * 2); }
+#choices.grid .choice { padding: calc(var(--gp) * 2) calc(var(--gp) * 3) calc(var(--gp) * 2) calc(var(--gp) * 9); border-image: var(--row) var(--k) fill / calc(var(--gp) * var(--k)) stretch; }
+#choices.grid .choice:focus-visible { border-image-source: var(--hi); }
+#choices.grid .lb { text-wrap: balance; }
 /* The first moments after buttons appear: a tap meant to finish the line must not pick one. */
 #choices.cold .choice, #thinkChoices.cold .choice { pointer-events: none; }
-/* A choice is his own words: the book face at 500, a step brighter than the dim line colour, a dim marker
-   at rest. Hovered or focused, the marker lights in the accent and the words go to the ink; a keyboard focus
-   also lays a slab one step lighter under the row. Pressed, the row drops one game pixel. */
+/* A choice is his own words: the book face at 500, a step brighter than the dim line colour, after the marker.
+   Hovered or focused, the words brighten to the pale ink; a keyboard focus also lays a slab one step lighter
+   under the row. Pressed, the row drops one game pixel. */
 .choice {
   position: relative; font: inherit; font-weight: 500; line-height: 1.3; text-align: left; color: var(--ui-row);
   background: none; border: 0 solid transparent; cursor: pointer; min-height: 44px;
-  padding: var(--gp) calc(var(--gp) * 3) var(--gp) calc(var(--gp) * 5);
+  padding: var(--gp) calc(var(--gp) * 3) var(--gp) calc(var(--gp) * 6);
 }
-.choice::before { left: calc(var(--gp) * 1.5); background: currentColor; opacity: 0.45; }
-.choice:hover, .choice:focus-visible { color: var(--ui-ink); outline: none; }
-.choice:hover::before, .choice:focus-visible::before { background: var(--ui-accent); opacity: 1; }
+.choice .lb { display: block; position: relative; }
+.choice .lb::before { left: calc(var(--gp) * -6); top: calc((1.3em - var(--gp) * 5) / 2); }
+.choice:hover, .choice:focus-visible { color: var(--ui-pale); outline: none; }
 .choice:focus-visible { border-image: var(--row) var(--k) fill / calc(var(--gp) * var(--k)) stretch; }
 .choice:active { transform: translateY(var(--gp)); }
 #more { right: calc(var(--gp) * 6); bottom: calc(var(--gp) * 4); }
@@ -175,7 +185,8 @@ body {
 /* The thought bubble (bible, 4b): a solid pixel cloud on the game's own grid, drawn by thinkLayout as SVG rects
    in game pixels (#thinkPix): a one-game-pixel outline in the ink, the palette's darkest index inside, and three
    shrinking pixel circles as the tail toward whoever is thinking. Its box is sized from the measured text, in
-   whole game pixels. The companion's question holds its two answers inside the cloud, as rows. */
+   whole game pixels. The companion's question is a bubble like his others; its two answers sit on a slab
+   directly above it, in the sky (#thinkChoices), clear of the man, the companion, the lantern and the tail. */
 #think {
   position: absolute; z-index: 6; color: var(--ui-ink);
   padding: calc(var(--u) * 2.4) calc(var(--u) * 2.8) calc(var(--u) * 3.2);
@@ -189,9 +200,12 @@ body {
 #thinkPix .line { fill: var(--ui-ink); fill-opacity: 0.9; }
 #thinkText { position: relative; text-wrap: balance; }
 #thinkText .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
-#thinkChoices { position: relative; display: flex; flex-direction: column; width: max-content; max-width: 100%; margin: calc(var(--gp) * 2) auto 0; }
+#thinkChoices {
+  position: absolute; left: 0; bottom: 100%; margin-bottom: calc(var(--gp) * 3); display: flex; flex-direction: column; width: max-content;
+  padding: calc(var(--gp) * 2) calc(var(--gp) * 6) calc(var(--gp) * 2) calc(var(--gp) * 5); text-align: left;
+  font-size: calc(var(--u) * 3.96); line-height: 1.45;
+}
 #thinkChoices[hidden] { display: none; }
-#thinkChoices .choice { font-size: max(15px, calc(var(--u) * 3.96)); color: var(--ui-ink); padding-right: calc(var(--gp) * 4); }
 /* The same 'more' marker as the panel's, inside the bubble's lower right, for a bubble that waits for a tap. */
 #thinkMore { right: calc(var(--gp) * 8); bottom: calc(var(--gp) * 3); }
 
@@ -251,16 +265,15 @@ body {
 .pips i { width: calc(var(--gp) * 3); height: calc(var(--gp) * 3); box-shadow: inset 0 0 0 var(--gp) var(--ui-dim); opacity: 0.6; }
 .pips i.on { background: var(--ui-ink); box-shadow: none; opacity: 1; }
 .pips b { margin-left: calc(var(--gp) * 2); font-size: max(11px, calc(var(--u) * 2.88)); font-weight: 500; color: var(--ui-dim); font-variant-numeric: tabular-nums; }
-/* Cast again: a raised slab (index 1 on an index 2 outline); hovered or focused it takes the ink outline and
-   lights the accent marker, with no ring. */
+/* Cast again: a raised slab (index 1 on an index 2 outline) with the choice marker before its words; hovered or
+   focused it takes the ink outline and its words brighten, with no ring. */
 #again {
-  position: relative; margin-top: calc(var(--gp) * 8); min-height: 44px; padding: calc(var(--gp) * 3) calc(var(--gp) * 10);
-  font: inherit; font-weight: 500; color: var(--ui-pale); background: none; cursor: pointer;
+  position: relative; margin-top: calc(var(--gp) * 8); min-height: 44px; padding: calc(var(--gp) * 3) calc(var(--gp) * 10) calc(var(--gp) * 3) calc(var(--gp) * 12);
+  font: inherit; font-weight: 500; color: var(--ui-ink); background: none; cursor: pointer;
   border: 0 solid transparent; border-image: var(--raise) var(--k) fill / calc(var(--gp) * var(--k)) stretch;
 }
-#again::before { left: calc(var(--gp) * 4); background: var(--ui-accent); opacity: 0; }
-#again:not(:disabled):hover, #again:focus-visible { outline: none; border-image-source: var(--hi); }
-#again:not(:disabled):hover::before, #again:focus-visible::before { opacity: 1; }
+#again::before { left: calc(var(--gp) * 6); top: 50%; margin-top: calc(var(--gp) * -2.5); }
+#again:not(:disabled):hover, #again:focus-visible { outline: none; border-image-source: var(--hi); color: var(--ui-pale); }
 #again:not(:disabled):active { transform: translateY(var(--gp)); }
 #again:disabled { cursor: default; opacity: 0.4; }
 
@@ -283,7 +296,7 @@ body {
     <div id="think" aria-live="polite">
       <svg id="thinkPix" aria-hidden="true"></svg>
       <div id="thinkText"></div>
-      <div id="thinkChoices" hidden></div>
+      <div id="thinkChoices" class="slab" hidden></div>
       <div id="thinkMore" class="pxmore" aria-hidden="true"></div>
     </div>
     <div id="card" class="slab" aria-live="polite">
