@@ -31,28 +31,31 @@ const ev = (type, target) => (target || $('stage')).dispatchEvent(new win.MouseE
 const down = () => ev('pointerdown', $('stage'));
 const up = () => win.dispatchEvent(new win.MouseEvent('pointerup', { bubbles: true }));
 const tap = () => { down(); up(); };
-const EN = { cast: 'Tap to cast', bite: 'Tap now', reel: 'Hold to reel' };
-const RU = { cast: 'Нажми, чтобы забросить', bite: 'Подсекай', reel: 'Держи, чтобы тянуть' };
+// The prompts the first catches must show (they step aside later, so the bot reads the stage's data-phase).
+const EN = { cast: 'Tap to cast', wait: 'Wait for a bite', bite: 'Tap now', reel: 'Hold to reel. Let go when it pulls.' };
+const RU = { cast: 'Нажми, чтобы забросить', wait: 'Жди поклёвки', bite: 'Подсекай', reel: 'Держи, чтобы тянуть. Рыба рвётся — отпускай.' };
 // The visible text of the overlay, for the Russian run's Latin check.
-const SHOWN = ['caption', 'prompt', 'who', 'text', 'choices', 'thinkWho', 'thinkText', 'thinkChoices', 'card', 'ending', 'title', 'count', 'mute'];
+const SHOWN = ['caption', 'prompt', 'who', 'text', 'choices', 'thinkText', 'thinkChoices', 'card', 'ending', 'title', 'count', 'mute'];
 function latinOnScreen(found) {
   for (const id of SHOWN) {
     const t = $(id).textContent;
     if (/[A-Za-z]/.test(t)) found.add(id + ': ' + t.trim().slice(0, 80));
   }
 }
-async function run(plan, label, useKeys, P, latin) {
+// fresh: the page's first run, where the first catches' prompts must show (they do not come back after).
+async function run(plan, label, useKeys, P, latin, fresh) {
   P = P || EN;
   let ci = 0, frame = 0, holdUntil = -1, restUntil = -1, taps = 0;
-  const trace = [];
+  const trace = [], prompts = new Set();
   while (frame < 10 * 600) {
     pump(1); frame++;
     if (latin) latinOnScreen(latin);
+    prompts.add($('prompt').textContent);
     if ($('ending').classList.contains('on')) break;
     if (holdUntil > 0) { if (frame >= holdUntil) { up(); holdUntil = -1; restUntil = frame + 3; } continue; }
     if (frame % 3) continue;
     const choices = [...$('choices').querySelectorAll('button'), ...$('thinkChoices').querySelectorAll('button')]; // the companion's question sits under his bubble
-    const prompt = $('prompt').textContent;
+    const prompt = $('prompt').textContent, phase = $('stage').dataset.phase;
     const cold = $('choices').classList.contains('cold') || $('thinkChoices').classList.contains('cold'); // fresh buttons ignore taps briefly
     if (choices.length && cold) continue;
     if (choices.length) {
@@ -60,10 +63,11 @@ async function run(plan, label, useKeys, P, latin) {
       trace.push(choices[k].textContent);
       if (useKeys) win.dispatchEvent(new win.KeyboardEvent('keydown', { code: 'Digit' + (k + 1), bubbles: true }));
       else choices[k].dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-    } else if ($('dialog').classList.contains('on') || $('think').classList.contains('on') || $('card').classList.contains('on') || $('title').classList.contains('on') || prompt === P.cast) { tap(); taps++; } // a waiting bubble is tapped through too
-    else if (prompt === P.bite || prompt.startsWith(P.reel)) { if (frame >= restUntil) { down(); holdUntil = frame + 5; } }
+    } else if ($('dialog').classList.contains('on') || $('think').classList.contains('on') || $('card').classList.contains('on') || $('title').classList.contains('on') || phase === 'ready' || (phase === 'ocean' && prompt === P.cast)) { tap(); taps++; } // a waiting bubble is tapped through too
+    else if (phase === 'bite' || phase === 'reeling') { if (frame >= restUntil) { down(); holdUntil = frame + 5; } }
   }
-  console.log(`[${label}] ending="${$('endTitle').textContent}" found="${$('endFound').textContent}" count="${$('count').textContent}" frames=${frame} choices=${trace.join(' | ')}`);
+  if (fresh) for (const k of ['cast', 'wait', 'bite', 'reel']) if (!prompts.has(P[k])) errors.push(label + ': the prompt never said ' + P[k]);
+  console.log(`[${label}] ending="${$('endTitle').textContent}" found="${$('endPips').getAttribute('aria-label')}" pips="${$('endPips').textContent}" count="${$('count').textContent}" frames=${frame} choices=${trace.join(' | ')}`);
 }
 async function english() {
   use(open('dist/index.html'));
@@ -72,8 +76,9 @@ async function english() {
   console.log('stage size:', $('stage').style.width, $('stage').style.height, 'canvas', $('c').width + 'x' + $('c').height, 'title on:', $('title').classList.contains('on'));
   console.log('language link:', $('lang').textContent, $('lang').getAttribute('href'), 'shown on the title:', !$('lang').hidden);
   $('mute').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-  console.log('mute label after click:', $('mute').textContent);
-  await run([0, 0, 0, 0, 0, 2], 'mouse, company+forever, yes -> cut', false);
+  console.log('mute label after click:', $('mute').getAttribute('aria-label'), 'muted:', $('mute').dataset.muted);
+  console.log('title found line on a first run:', JSON.stringify($('found').textContent));
+  await run([0, 0, 0, 0, 0, 2], 'mouse, company+forever, yes -> cut', false, EN, null, true);
   console.log('Cast again disabled at the ending:', $('again').disabled);
   await new Promise(r => setTimeout(r, 1700)); // Cast again wakes 1.6 s after the card
   console.log('Cast again disabled after 1.7 s:', $('again').disabled);
@@ -89,11 +94,11 @@ async function russian() {
   use(open('tools/out/ru/index.html', 'https://tahiktim-coder.github.io/still-water/ru/'));
   await new Promise(r => setTimeout(r, 50));
   pump(5);
-  console.log('ru: <html lang>', doc.documentElement.lang, 'tab', doc.title, 'h1', $('title').querySelector('h1').textContent);
+  console.log('ru: <html lang>', doc.documentElement.lang, 'tab', doc.title, 'h1', $('title').querySelector('h1').getAttribute('aria-label'), 'logo', !!$('title').querySelector('h1 svg'));
   console.log('ru: language link:', $('lang').textContent, $('lang').getAttribute('href'), 'shown on the title:', !$('lang').hidden);
   if ($('lang').getAttribute('href') !== '../') errors.push('the Russian page should link back to ../');
   const latin = new Set();
-  await run([0, 2, 1, 0], 'ru: mouse, let go, home, hear -> home', false, RU, latin);
+  await run([0, 2, 1, 0], 'ru: mouse, let go, home, hear -> home', false, RU, latin, true);
   if ($('lang').hidden !== true) errors.push('the language link should hide once the game starts');
   console.log('ru: Latin on screen:', latin.size ? [...latin].join(' / ') : 'none');
   if (latin.size) errors.push('Latin letters on the Russian page: ' + [...latin].join(' / '));

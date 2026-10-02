@@ -5,31 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1a33">
 <title>Still Water</title>
+<meta name="description" content="A short fishing tale">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400..500;1,7..72,400&family=Press+Start+2P&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400..500;1,7..72,400&display=swap" rel="stylesheet">
 <style>
-/* Two faces (chosen in a font lab over real frames, English and Russian, at phone sizes): Literata, a book serif
-   with a strong Cyrillic and an optical-size axis, for every sentence, choice, hint and counter; Press Start 2P,
-   a pixel face with a well-drawn Cyrillic, for the display tier only (the title, the ending title, the fish's
-   name and the speaker labels, the .px class), its size snapped to its 8 px grid in device pixels (snapPx). */
+/* One face (chosen in a font lab over real frames, English and Russian, at phone sizes): Literata, a book serif
+   with a strong Cyrillic and an optical-size axis, for every word on screen. The title is pixel lettering on
+   the game grid (logoSVG), not type.
+   One kind of box (the quiet slab, chosen in a UI lab): every box is one opaque slab in the palette's darkest
+   index on the game-pixel grid, a one-game-pixel notch at each corner and a one-game-pixel outline one step
+   lighter. UI.colors draws the slabs as tiny SVGs from the live palette (--slab, --raise, --hi, --row) and
+   border-image nine-slices them at --k game pixels, so every box recolours with the mood. */
 :root {
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   --page-bg: #0a1a33;
   --page-ink: #eaf7ff;
-  --ui-panel: rgba(10, 26, 51, 0.86);
-  --ui-panel-soft: rgba(10, 26, 51, 0.6);
   --ui-solid: #0a1a33;
   --ui-edge: #3673b1;
   --ui-ink: #f1f9ff;
+  --ui-pale: #f9fdff;
+  --ui-row: #c3def3;
   --ui-dim: #99c4e7;
   --ui-accent: #e2aa2a;
+  --slab: none; --raise: none; --hi: none; --row: none; --k: 2;
   --u: 3.6px;
   --gp: 1px; /* one game pixel in CSS px, set by resize */
   --font: Literata, 'PT Serif', Georgia, serif;
-  --font-px: 'Press Start 2P', ui-monospace, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --page-bg: #07142a; --page-ink: #eaf7ff; }
@@ -50,10 +54,6 @@ body {
   font-family: var(--font); font-optical-sizing: auto; font-synthesis: none;
 }
 :root[lang="ru"] body { -webkit-hyphens: manual; hyphens: manual; }
-/* The pixel face: never faux-bolded, no tracking, and its full-cell space pulled in so two words do not look double-spaced.
-   Its ligatures are off: Press Start 2P squeezes "fi" into one 8 px cell, so "Golden fish" read "Golden ﬁsh". */
-.px { font-family: var(--font-px); font-weight: 400; letter-spacing: 0; word-spacing: -0.4em; text-transform: none; line-height: 1.25;
-  font-variant-ligatures: none; font-feature-settings: "liga" 0, "clig" 0; }
 #wrap { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 #stage {
   position: relative; overflow: hidden; width: 216px; height: 384px;
@@ -61,56 +61,67 @@ body {
   touch-action: none; cursor: pointer;
 }
 #c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: crisp-edges; image-rendering: pixelated; }
-.panel {
-  background: var(--ui-panel);
-  border: calc(var(--u) * 0.6) solid var(--ui-edge);
-  box-shadow: 0 0 0 calc(var(--u) * 0.6) var(--ui-solid);
+/* Words kept for screen readers only. */
+.sr { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* The slab: one opaque box on the game grid (see the head of this sheet). */
+.slab { border: 0 solid transparent; border-image: var(--slab) var(--k) fill / calc(var(--gp) * var(--k)) stretch; }
+.slab:empty { border-image: none; }
+/* Loose text over the picture (the prompt, 'Tap to begin'): a one-game-pixel outline in the darkest index. */
+.shade { text-shadow: var(--gp) 0 0 var(--ui-solid), calc(var(--gp) * -1) 0 0 var(--ui-solid), 0 var(--gp) 0 var(--ui-solid), 0 calc(var(--gp) * -1) 0 var(--ui-solid),
+  0 calc(var(--gp) * 2) 0 var(--ui-solid); }
+/* The pixel markers: a 2 by 3 game-pixel triangle pointing right for a choice, a 5 by 3 one pointing down for
+   'more' (the panel, the bubble and the catch card), drawn with clip-path so no glyph falls back to a system font. */
+.choice::before, #again::before {
+  content: ''; position: absolute; top: 50%; margin-top: calc(var(--gp) * -1.5); width: calc(var(--gp) * 2); height: calc(var(--gp) * 3);
+  clip-path: polygon(0 0, 50% 0, 50% 33.34%, 100% 33.34%, 100% 66.67%, 50% 66.67%, 50% 100%, 0 100%);
 }
-/* Loose text over the picture: a one-game-pixel hard drop in the palette's darkest index, and a halo round it. */
-.shade { text-shadow: 0 var(--gp) 0 var(--ui-solid), 0 0 calc(var(--gp) * 2) var(--ui-solid), 0 0 calc(var(--gp) * 4) var(--ui-solid); }
-/* Small loose lines that can sit on a bright cloud or its reflection (the title's subtitle, how-to and found
-   lines, the captions): a plate of the
-   palette's darkest index at partial opacity behind the words, its ends stepped two game pixels in, like the
-   bubble's corners. hugPlate sizes the box to the widest balanced line, so the plate hugs the words. */
-.plate { position: relative; isolation: isolate; padding: 0 calc(var(--gp) * 4); }
-.plate::before {
-  content: ''; position: absolute; inset: 0; z-index: -1; background: var(--ui-solid); opacity: 0.6;
-  clip-path: polygon(calc(var(--gp) * 2) 0, calc(100% - var(--gp) * 2) 0, calc(100% - var(--gp) * 2) var(--gp), calc(100% - var(--gp)) var(--gp),
-    calc(100% - var(--gp)) calc(var(--gp) * 2), 100% calc(var(--gp) * 2), 100% calc(100% - var(--gp) * 2), calc(100% - var(--gp)) calc(100% - var(--gp) * 2),
-    calc(100% - var(--gp)) calc(100% - var(--gp)), calc(100% - var(--gp) * 2) calc(100% - var(--gp)), calc(100% - var(--gp) * 2) 100%, calc(var(--gp) * 2) 100%,
-    calc(var(--gp) * 2) calc(100% - var(--gp)), var(--gp) calc(100% - var(--gp)), var(--gp) calc(100% - var(--gp) * 2), 0 calc(100% - var(--gp) * 2),
-    0 calc(var(--gp) * 2), var(--gp) calc(var(--gp) * 2), var(--gp) var(--gp), calc(var(--gp) * 2) var(--gp));
+.pxmore, #card::after {
+  position: absolute; width: calc(var(--gp) * 5); height: calc(var(--gp) * 3); background: var(--ui-accent); opacity: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 33.34%, 80% 33.34%, 80% 66.67%, 60% 66.67%, 60% 100%, 40% 100%, 40% 66.67%, 20% 66.67%, 20% 33.34%, 0 33.34%);
 }
-.plate:empty::before { display: none; }
 
+/* The HUD: the fish count on a small slab, and 44 px buttons, each a 15 by 11 game-pixel slab under a pixel
+   icon (Mute, Skip) or a two-letter code (the language link, on the title only). */
 #hud {
-  position: absolute; z-index: 5; top: calc(var(--u) * 3); left: calc(var(--u) * 4); right: calc(var(--u) * 4);
+  position: absolute; z-index: 5; top: calc(var(--gp) * 2); left: calc(var(--gp) * 4); right: var(--gp);
   display: flex; justify-content: space-between; align-items: center;
   font-size: max(11px, calc(var(--u) * 2.97)); font-weight: 500; pointer-events: none;
 }
-#count { color: var(--ui-ink); opacity: 0.9; }
-/* Mute, the language link and Skip fish: the panel's fill at 60% under the frame, so a cloud behind them cannot eat the label. */
+#count { color: var(--ui-ink); line-height: calc(var(--gp) * 11); padding: 0 calc(var(--gp) * 4); font-variant-numeric: tabular-nums; }
+#count:empty { visibility: hidden; }
+#hudButtons { display: flex; align-items: center; }
 #mute, #skip, #lang {
-  pointer-events: auto; font: inherit; font-size: max(11px, calc(var(--u) * 2.97)); font-weight: 500; line-height: 1.2;
-  color: var(--ui-ink); background: var(--ui-panel-soft); cursor: pointer;
-  min-height: max(44px, calc(var(--u) * 11)); min-width: 44px;
-  border: calc(var(--u) * 0.45) solid var(--ui-edge); padding: calc(var(--u) * 0.6) calc(var(--u) * 1.8);
+  pointer-events: auto; position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; margin: 0; padding: 0; background: none; border: 0; cursor: pointer;
+  font: 500 max(11px, calc(var(--u) * 2.97))/1 var(--font); letter-spacing: 0.08em; color: var(--ui-ink); text-decoration: none;
 }
-#skip { margin-left: calc(var(--u) * 1.5); border-style: dashed; }
-#skip[hidden] { display: none; }
-#hudButtons { display: flex; align-items: stretch; }
-/* The link to the other language's page, on the title only: the same frame as Mute, left of it. */
-#lang { display: inline-flex; align-items: center; justify-content: center; margin-right: calc(var(--u) * 1.5); text-decoration: none; }
-#lang[hidden] { display: none; }
-#mute:focus-visible, #skip:focus-visible, #lang:focus-visible, .choice:focus-visible, #again:focus-visible { outline: calc(var(--u) * 0.6) solid var(--ui-accent); outline-offset: calc(var(--u) * 0.5); }
+#mute::before, #skip::before, #lang::before {
+  content: ''; position: absolute; z-index: -1; left: 50%; top: 50%;
+  width: calc(var(--gp) * 15); height: calc(var(--gp) * 11); margin: calc(var(--gp) * -5.5) 0 0 calc(var(--gp) * -7.5);
+  border: 0 solid transparent; border-image: var(--slab) var(--k) fill / calc(var(--gp) * var(--k)) stretch;
+}
+#skip[hidden], #lang[hidden] { display: none; }
+#skip { opacity: 0.75; }
+.icon { display: block; fill: currentColor; shape-rendering: crispEdges; }
+#mute .icon { width: calc(var(--gp) * 9); height: calc(var(--gp) * 7); }
+#skip .icon { width: calc(var(--gp) * 7); height: calc(var(--gp) * 5); }
+#mute .off, #mute[data-muted="1"] .on { display: none; }
+#mute[data-muted="1"] .off { display: block; }
+#mute:focus-visible, #skip:focus-visible, #lang:focus-visible { outline: none; }
+#mute:focus-visible::before, #skip:focus-visible::before, #lang:focus-visible::before { border-image-source: var(--hi); }
+#mute:active, #skip:active, #lang:active { transform: translateY(var(--gp)); }
 
+/* The caption: a slab hugging its words (hug). On the title (only the test build's T key puts one there) it
+   sits low, clear of the name. */
 #caption {
   position: absolute; z-index: 5; top: 11%; left: 0; right: 0; width: 82%; margin: 0 auto; text-align: center;
+  padding: calc(var(--gp) * 3) calc(var(--gp) * 6);
   font-size: calc(var(--u) * 3.6); color: var(--ui-ink); text-wrap: balance;
   opacity: 0; transition: opacity 0.9s ease; pointer-events: none;
 }
 #caption.on { opacity: 1; }
 #caption.whisper { color: var(--ui-dim); letter-spacing: 0.04em; }
+#stage.titling #caption { top: auto; bottom: 30%; z-index: 8; }
 #prompt {
   position: absolute; z-index: 5; left: 6%; right: 6%; bottom: 9%; text-align: center;
   font-size: calc(var(--u) * 3.33); font-weight: 500; color: var(--ui-ink);
@@ -119,50 +130,52 @@ body {
 #prompt.on { opacity: 0.92; }
 #prompt.urgent { font-size: calc(var(--u) * 4.14); animation: blink 0.36s steps(2, jump-none) infinite; }
 
+/* The dialogue panel: one slab holding the speaker's label, the line and the choices. */
 #dialog {
-  position: absolute; z-index: 6; left: 4%; right: 4%; bottom: calc(var(--u) * 4);
+  position: absolute; z-index: 6; left: calc(var(--gp) * 6); right: calc(var(--gp) * 6); bottom: calc(var(--gp) * 6);
   max-height: var(--dlg-max, 46%); display: flex; flex-direction: column;
-  padding: calc(var(--u) * 3) calc(var(--u) * 4) calc(var(--u) * 3.4);
+  padding: calc(var(--gp) * 6) calc(var(--gp) * 7);
   opacity: 0; transform: translateY(calc(var(--u) * 2)); transition: opacity 0.25s ease, transform 0.25s ease;
   pointer-events: none;
 }
 #dialog.on { opacity: 1; transform: none; pointer-events: auto; }
-#who { flex: 0 0 auto; font-size: max(8px, calc(var(--u) * 2.72)); color: var(--ui-accent); margin-bottom: calc(var(--u) * 1.2 + var(--gp)); }
+/* Speaker labels: small capitals, a little tracking, in the label colour. */
+#who { flex: 0 0 auto; font-size: 11px; font-weight: 500; line-height: 1.2; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ui-accent); margin-bottom: calc(var(--gp) * 3); }
 #text { flex: 0 1 auto; min-height: 2.9em; overflow-y: auto; max-width: 34em; line-height: 1.45; text-wrap: pretty; }
 #dialog.narr #text, #dialog.whisper #text { color: var(--ui-dim); }
 #dialog.whisper #text { letter-spacing: 0.04em; }
 #text .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
 #dialog.red #who { color: var(--ui-dim); }
 #dialog.red.on #text { animation: shiver 0.14s steps(2, jump-none) infinite; }
-#choices { flex: 0 0 auto; display: flex; flex-direction: column; gap: calc(var(--u) * 1.8); margin-top: calc(var(--u) * 2.8); }
+/* The choices: plain rows, their words flush with the line's, each a 44 px target with no gap between them. */
+#choices { flex: 0 0 auto; display: flex; flex-direction: column; gap: 0; margin: calc(var(--gp) * 2) 0 0 calc(var(--gp) * -5); }
 #choices[hidden] { display: none; }
-#choices.many { gap: max(6px, calc(var(--u) * 2)); margin-top: calc(var(--u) * 2.2); }
-/* While buttons show, the question may scroll so the buttons fit; on a short stage four or more sit in two columns. */
+/* While buttons show, the question may scroll so the buttons fit; only when one column of them would leave
+   less than two lines of the question do they sit in two columns (fitChoices). */
 #dialog.choosing #text { min-height: 0; }
 #choices.grid { display: grid; grid-template-columns: 1fr 1fr; }
 /* The first moments after buttons appear: a tap meant to finish the line must not pick one. */
 #choices.cold .choice, #thinkChoices.cold .choice { pointer-events: none; }
-#choices.many .choice { padding: calc(var(--u) * 1.05) calc(var(--u) * 2.4); font-size: calc(var(--u) * 3.6); }
-/* The choices are his own words: the book face at 500, so they read as tappable above the prose. */
+/* A choice is his own words: the book face at 500, a step brighter than the dim line colour, a dim marker
+   at rest. Hovered or focused, the marker lights in the accent and the words go to the ink; a keyboard focus
+   also lays a slab one step lighter under the row. Pressed, the row drops one game pixel. */
 .choice {
-  font: inherit; font-weight: 500; line-height: 1.3; text-align: left; color: var(--ui-ink); background: transparent; cursor: pointer;
-  min-height: max(44px, calc(var(--u) * 11));
-  border: calc(var(--u) * 0.5) solid var(--ui-edge);
-  padding: calc(var(--u) * 1.7) calc(var(--u) * 2.8);
+  position: relative; font: inherit; font-weight: 500; line-height: 1.3; text-align: left; color: var(--ui-row);
+  background: none; border: 0 solid transparent; cursor: pointer; min-height: 44px;
+  padding: var(--gp) calc(var(--gp) * 3) var(--gp) calc(var(--gp) * 5);
 }
-.choice:hover { background: var(--ui-edge); color: var(--ui-solid); }
-/* The 'more' marker: a 5 by 3 game-pixel triangle drawn in CSS, so no glyph falls back to a system font. */
-.pxmore {
-  position: absolute; width: calc(var(--gp) * 5); height: calc(var(--gp) * 3); background: var(--ui-accent); opacity: 0;
-  clip-path: polygon(0 0, 100% 0, 100% 33.34%, 80% 33.34%, 80% 66.67%, 60% 66.67%, 60% 100%, 40% 100%, 40% 66.67%, 20% 66.67%, 20% 33.34%, 0 33.34%);
-}
-#more { right: calc(var(--u) * 3.2); bottom: calc(var(--u) * 2); }
+.choice::before { left: calc(var(--gp) * 1.5); background: currentColor; opacity: 0.45; }
+.choice:hover, .choice:focus-visible { color: var(--ui-ink); outline: none; }
+.choice:hover::before, .choice:focus-visible::before { background: var(--ui-accent); opacity: 1; }
+.choice:focus-visible { border-image: var(--row) var(--k) fill / calc(var(--gp) * var(--k)) stretch; }
+.choice:active { transform: translateY(var(--gp)); }
+#more { right: calc(var(--gp) * 6); bottom: calc(var(--gp) * 4); }
 #more.on, #thinkMore.on { opacity: 0.9; animation: nudge 0.9s steps(2, jump-none) infinite; }
 
 /* The thought bubble (bible, 4b): a solid pixel cloud on the game's own grid, drawn by thinkLayout as SVG rects
-   in game pixels (#thinkPix): a one-game-pixel outline in the ink, the palette's darkest index at 80% inside, and
-   three shrinking pixel circles as the tail toward whoever is thinking. Its box is sized from the measured
-   text, in whole game pixels; #thinkChoices is the companion's question only, above the bubble. */
+   in game pixels (#thinkPix): a one-game-pixel outline in the ink, the palette's darkest index inside, and three
+   shrinking pixel circles as the tail toward whoever is thinking. Its box is sized from the measured text, in
+   whole game pixels. The companion's question holds its two answers inside the cloud, as rows. */
 #think {
   position: absolute; z-index: 6; color: var(--ui-ink);
   padding: calc(var(--u) * 2.4) calc(var(--u) * 2.8) calc(var(--u) * 3.2);
@@ -172,92 +185,91 @@ body {
 #think.on { opacity: 1; }
 #think.ask { pointer-events: auto; }
 #thinkPix { position: absolute; overflow: visible; shape-rendering: crispEdges; pointer-events: none; }
-#thinkPix .fill { fill: var(--ui-solid); fill-opacity: 0.8; }
+#thinkPix .fill { fill: var(--ui-solid); }
 #thinkPix .line { fill: var(--ui-ink); fill-opacity: 0.9; }
-/* The speaker's tab sits on the top outline, on its own solid plate, so the outline never runs through the letters. */
-#thinkWho {
-  position: absolute; top: calc(var(--gp) * -4); left: calc(var(--gp) * 7);
-  padding: var(--gp) calc(var(--gp) * 2); font-size: 8px; line-height: 1; color: var(--ui-dim);
-  background: var(--ui-solid); box-shadow: 0 0 0 var(--gp) var(--ui-ink);
-}
-#thinkWho[hidden] { display: none; }
 #thinkText { position: relative; text-wrap: balance; }
 #thinkText .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
-#thinkChoices {
-  position: absolute; left: -12%; right: -12%; bottom: 100%; margin-bottom: calc(var(--gp) * 6);
-  display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--u) * 1.2);
-}
+#thinkChoices { position: relative; display: flex; flex-direction: column; width: max-content; max-width: 100%; margin: calc(var(--gp) * 2) auto 0; }
 #thinkChoices[hidden] { display: none; }
-#thinkChoices .choice { flex: 1 1 auto; text-align: center; padding: calc(var(--u) * 0.7) calc(var(--u) * 1.6); font-size: calc(var(--u) * 3.6); background: var(--ui-panel); }
-#thinkChoices .choice:hover { background: var(--ui-edge); }
+#thinkChoices .choice { font-size: max(15px, calc(var(--u) * 3.96)); color: var(--ui-ink); padding-right: calc(var(--gp) * 4); }
 /* The same 'more' marker as the panel's, inside the bubble's lower right, for a bubble that waits for a tap. */
 #thinkMore { right: calc(var(--gp) * 8); bottom: calc(var(--gp) * 3); }
 
+/* The catch card: a slab where the panel lives, so the boat, the man and the line stay in view above it. Its
+   'Tap to continue' is for screen readers; the eye gets the ▾ marker once CARD_GRACE has passed. */
 #card {
-  position: absolute; z-index: 6; left: 10%; right: 10%; top: 27%;
-  padding: calc(var(--u) * 4) calc(var(--u) * 4) calc(var(--u) * 3.4); text-align: center;
-  opacity: 0; transform: scale(0.96); transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none;
+  position: absolute; z-index: 6; left: calc(var(--gp) * 6); right: calc(var(--gp) * 6); bottom: calc(var(--gp) * 6);
+  padding: calc(var(--gp) * 6) calc(var(--gp) * 8) calc(var(--gp) * 7); text-align: center;
+  opacity: 0; transform: translateY(calc(var(--u) * 2)); transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none;
 }
 #card.on { opacity: 1; transform: none; }
-#cardFish { display: block; margin: 0 auto calc(var(--u) * 3); image-rendering: crisp-edges; image-rendering: pixelated; }
-#cardName { font-size: calc(var(--u) * 4.16); line-height: 1.35; }
-#cardMeta { color: var(--ui-dim); font-size: max(11px, calc(var(--u) * 3.06)); margin-top: calc(var(--u) * 1); }
-#cardDesc { margin: calc(var(--u) * 2.4) 0 0; text-wrap: pretty; }
-#cardVoice { margin: calc(var(--u) * 2) 0 0; color: var(--ui-accent); font-style: italic; text-wrap: pretty; }
-#card .hint { margin-top: calc(var(--u) * 3); font-size: max(11px, calc(var(--u) * 2.79)); color: var(--ui-dim); opacity: 0; transition: opacity 0.3s ease; }
-:root[lang="ru"] #cardMeta, :root[lang="ru"] #card .hint { font-size: max(12px, calc(var(--u) * 3.06)); }
-#card.ready .hint { opacity: 1; }
+#cardFish { display: block; margin: 0 auto calc(var(--gp) * 4); image-rendering: crisp-edges; image-rendering: pixelated; }
+#cardName { font-size: calc(var(--u) * 4.6); font-weight: 500; line-height: 1.2; }
+#cardMeta { margin-top: calc(var(--gp) * 1.5); color: var(--ui-dim); font-size: max(11px, calc(var(--u) * 3.06)); font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+:root[lang="ru"] #cardMeta { font-size: max(12px, calc(var(--u) * 3.06)); }
+#cardDesc { margin: calc(var(--gp) * 4) 0 0; text-wrap: balance; }
+#cardVoice { margin: calc(var(--gp) * 3) 0 0; color: var(--ui-accent); font-style: italic; text-wrap: balance; }
+#card::after { content: ''; right: calc(var(--gp) * 6); bottom: calc(var(--gp) * 4); transition: opacity 0.3s ease; }
+#card.ready::after { opacity: 1; animation: nudge 0.9s steps(2, jump-none) infinite; }
 
+/* The title: the pixel name (logoSVG, set on a whole game-pixel column and row by placeLogo), 'Tap to begin',
+   and, once an ending has been found, one quiet line counting them. */
 #title {
   position: absolute; z-index: 7; inset: 0; display: flex; flex-direction: column; align-items: center;
   text-align: center; opacity: 0; transition: opacity 1.1s ease; pointer-events: none;
 }
 #title.on { opacity: 1; }
-#title h1 { margin: 20% 0 0; font-size: calc(var(--u) * 8.5); line-height: 1.1; white-space: nowrap; color: var(--ui-ink); }
-#title .sub { margin: calc(var(--u) * 3.4) 0 0; font-size: max(11px, calc(var(--u) * 3.78)); color: var(--ui-dim); }
-/* 'Tap to begin' is bigger and breathes, so it takes a stronger shade instead of a plate: a one-game-pixel outline
-   in the darkest index and a soft halo. The how-to hangs from its foot (at 79%), so a longer wrap
-   grows down, never into it. */
-#title .begin { position: absolute; bottom: 21%; left: 0; right: 0; margin: 0; font-size: max(11px, calc(var(--u) * 4.14)); font-weight: 500; animation: breathe 2.6s ease-in-out infinite;
-  text-shadow: var(--gp) 0 0 var(--ui-solid), calc(var(--gp) * -1) 0 0 var(--ui-solid), 0 var(--gp) 0 var(--ui-solid), 0 calc(var(--gp) * -1) 0 var(--ui-solid),
-    0 0 calc(var(--gp) * 4) var(--ui-solid); }
-#title .how { position: absolute; top: calc(79% + var(--gp) * 2); left: 0; right: 0; width: max(80%, 282px); margin: 0 auto; font-size: max(11px, calc(var(--u) * 2.97)); font-weight: 500; color: var(--ui-dim); text-wrap: balance; }
-#title .found { position: absolute; bottom: 9.5%; left: 0; right: 0; width: 86%; margin: 0 auto; font-size: max(11px, calc(var(--u) * 2.79)); font-weight: 500; color: var(--ui-accent); }
-/* The seven ending titles in order under the counter, a middot between them and a ? for each one not found yet. */
-.endlist { margin: 0; font-size: max(11px, calc(var(--u) * 2.61)); line-height: 1.35; text-wrap: balance; }
-.endlist span { white-space: nowrap; }
-.endlist span + span::before { content: '\00b7'; padding: 0 calc(var(--u) * 1.3); }
-.endlist:empty { display: none; }
-#title .endlist { position: absolute; bottom: 2.5%; left: 0; right: 0; width: 86%; margin: 0 auto; font-weight: 500; color: var(--ui-dim); }
+#title h1 { position: absolute; left: 0; top: 0; margin: 0; line-height: 0; }
+#title h1 svg { display: block; overflow: visible; }
+#title .begin { position: absolute; bottom: 21%; left: 0; right: 0; margin: 0; font-size: max(13px, calc(var(--u) * 4.14)); font-weight: 500; animation: breathe 2.6s ease-in-out infinite; }
+#found { position: absolute; bottom: 9.5%; left: 0; right: 0; width: max-content; margin: 0 auto; padding: calc(var(--gp) * 2) calc(var(--gp) * 5);
+  font-size: max(11px, calc(var(--u) * 2.79)); font-weight: 500; color: var(--ui-row); }
+#found:empty { display: none; }
 
 #fade { position: absolute; z-index: 8; inset: 0; background: #000; opacity: 1; pointer-events: none; transition: opacity 0.6s ease; }
 
+/* The ending: one slab holding the title, the text, a one-game-pixel divider, what you asked for, the endings
+   found as pips, and Cast again. The words are in the pale ink; only the title, the divider and the pips take
+   the mood's colour. */
 #ending {
   position: absolute; z-index: 9; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;
-  text-align: center; padding: 0 11%;
-  background: linear-gradient(to bottom, transparent 8%, rgba(0, 0, 0, 0.62) 32%, rgba(0, 0, 0, 0.62) 68%, transparent 92%);
+  text-align: center; padding: 0 calc(var(--gp) * 6);
+  background: color-mix(in srgb, var(--ui-solid) 55%, transparent);
   opacity: 0; transition: opacity 1.6s ease; pointer-events: none;
 }
 #ending.on { opacity: 1; pointer-events: auto; }
-#ending h2 { margin: 0; font-size: calc(var(--u) * 6.4); line-height: 1.2; white-space: nowrap; color: #fff; }
-#endText { margin: calc(var(--u) * 4) 0 0; color: #f3ece4; max-width: 30em; line-height: 1.5; text-wrap: balance; }
-#endAsked { margin: calc(var(--u) * 2.4) 0 0; color: #f3ece4; max-width: 30em; line-height: 1.5; white-space: pre-line; }
-#endFound { margin: calc(var(--u) * 4) 0 0; font-size: max(11px, calc(var(--u) * 2.88)); color: #c9b9a8; }
-#endList { margin-top: calc(var(--u) * 1.2); color: #a8998a; }
+.endBox { display: flex; flex-direction: column; align-items: center; width: 100%; padding: calc(var(--gp) * 11) calc(var(--gp) * 8) calc(var(--gp) * 10); }
+#ending h2 { margin: 0 -0.1em 0 0; font-size: calc(var(--u) * 5.4); font-weight: 500; line-height: 1.2; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ui-ink); }
+#endText { margin: calc(var(--gp) * 7) 0 0; color: var(--ui-pale); max-width: 30em; line-height: 1.5; text-wrap: balance; }
+#endAsked { position: relative; margin: calc(var(--gp) * 6) 0 0; padding-top: calc(var(--gp) * 6); color: var(--ui-pale); max-width: 30em; line-height: 1.5; white-space: pre-line; }
+#endAsked:empty { display: none; }
+#endAsked .head { color: var(--ui-dim); }
+#endAsked::before { content: ''; position: absolute; top: 0; left: 50%; width: calc(var(--gp) * 14); height: var(--gp); margin-left: calc(var(--gp) * -7); background: var(--ui-dim); opacity: 0.6; }
+/* Pips: a 3-game-pixel mark per ending, solid when found, an outline when not, then the count. */
+.pips { display: flex; align-items: center; justify-content: center; gap: calc(var(--gp) * 3); margin: calc(var(--gp) * 7) 0 0; }
+.pips[hidden] { display: none; }
+.pips i { width: calc(var(--gp) * 3); height: calc(var(--gp) * 3); box-shadow: inset 0 0 0 var(--gp) var(--ui-dim); opacity: 0.6; }
+.pips i.on { background: var(--ui-ink); box-shadow: none; opacity: 1; }
+.pips b { margin-left: calc(var(--gp) * 2); font-size: max(11px, calc(var(--u) * 2.88)); font-weight: 500; color: var(--ui-dim); font-variant-numeric: tabular-nums; }
+/* Cast again: a raised slab (index 1 on an index 2 outline); hovered or focused it takes the ink outline and
+   lights the accent marker, with no ring. */
 #again {
-  margin-top: calc(var(--u) * 5); font: inherit; font-weight: 500; color: #fff; background: transparent; cursor: pointer;
-  min-height: max(44px, calc(var(--u) * 11));
-  border: calc(var(--u) * 0.6) solid #fff; padding: calc(var(--u) * 1.8) calc(var(--u) * 5);
+  position: relative; margin-top: calc(var(--gp) * 8); min-height: 44px; padding: calc(var(--gp) * 3) calc(var(--gp) * 10);
+  font: inherit; font-weight: 500; color: var(--ui-pale); background: none; cursor: pointer;
+  border: 0 solid transparent; border-image: var(--raise) var(--k) fill / calc(var(--gp) * var(--k)) stretch;
 }
-#again:not(:disabled):hover { background: #fff; color: #000; }
-#again:disabled { cursor: default; }
+#again::before { left: calc(var(--gp) * 4); background: var(--ui-accent); opacity: 0; }
+#again:not(:disabled):hover, #again:focus-visible { outline: none; border-image-source: var(--hi); }
+#again:not(:disabled):hover::before, #again:focus-visible::before { opacity: 1; }
+#again:not(:disabled):active { transform: translateY(var(--gp)); }
+#again:disabled { cursor: default; opacity: 0.4; }
 
 @keyframes blink { 50% { opacity: 0.35; } }
 @keyframes shiver { 50% { transform: translate(0.05em, -0.04em); } }
 @keyframes nudge { 50% { transform: translateY(var(--gp)); } }
 @keyframes breathe { 50% { opacity: 0.7; } }
 @media (prefers-reduced-motion: reduce) {
-  #prompt.urgent, #dialog.red.on #text, #more.on, #thinkMore.on, #title .begin { animation: none; }
+  #prompt.urgent, #dialog.red.on #text, #more.on, #thinkMore.on, #card.ready::after, #title .begin { animation: none; }
 }
 </style>
 </head>
@@ -265,46 +277,43 @@ body {
 <div id="wrap">
   <div id="stage" aria-label="Still Water, a short fishing tale">
     <canvas id="c" width="216" height="384"></canvas>
-    <div id="hud"><span id="count" class="shade" aria-live="polite"></span><span id="hudButtons"><a id="lang" href="ru/" hreflang="ru" lang="ru" hidden>RU</a><button id="mute" type="button">Mute</button><button id="skip" type="button" hidden>Skip fish</button></span></div>
-    <div id="caption" class="shade plate" aria-live="polite"></div>
+    <div id="hud"><span id="count" class="slab" aria-live="polite"></span><span id="hudButtons"><a id="lang" href="ru/" hreflang="ru" lang="ru" hidden>RU</a><button id="mute" type="button" aria-label="Mute" title="Mute"><svg class="icon on" viewBox="0 0 9 7" aria-hidden="true"><rect x="3" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="7" y="1" width="1" height="1"/><rect x="0" y="2" width="4" height="1"/><rect x="5" y="2" width="1" height="1"/><rect x="8" y="2" width="1" height="1"/><rect x="0" y="3" width="4" height="1"/><rect x="5" y="3" width="1" height="1"/><rect x="8" y="3" width="1" height="1"/><rect x="0" y="4" width="4" height="1"/><rect x="5" y="4" width="1" height="1"/><rect x="8" y="4" width="1" height="1"/><rect x="2" y="5" width="2" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="3" y="6" width="1" height="1"/></svg><svg class="icon off" viewBox="0 0 9 7" aria-hidden="true"><rect x="3" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="0" y="2" width="4" height="1"/><rect x="5" y="2" width="1" height="1"/><rect x="7" y="2" width="1" height="1"/><rect x="0" y="3" width="4" height="1"/><rect x="6" y="3" width="1" height="1"/><rect x="0" y="4" width="4" height="1"/><rect x="5" y="4" width="1" height="1"/><rect x="7" y="4" width="1" height="1"/><rect x="2" y="5" width="2" height="1"/><rect x="3" y="6" width="1" height="1"/></svg></button><button id="skip" type="button" aria-label="Skip" title="Skip" hidden><svg class="icon" viewBox="0 0 7 5" aria-hidden="true"><rect x="0" y="0" width="1" height="1"/><rect x="4" y="0" width="1" height="1"/><rect x="0" y="1" width="2" height="1"/><rect x="4" y="1" width="2" height="1"/><rect x="0" y="2" width="3" height="1"/><rect x="4" y="2" width="3" height="1"/><rect x="0" y="3" width="2" height="1"/><rect x="4" y="3" width="2" height="1"/><rect x="0" y="4" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/></svg></button></span></div>
+    <div id="caption" class="slab" aria-live="polite"></div>
     <div id="prompt" class="shade"></div>
     <div id="think" aria-live="polite">
       <svg id="thinkPix" aria-hidden="true"></svg>
-      <div id="thinkWho" class="px" hidden>Fisherman</div>
-      <div id="thinkText" class="shade"></div>
+      <div id="thinkText"></div>
       <div id="thinkChoices" hidden></div>
       <div id="thinkMore" class="pxmore" aria-hidden="true"></div>
     </div>
-    <div id="card" class="panel" aria-live="polite">
+    <div id="card" class="slab" aria-live="polite">
       <canvas id="cardFish" width="8" height="8"></canvas>
-      <div id="cardName" class="px"></div>
+      <div id="cardName"></div>
       <div id="cardMeta"></div>
       <p id="cardDesc"></p>
       <p id="cardVoice" hidden></p>
-      <div class="hint">Tap to continue</div>
+      <div class="hint sr">Tap to continue</div>
     </div>
-    <div id="dialog" class="panel" aria-live="polite">
-      <div id="who" class="px"></div>
+    <div id="dialog" class="slab" aria-live="polite">
+      <div id="who"></div>
       <div id="text"></div>
       <div id="choices" hidden></div>
       <div id="more" class="pxmore" aria-hidden="true"></div>
     </div>
-    <div id="title" class="shade">
-      <h1 class="px">Still Water</h1>
-      <p class="sub shade plate">A short fishing tale</p>
-      <p class="begin">Tap to begin</p>
-      <p class="how shade plate">Tap to cast. Tap when the float goes under. Hold to reel.</p>
-      <p class="found plate" id="found"></p>
-      <p class="endlist plate" id="foundList"></p>
+    <div id="title">
+      <h1 aria-label="Still Water"><span class="sr">Still Water</span></h1>
+      <p class="begin shade">Tap to begin</p>
+      <p id="found" class="slab"></p>
     </div>
     <div id="fade"></div>
-    <div id="ending" class="shade" aria-live="polite">
-      <h2 id="endTitle" class="px"></h2>
-      <p id="endText"></p>
-      <p id="endAsked"></p>
-      <p id="endFound"></p>
-      <p class="endlist" id="endList"></p>
-      <button id="again" type="button" disabled tabindex="-1">Cast again</button>
+    <div id="ending" aria-live="polite">
+      <div class="endBox slab">
+        <h2 id="endTitle"></h2>
+        <p id="endText"></p>
+        <p id="endAsked"></p>
+        <div id="endPips" class="pips" role="img" hidden></div>
+        <button id="again" type="button" disabled tabindex="-1">Cast again</button>
+      </div>
     </div>
   </div>
 </div>

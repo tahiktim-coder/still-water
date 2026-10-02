@@ -1086,12 +1086,11 @@ const RU = {
   'Still Water': 'Тихий омут',
   'Still Water, a short fishing tale': 'Тихий омут, короткая рыбацкая сказка',
   'Mute': 'Без звука',
-  'Skip fish': 'Пропустить рыбу',
+  'Skip': 'Дальше',
   'Fisherman': 'Рыбак',
   'Tap to continue': 'Нажми, чтобы продолжить',
   'A short fishing tale': 'Короткая рыбацкая сказка',
   'Tap to begin': 'Нажми, чтобы начать',
-  'Tap to cast. Tap when the float goes under. Hold to reel.': 'Нажми, чтобы забросить. Поплавок ушёл под воду — подсекай. Держи, чтобы тянуть.',
   'Cast again': 'Забросить снова',
   'Glass perch': 'Стеклянный окунь',
   'Eyeless perch': 'Безглазый окунь',
@@ -1254,13 +1253,13 @@ const RU = {
   'Someone knocks on the cabin door.': 'Кто-то стучит в дверь избушки.',
   'The knocking again. Slower.': 'Опять стучат. Медленнее.',
   'The line snapped.': 'Леска лопнула.',
-  'The line snapped. Let go when it pulls.': 'Леска лопнула. Отпускай, когда рыба рвётся.',
+  'The line snapped. Let go when it pulls.': 'Леска лопнула. Рыба рвётся — отпускай.',
   'It slipped away. Cast again.': 'Сорвалась. Забрасывай снова.',
   'It slipped the hook.': 'Сорвалась с крючка.',
   'Too early.': 'Рано.',
   'Too early. Nothing was biting yet.': 'Рано. Ещё не клевало.',
-  'Test mode on': 'Тестовый режим включён',
-  'Test mode off': 'Тестовый режим выключен',
+  'Test on': 'Тест включён',
+  'Test off': 'Тест выключен',
   'Golden fish': 'Золотая рыбка',
   'The lake': 'Озеро',
   'The sea': 'Море',
@@ -1372,15 +1371,16 @@ const RU = {
   'You said.': 'Ты же сказал.',
   'Cut the line.': 'Перережь леску.',
   'Tap to cast': 'Нажми, чтобы забросить',
-  'Wait for the float to go under': 'Жди, пока поплавок уйдёт под воду',
+  'Wait for a bite': 'Жди поклёвки',
   'Tap now': 'Подсекай',
-  'Hold to reel. Let go when it pulls hard.': 'Держи, чтобы тянуть. Отпускай, когда рыба рвётся.',
-  'Hold to reel': 'Держи, чтобы тянуть',
+  'Hold to reel. Let go when it pulls.': 'Держи, чтобы тянуть. Рыба рвётся — отпускай.',
   '1 fish': '1 рыба',
   ' fish': ' рыб',
-  'Endings found: ': 'Найдено концовок: ',
-  ' of ': ' из ',
-  'not found': 'не найдена',
+  // The endings counters: {n} found of {m}. The title says it in words; the ending card's pips carry the
+  // short form, with the whole sentence as their accessible name.
+  '{n} of {m} endings': '{n} из {m} концовок',
+  '{n} of {m}': '{n} из {m}',
+  'Endings found: {n} of {m}': 'Найдено концовок: {n} из {m}',
   'Unmute': 'Со звуком',
   ' (test build)': ' (тестовая сборка)', // the test build tab title (build.js --test)
 };
@@ -1397,7 +1397,11 @@ function ruPlural(n, forms) {
 // The HUD counter, the card's weight (a decimal comma in Russian) and the endings counter.
 const countText = n => (n <= 0 ? '' : LANG === 'ru' ? n + ' ' + ruPlural(n, RU_FISH) : n === 1 ? '1 fish' : n + ' fish');
 const kgText = w => (LANG === 'ru' ? w.toFixed(2).replace('.', ',') : w.toFixed(2)) + tr(' kg');
-const foundText = n => tr('Endings found: ') + n + tr(' of ') + ENDING_COUNT;
+// '{n} из {m} концовок' needs no ruPlural: after «из» the noun is in the genitive plural, governed by m (7).
+const fillCount = (s, n) => tr(s).replace('{n}', n).replace('{m}', ENDING_COUNT);
+const foundLine = n => fillCount('{n} of {m} endings', n);
+const foundShort = n => fillCount('{n} of {m}', n);
+const foundText = n => fillCount('Endings found: {n} of {m}', n);
 
 // ---------------------------------------------------------------- state
 const WS = {};
@@ -1485,7 +1489,7 @@ function stubUI() {
       else if (t) log.push(['dialogue', t]);
     },
     dlgChoices(list) { this.choices = list; if (list) log.push(['choices', list.map(c => c.label)]); },
-    dlgMore() {}, dlgBusy() {}, dlgHide: f('dlgHide'), thinkMore() {}, cardReady() {},
+    dlgMore() {}, dlgBusy() {}, dlgHide: f('dlgHide'), thinkMore() {}, cardReady() {}, phase() {},
     // The thought bubble: logged as 'think' entries; its choices (the companion's question) go in choices.
     think(text, opts) {
       log.push(['think', text, opts && opts.side || 'fisherman']);
@@ -2931,13 +2935,13 @@ function dlgNext() {
   const d = DLG.done; DLG.done = null;
   if (d) d();
 }
-// A line in a bubble, complete at once; the panel closes for it. The companion's has no label, the
-// fisherman's (side 'fisherman') carries his.
+// A line in a bubble, complete at once; the panel closes for it. No bubble carries a label: the tail says
+// who thinks it (labels are for the panel).
 function dlgBubble(L) {
   DLG.n = L.text.length; G.thinkUntil = 0;
   UI.dlgHide();
   const side = L.side || 'companion';
-  UI.think(L.text, { side, who: side === 'fisherman' ? tr(L.who) : '', mark: L.mark, choices: L.choices ? choiceList(L) : null, more: !L.choices });
+  UI.think(L.text, { side, mark: L.mark, choices: L.choices ? choiceList(L) : null, more: !L.choices });
 }
 // The choice buttons for a line. A tap closes the panel (or the bubble) and runs the pick at once; the
 // label never shows in the bubble. A pick that did not start a new dlgRun lets the list continue.
@@ -3517,7 +3521,7 @@ function drawOceanMarker(t) {
   }
 }
 // The choice is made by input: a cast while the big one is under the boat is the Swallowed ending; waiting the
-// window out lets it leave. Skip fish counts as a cast here.
+// window out lets it leave. A test skip counts as a cast here.
 function oceanCast() {
   STORY.ocean = 'swallowed'; // the weight holds through the lunge and fades as it swims off (bigSwimsOff)
   playCine(CINE_SWALLOW, () => showEnding('swallowed'));
@@ -4345,18 +4349,22 @@ function showEnding(id, variant) {
 }
 
 // ---------------------------------------------------------------- fishing
+// The prompts teach and then step aside: 'Tap to cast' and the wait line for the first two catches, the reel
+// line for the first three. 'Tap now' marks a timed window and always shows, and so does the ocean window's
+// 'Tap to cast' (a story beat, after its grace).
 function promptFor(p) {
-  if (p === 'ready') return 'Tap to cast';
+  if (p === 'ready') return G.tutorial < 2 ? 'Tap to cast' : '';
   if (p === 'ocean') return G.pt >= OCEAN_GRACE ? 'Tap to cast' : ''; // the window, after its grace (phase 22)
-  if (p === 'waiting' && G.tutorial < 2) return 'Wait for the float to go under';
+  if (p === 'waiting' && G.tutorial < 2) return 'Wait for a bite';
   if (p === 'bite') return 'Tap now';
-  if (p === 'reeling') return G.tutorial < 3 ? 'Hold to reel. Let go when it pulls hard.' : 'Hold to reel';
+  if (p === 'reeling' && G.tutorial < 3) return 'Hold to reel. Let go when it pulls.';
   return '';
 }
 // The tutorial prompt is hidden while a thought bubble is up, so two texts never share the stage.
 function refreshPrompt() { UI.prompt(G.t < G.thinkUntil || !G.arrived ? '' : tr(promptFor(G.phase))); }
 function setPhase(p) {
   G.phase = p; G.pt = 0;
+  UI.phase(p);
   refreshPrompt();
 }
 // Captions, with their end time tracked so the said lines can wait their turn.
@@ -4380,7 +4388,7 @@ function thinkBeat(text) {
 // ignored for THINK_GRACE seconds and the ▾ marker lights only after that.
 const THINK_GRACE = 0.8;
 function thinkLine(text, side) {
-  UI.think(tr(text), { who: side === 'fisherman' ? tr('Fisherman') : '', side, more: false });
+  UI.think(tr(text), { side, more: false });
   G.thinkUntil = Infinity; G.thinkAt = G.t; G.thinkMore = false;
   refreshPrompt();
 }
@@ -4744,14 +4752,15 @@ function release() { G.holding = false; }
 // Skips the fishing minigame: one call lands the next fish, or triggers the golden
 // scene or the red sequence, exactly as a real catch would. In the test build, enable with ?test in the
 // URL or the T key. The S key or the Skip button performs a skip.
-// TEST_BUILD gates the T and S keys, the Skip fish button and the ?test flag in the browser. It is false in
+// TEST_BUILD gates the T and S keys, the Skip button and the ?test flag in the browser. It is false in
 // the shipping build; npm run build:test flips it (build.js). Node tools call setTestMode directly.
 const TEST_BUILD = false;
 let TEST = false;
-function setTestMode(on) {
+// say: the T key's toggle shows a caption; switching it on at boot (the test page) or from the tools is silent.
+function setTestMode(on, say) {
   TEST = !!on;
   if (UI.el && UI.el.skip) UI.el.skip.hidden = !TEST;
-  cap(TEST ? 'Test mode on' : 'Test mode off', 1.5);
+  if (say) cap(TEST ? 'Test on' : 'Test off', 1.5);
 }
 const SKIP_BOB = { x: 63, y: 280 };
 function testCatch() {
@@ -4852,6 +4861,9 @@ function init() {
 // of bumps along the top, a smaller row along the bottom and one round each end; the tail is three pixel
 // circles (TAIL_PUFFS, radius 3, 2 and 1) stepping down from x tx toward the speaker (dir).
 const THINK_PAD = 2, THINK_GW = Math.round(W * 0.4), THINK_GUTTER = 16, BUMP_R = 5.5;
+// A long line (the bait line in Russian) widens the cloud in steps up to THINK_GW_MAX game pixels, so it sets in
+// THINK_LINES lines.
+const THINK_GW_MAX = 116, THINK_LINES = 3;
 const TAIL_PUFFS = [
   { dx: 0, dy: 4, rows: ['..###..', '.#####.', '#######', '#######', '#######', '.#####.', '..###..'] },
   { dx: 5, dy: 10, rows: ['.###.', '#####', '#####', '#####', '.###.'] },
@@ -4913,29 +4925,115 @@ const THINK_AT = {
 };
 const thinkAnchor = side => (WS.mood > 1 && THINK_AT[side + 'Red']) || THINK_AT[side];
 // The catch card's sprite scale: the largest integer factor that keeps the fish inside CARD_FISH_W of the
-// panel's width and CARD_FISH_H percent of the stage's width tall, between CARD_FISH_MIN and CARD_FISH_MAX,
+// panel's width, CARD_FISH_H percent of the stage's width tall and CARD_FISH_V percent of its height (the card
+// sits low, under the boat, so a short stage takes a smaller fish), between CARD_FISH_MIN and CARD_FISH_MAX,
 // so the species signatures read on a phone (bible, section 5).
-const CARD_FISH_W = 0.6, CARD_FISH_H = 26, CARD_FISH_MIN = 2, CARD_FISH_MAX = 8;
-function cardFishScale(w, h, stageW, panelW) {
-  const u = stageW / 100;
-  return clamp(Math.floor(Math.min((CARD_FISH_W * (panelW || 80 * u)) / w, (CARD_FISH_H * u) / h)), CARD_FISH_MIN, CARD_FISH_MAX);
+const CARD_FISH_W = 0.6, CARD_FISH_H = 26, CARD_FISH_V = 12, CARD_FISH_MIN = 2, CARD_FISH_MAX = 8;
+function cardFishScale(w, h, stageW, panelW, stageH) {
+  const u = stageW / 100, tall = Math.min(CARD_FISH_H * u, stageH ? CARD_FISH_V * stageH / 100 : Infinity);
+  return clamp(Math.floor(Math.min((CARD_FISH_W * (panelW || 80 * u)) / w, tall / h)), CARD_FISH_MIN, CARD_FISH_MAX);
 }
 // Russian typography on screen: a one-letter word (в, с, к, у, о, и, а, я) keeps the next word on its line,
 // and an em dash keeps the word before it, through a no-break space. Only the displayed text changes (the
 // UI sinks call it): tr, the logic and the sim see the plain strings. Two passes catch "и в дом".
+// A one- or two-letter word before closing punctuation keeps the word before it too (сказал он.).
+const NB_TAIL = / ([а-яёА-ЯЁ]{1,2}[.,!?…])/g;
 const NB_ONE = /(^|[\s («"])([вВсСкКуУоОиИаАяЯ]) /g;
 function nbsp(t) {
   if (LANG !== 'ru' || !t) return t;
-  return t.replace(NB_ONE, '$1$2 ').replace(NB_ONE, '$1$2 ').replace(/ —/g, ' —');
+  return t.replace(NB_ONE, '$1$2 ').replace(NB_ONE, '$1$2 ').replace(/ —/g, ' —').replace(NB_TAIL, ' $1');
+}
+// The title's pixel lettering (chosen in a logo lab: 'soft'). Hand-made letters drawn as SVG rects, one glyph
+// pixel to one game pixel, so set on a whole game-pixel column and row (placeLogo) the name sits on the
+// canvas's own grid; it recolours with the mood through the UI's CSS variables: the letters in the ink, a
+// one-pixel ring round them in --ui-edge (the ramp's middle index), which all but vanishes on the sky and holds
+// the letters over a bright cloud. Each glyph is a one-pixel skeleton set a column heavier, so the stems are two
+// game pixels and the bars one. Rows: 0 the cap top, 4 the x-height, 11 the baseline, 12 to 14 the descender;
+// each glyph is [its first row, its rows]. Enough glyphs for 'Still Water' and 'Тихий омут'.
+const LOGO_GLYPHS = {
+  S: [0, ['.#####.', '#.....#', '#......', '#......', '.#.....', '..###..', '.....#.', '......#', '......#', '......#', '#.....#', '.#####.']],
+  W: [0, ['#.......#', '#.......#', '#.......#', '#.......#', '#...#...#', '#...#...#', '#...#...#', '#...#...#', '#...#...#', '#...#...#', '#...#...#', '.###.###.']],
+  t: [1, ['.#..', '.#..', '.#..', '####', '.#..', '.#..', '.#..', '.#..', '.#..', '.#..', '..##']],
+  i: [1, ['.#.', '.#.', '...', '##.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '..#']],
+  l: [0, ['##.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '..#']],
+  a: [4, ['.####.', '.....#', '.....#', '.#####', '#....#', '#....#', '#...##', '.###.#']],
+  e: [4, ['.####.', '#....#', '#....#', '######', '#.....', '#.....', '#.....', '.####.']],
+  r: [4, ['#..##', '#.#..', '##...', '#....', '#....', '#....', '#....', '#....']],
+  'Т': [0, ['#######', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...', '...#...']],
+  'и': [4, ['#....#', '#....#', '#...##', '#..#.#', '#.#..#', '##...#', '#....#', '#....#']],
+  'й': [1, ['.#..#.', '..##..', '......', '#....#', '#....#', '#...##', '#..#.#', '#.#..#', '##...#', '#....#', '#....#']],
+  'х': [4, ['#....#', '#....#', '.#..#.', '..##..', '..##..', '.#..#.', '#....#', '#....#']],
+  'о': [4, ['.####.', '#....#', '#....#', '#....#', '#....#', '#....#', '#....#', '.####.']],
+  'м': [4, ['#.....#', '##...##', '#.#.#.#', '#..#..#', '#.....#', '#.....#', '#.....#', '#.....#']],
+  'у': [4, ['#....#', '#....#', '#....#', '#....#', '#....#', '#....#', '#...##', '.###.#', '.....#', '.....#', '.####.']],
+  'т': [4, ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..']],
+};
+const LOGO_ROWS = 15, LOGO_GAP = 2, LOGO_SPACE = 4, LOGO_ROW = 42; // LOGO_ROW: the cap top, in game rows
+// The name as an SVG string and its size in game pixels (one pixel of padding round the letters for the ring).
+function logoSVG(text) {
+  const on = new Set();
+  let x = 0;
+  for (const ch of text) {
+    const g = LOGO_GLYPHS[ch];
+    if (!g) { x += ch === ' ' ? LOGO_SPACE : 5 + LOGO_GAP; continue; }
+    let w = 0;
+    g[1].forEach((row, j) => {
+      for (let i = 0; i < row.length; i++) if (row[i] === '#') { on.add((x + i) + ',' + (g[0] + j)); on.add((x + i + 1) + ',' + (g[0] + j)); }
+      w = Math.max(w, row.length);
+    });
+    x += w + 1 + LOGO_GAP;
+  }
+  const w = Math.max(0, x - LOGO_GAP), W2 = w + 3, H2 = LOGO_ROWS + 2;
+  const ring = new Set();
+  for (const k of on) {
+    const [cx, cy] = k.split(',').map(Number);
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) if (!on.has((cx + dx) + ',' + (cy + dy))) ring.add((cx + dx) + ',' + (cy + dy));
+  }
+  // Each row's runs as rects, shifted by the padding.
+  const rects = cells => {
+    let r = '';
+    for (let y = -1; y <= LOGO_ROWS; y++) {
+      for (let x0 = -1; x0 <= w + 1; x0++) {
+        if (!cells.has(x0 + ',' + y)) continue;
+        let x1 = x0;
+        while (cells.has((x1 + 1) + ',' + y)) x1++;
+        r += '<rect x="' + (x0 + 1) + '" y="' + (y + 1) + '" width="' + (x1 - x0 + 1) + '" height="1"/>';
+        x0 = x1;
+      }
+    }
+    return r;
+  };
+  const svg = '<svg viewBox="0 0 ' + W2 + ' ' + H2 + '" shape-rendering="crispEdges" aria-hidden="true" focusable="false"' +
+    ' style="width:calc(var(--gp) * ' + W2 + ');height:calc(var(--gp) * ' + H2 + ')">' +
+    '<g style="fill:var(--ui-edge)">' + rects(ring) + '</g><g style="fill:var(--ui-ink)">' + rects(on) + '</g></svg>';
+  return { svg, w: W2, h: H2 };
+}
+// The slabs (the quiet slab of the UI lab): a 5 by 5 game-pixel box with its four corner pixels cut, its ring
+// in the line colour (no ring when line is null) and the rest in the fill, as a tiny SVG that border-image
+// nine-slices at SLAB_K game pixels. UI.colors builds them from the live palette.
+const SLAB_K = 2;
+function slabURI(fill, line) {
+  const n = 2 * SLAB_K + 1;
+  const inside = (x, y) => x >= 0 && y >= 0 && x < n && y < n && !((x === 0 || x === n - 1) && (y === 0 || y === n - 1));
+  let f = '', l = '';
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    if (!inside(x, y)) continue;
+    const r = "<rect x='" + x + "' y='" + y + "' width='1' height='1'/>";
+    if (line && (!inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1))) l += r; else f += r;
+  }
+  const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='" + n + "' height='" + n + "' viewBox='0 0 " + n + ' ' + n +
+    "' shape-rendering='crispEdges'><g fill='" + fill + "'>" + f + '</g>' + (line ? "<g fill='" + line + "'>" + l + '</g>' : '') + '</svg>';
+  return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
 }
 function makeUI() {
   const $ = id => document.getElementById(id);
   const el = {
     stage: $('stage'), prompt: $('prompt'), caption: $('caption'), count: $('count'),
-    think: $('think'), thinkPix: $('thinkPix'), thinkWho: $('thinkWho'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'), thinkMore: $('thinkMore'),
+    think: $('think'), thinkPix: $('thinkPix'), thinkText: $('thinkText'), thinkChoices: $('thinkChoices'), thinkMore: $('thinkMore'),
     card: $('card'), cardFish: $('cardFish'), cardName: $('cardName'), cardMeta: $('cardMeta'), cardDesc: $('cardDesc'), cardVoice: $('cardVoice'),
     dlg: $('dialog'), who: $('who'), text: $('text'), choices: $('choices'), more: $('more'),
-    title: $('title'), found: $('found'), foundList: $('foundList'), ending: $('ending'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endFound: $('endFound'), endList: $('endList'),
+    title: $('title'), logo: document.querySelector('#title h1'), found: $('found'),
+    ending: $('ending'), endBox: document.querySelector('#ending .endBox'), endTitle: $('endTitle'), endText: $('endText'), endAsked: $('endAsked'), endPips: $('endPips'),
     again: $('again'), fade: $('fade'), mute: $('mute'), skip: $('skip'), lang: $('lang'),
   };
   let capTimer = null;
@@ -4968,38 +5066,55 @@ function makeUI() {
       box.appendChild(b);
     });
   };
-  // On a short stage the buttons may not fit under the question at a comfortable size: when the question has
-  // to scroll to make room for them, four or more go into two columns.
+  // The choices stay one column of plain rows: the question may scroll to make room for them, and only when
+  // that would leave less than two lines of it in view (a short stage, four or more answers) do they go into
+  // two columns.
   const fitChoices = () => {
     el.choices.classList.remove('grid');
     if (el.choices.hidden || !el.choices.classList.contains('many')) return;
-    if (el.text.scrollHeight > el.text.clientHeight + 1 || el.dlg.scrollHeight > el.dlg.clientHeight + 1) el.choices.classList.add('grid');
+    const lh = parseFloat(getComputedStyle(el.text).lineHeight) || 0;
+    const need = Math.min(el.text.scrollHeight, lh * 2) - 1;
+    if (el.text.clientHeight < need || el.dlg.scrollHeight > el.dlg.clientHeight + 1) el.choices.classList.add('grid');
   };
-  const endingList = (box, found) => {
+  // The endings found as pips (filled when found) and the short count; the whole sentence is their name.
+  const pips = (box, found) => {
     box.innerHTML = '';
-    if (!found) return;
+    const n = found ? found.length : 0;
+    box.hidden = !n;
+    if (!n) return;
+    box.setAttribute('aria-label', foundText(n));
     Object.keys(ENDINGS).forEach(id => {
-      const s = document.createElement('span');
-      const got = found.indexOf(id) >= 0;
-      s.textContent = got ? tr(ENDINGS[id].title) : '?'; // a neutral mark: a dash between titles read as punctuation
-      if (!got) s.setAttribute('aria-label', tr('not found'));
-      box.appendChild(s);
+      const i = document.createElement('i');
+      if (found.indexOf(id) >= 0) i.className = 'on';
+      box.appendChild(i);
     });
+    const b = document.createElement('b');
+    b.textContent = foundShort(n);
+    box.appendChild(b);
   };
   let againTimer = null, cardSize = null;
   const cardScale = () => {
     if (!cardSize) return;
-    const sc = cardFishScale(cardSize.w, cardSize.h, el.stage.clientWidth, el.card.clientWidth);
+    const sc = cardFishScale(cardSize.w, cardSize.h, el.stage.clientWidth, el.card.clientWidth, el.stage.clientHeight);
     el.cardFish.style.width = cardSize.w * sc + 'px'; el.cardFish.style.height = cardSize.h * sc + 'px';
   };
   // The bubble's place and cloud from the live stage size, all in whole game pixels (gp CSS px each): the
-  // width is THINK_GW, the height the measured text's rounded up, so the cloud always holds its text; its
-  // right edge stays THINK_GUTTER CSS px inside the stage. The cloud is drawn by thinkMask and thinkRects.
+  // width is THINK_GW, widened in steps up to THINK_GW_MAX while the text would take more than THINK_LINES
+  // lines; the height is the measured content's, rounded up, so the cloud always holds its text (and the
+  // companion's two answers); its right edge stays THINK_GUTTER CSS px inside the stage. The cloud is drawn by
+  // thinkMask and thinkRects.
   const thinkLayout = side => {
-    const a = thinkAnchor(side), gp = el.stage.clientWidth / W, gw = THINK_GW;
-    const left = Math.min(a.left, Math.floor(W - THINK_GUTTER / gp) - gw - 1);
-    el.think.style.width = gw * gp + 'px';
+    const a = thinkAnchor(side), gp = el.stage.clientWidth / W;
+    const lh = parseFloat(getComputedStyle(el.thinkText).lineHeight) || 0;
+    let gw = THINK_GW;
     el.think.style.height = 'auto';
+    for (;;) {
+      el.think.style.width = gw * gp + 'px';
+      const lines = lh ? Math.round(el.thinkText.getBoundingClientRect().height / lh) : 0;
+      if (lines <= THINK_LINES || gw >= THINK_GW_MAX) break;
+      gw = Math.min(THINK_GW_MAX, gw + 4);
+    }
+    const left = Math.min(a.left, Math.floor(W - THINK_GUTTER / gp) - gw - 1);
     const gh = Math.max(12, Math.ceil(el.think.getBoundingClientRect().height / gp - 0.01));
     el.think.style.height = gh * gp + 'px';
     el.think.style.left = left * gp + 'px';
@@ -5011,23 +5126,29 @@ function makeUI() {
     svg.style.width = k.mw * gp + 'px'; svg.style.height = k.mh * gp + 'px';
     svg.innerHTML = thinkRects(k);
   };
-  // Press Start 2P (.px) is drawn on an 8 px grid: its size is snapped to a whole multiple of 8 device px
-  // (from the CSS size, read afresh each time), and a title set nowrap (h1, h2) steps down until it fits
-  // its box with a 24 px gutter, so a long title never clips or crowds the edge.
-  const snapPx = () => {
-    const dpr = window.devicePixelRatio || 1, step = 8 / dpr;
-    el.stage.querySelectorAll('.px').forEach(n => {
-      n.style.fontSize = '';
-      let k = Math.max(1, Math.round((parseFloat(getComputedStyle(n).fontSize) || 8) * dpr / 8));
-      n.style.fontSize = k * step + 'px';
-      if (n.tagName !== 'H1' && n.tagName !== 'H2') return;
-      const box = n.parentElement, cs = getComputedStyle(box);
-      const room = Math.min(box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), el.stage.clientWidth - 48);
-      while (k > 1 && n.scrollWidth > room) { k--; n.style.fontSize = k * step + 'px'; }
-    });
+  // The title's pixel name, in the page's language, on a whole game-pixel column (centred) and row (LOGO_ROW).
+  const placeLogo = () => {
+    const L = logoSVG(tr('Still Water'));
+    el.logo.querySelectorAll('svg').forEach(n => n.remove());
+    el.logo.insertAdjacentHTML('beforeend', L.svg);
+    el.logo.style.left = 'calc(var(--gp) * ' + Math.floor((W - L.w) / 2) + ')';
+    el.logo.style.top = 'calc(var(--gp) * ' + LOGO_ROW + ')';
   };
-  // A plate (.plate) hugs its words: the box is set to the widest line as laid out (balanced), plus its padding.
-  const hugPlate = n => {
+  placeLogo();
+  // The ending's title is set nowrap: it steps down a pixel at a time until it fits its box, so a long title
+  // never clips or crowds the edge.
+  const fitTitles = () => {
+    const n = el.endTitle;
+    n.style.fontSize = '';
+    if (!el.ending.classList.contains('on')) return;
+    const cs = getComputedStyle(el.endBox);
+    const room = Math.min(el.endBox.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), el.stage.clientWidth - 48);
+    let fs = parseFloat(getComputedStyle(n).fontSize) || 16;
+    while (fs > 12 && n.scrollWidth > room) { fs -= 1; n.style.fontSize = fs + 'px'; }
+  };
+  // The caption's slab hugs its words: its box is set to the widest line as laid out (balanced), plus padding.
+  const hugCaption = () => {
+    const n = el.caption;
     n.style.width = '';
     if (!n.textContent) return;
     const r = document.createRange(), rows = new Map();
@@ -5042,7 +5163,7 @@ function makeUI() {
     const cs = getComputedStyle(n);
     n.style.width = Math.ceil(w + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2) + 'px';
   };
-  const hugPlates = () => el.stage.querySelectorAll('.plate').forEach(hugPlate);
+  let slabKey = '';
   const ui = {
     el, choices: null, thinkOwns: false, thinkSide: null, choicesAt: -9,
     choicesCold() { return G.t - this.choicesAt < CHOICE_GRACE; },
@@ -5051,24 +5172,27 @@ function makeUI() {
       if (this.choicesCold()) return;
       el.choices.classList.remove('cold'); el.thinkChoices.classList.remove('cold');
     },
+    // The phase on the stage (data-phase), for the DOM test's bot: the prompts no longer say what to do after
+    // the first catches.
+    phase(p) { el.stage.dataset.phase = p; },
     thinkMore(on) { el.thinkMore.classList.toggle('on', !!on); },
     cardReady() { el.card.classList.add('ready'); },
     dlgBusy(on) { if (on) el.dlg.setAttribute('aria-busy', 'true'); else el.dlg.removeAttribute('aria-busy'); },
-    fitChoices,
-    // The dialogue panel never reaches the companion: its cap is the stage below his head (at his seat, or
-    // floating once the boat has sunk), less the panel's bottom margin (4u). Set on resize and with every menu.
+    fitChoices, fitTitles, hugCaption,
+    // The dialogue panel and the catch card never reach the companion: their cap is the stage below his head
+    // (at his seat, or floating once the boat has sunk), less the panel's bottom margin. Set on resize and with
+    // every menu.
     dlgCap() {
       const top = compY(boatSinkPx()) - 4;
-      el.stage.style.setProperty('--dlg-max', 'min(46%, calc(' + ((H - top) / H * 100).toFixed(2) + '% - var(--u) * 4))');
+      el.stage.style.setProperty('--dlg-max', 'min(46%, calc(' + ((H - top) / H * 100).toFixed(2) + '% - var(--gp) * 6))');
     },
     inDialog(t) { return !!(t && t.closest && t.closest('#dialog.on')); },
-    // The thought bubble (bible, 4b): opts.side 'fisherman' (default) or 'companion', opts.who the tiny label,
-    // opts.mark the wrong question mark, opts.choices buttons under it (the companion's question), opts.more
-    // the ▾ marker in the lower right for a bubble that waits for a tap (every bubble does).
+    // The thought bubble (bible, 4b): opts.side 'fisherman' (default) or 'companion', opts.mark the wrong
+    // question mark, opts.choices the answers inside it as rows (the companion's question), opts.more the ▾
+    // marker in the lower right for a bubble that waits for a tap (every bubble does). No bubble has a label.
     think(text, opts) {
       opts = opts || {};
       const side = opts.side || 'fisherman';
-      el.thinkWho.hidden = !opts.who; el.thinkWho.textContent = opts.who || '';
       setText(el.thinkText, text, opts.mark);
       el.thinkMore.classList.toggle('on', !!opts.more);
       buttons(el.thinkChoices, opts.choices || null);
@@ -5086,11 +5210,10 @@ function makeUI() {
       if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; }
     },
     thinkRelayout() { if (this.thinkSide) thinkLayout(this.thinkSide); },
-    snapPx, hugPlates,
     prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === tr('Tap now')); },
     caption(t, dur, style) {
-      el.caption.textContent = nbsp(t); el.caption.className = 'shade plate on' + (style ? ' ' + style : '');
-      hugPlate(el.caption);
+      el.caption.textContent = nbsp(t); el.caption.className = 'slab on' + (style ? ' ' + style : '');
+      hugCaption();
       clearTimeout(capTimer);
       capTimer = setTimeout(() => el.caption.classList.remove('on'), (dur || 2.5) * 1000);
     },
@@ -5116,7 +5239,7 @@ function makeUI() {
     cardHide() { el.card.classList.remove('on', 'ready'); },
     // After a resize or rotation, the open card's fish is rescaled to the new card.
     cardRelayout() { if (el.card.classList.contains('on')) cardScale(); },
-    dlgShow(who, style) { el.dlg.className = 'panel on ' + (style || ''); el.who.textContent = who || ''; el.who.hidden = !who; el.more.classList.remove('on'); this.dlgBusy(true); },
+    dlgShow(who, style) { el.dlg.className = 'slab on ' + (style || ''); el.who.textContent = who || ''; el.who.hidden = !who; el.more.classList.remove('on'); this.dlgBusy(true); },
     dlgText(t, mark) { setText(el.text, t, mark); },
     dlgChoices(list) {
       buttons(el.choices, list);
@@ -5128,21 +5251,28 @@ function makeUI() {
     },
     dlgMore(on) { el.more.classList.toggle('on', !!on); },
     dlgHide() { el.dlg.classList.remove('on', 'choosing'); el.dlg.removeAttribute('aria-busy'); el.choices.innerHTML = ''; el.choices.hidden = true; this.choices = null; },
-    // found: the ids of the endings found so far. The counter, then the six titles in order, a dash for each unfound one.
+    // found: the ids of the endings found so far. The title says nothing of them on a first run, then one quiet
+    // line in words.
     title(on, found) {
       el.title.classList.toggle('on', !!on);
+      el.stage.classList.toggle('titling', !!on); // a caption on the title sits low, clear of the name
       el.lang.hidden = !on; // the language link only on the title
       const n = found ? found.length : 0;
-      el.found.textContent = n ? foundText(n) : '';
-      endingList(el.foundList, n ? found : null);
-      hugPlate(el.found); hugPlate(el.foundList);
+      el.found.textContent = n ? foundLine(n) : '';
     },
+    // The ending card. The asked-for list's first line is its header (dim); the labels follow in the pale ink.
     ending(e, found) {
-      el.endTitle.textContent = e.title; el.endText.textContent = nbsp(e.text); el.endAsked.textContent = nbsp(e.asked || '');
-      el.endFound.textContent = foundText(found.length);
-      endingList(el.endList, found);
+      el.endTitle.textContent = e.title; el.endText.textContent = nbsp(e.text);
+      const asked = nbsp(e.asked || '').split(ASKED_SEP);
+      el.endAsked.textContent = '';
+      if (asked.length > 1) {
+        const h = document.createElement('span');
+        h.className = 'head'; h.textContent = asked[0];
+        el.endAsked.append(h, ASKED_SEP + asked.slice(1).join(ASKED_SEP));
+      } else el.endAsked.textContent = asked[0];
+      pips(el.endPips, found);
       el.ending.classList.add('on');
-      snapPx(); // the title steps down to fit its line
+      fitTitles();
       // Cast again wakes only once the card has faded in (AGAIN_DELAY), so a stray tap from the finale cannot
       // restart before the ending is read; until then it is disabled and out of the tab order.
       this.againOff();
@@ -5156,27 +5286,44 @@ function makeUI() {
     againOff() { clearTimeout(againTimer); againTimer = null; el.again.disabled = true; el.again.tabIndex = -1; },
     endingHide() { el.ending.classList.remove('on'); this.againOff(); },
     fade(v, dur) { el.fade.style.transitionDuration = (dur || 0.6) + 's'; el.fade.style.opacity = v; },
+    // Mute is a pixel speaker (crossed out when muted); its words are its name and its tooltip, the action.
+    muted(on) {
+      const w = tr(on ? 'Unmute' : 'Mute');
+      el.mute.setAttribute('aria-label', w); el.mute.title = w;
+      el.mute.dataset.muted = on ? '1' : '';
+    },
     colors() {
       const s = document.documentElement.style;
-      s.setProperty('--ui-panel', rgb(0, 0.86));
-      s.setProperty('--ui-panel-soft', rgb(0, 0.6)); // under Mute and the language link
+      const ink = mixWhite(11, WS.mood > 1 ? 0.25 : 0.4);
       s.setProperty('--ui-solid', rgb(0));
       s.setProperty('--ui-edge', rgb(6));
-      s.setProperty('--ui-ink', mixWhite(11, WS.mood > 1 ? 0.25 : 0.4));
+      s.setProperty('--ui-ink', ink);
+      s.setProperty('--ui-pale', mixWhite(11, 0.7)); // the ending's words: the ink's own hue, paler, to read on black
+      s.setProperty('--ui-row', mixWhite(10, 0.3)); // a choice at rest, one ramp step above the dim line colour
       s.setProperty('--ui-dim', mixWhite(9, 0.2));
       s.setProperty('--ui-accent', WS.mood > 1 ? mixWhite(15, 0.45) : rgb(15)); // the ▾ and labels stay visible on the red panel
       document.body.style.background = rgb(0);
+      // The slabs: the box (index 0 ringed by 1), the raised button (1 ringed by 2), its focus (1 ringed by the
+      // ink) and a focused row (1, no ring). Rebuilt only when one of their colours changes.
+      const key = rgb(0) + rgb(1) + rgb(2) + ink;
+      if (key === slabKey) return;
+      slabKey = key;
+      s.setProperty('--k', String(SLAB_K));
+      s.setProperty('--slab', slabURI(rgb(0), rgb(1)));
+      s.setProperty('--raise', slabURI(rgb(1), rgb(2)));
+      s.setProperty('--hi', slabURI(rgb(1), ink));
+      s.setProperty('--row', slabURI(rgb(1), null));
     },
   };
   return ui;
 }
 const CHOICE_GRACE = 0.4, AGAIN_DELAY = 1600;
-// The template's own text, in the page's language: the tab title, the labels and the title screen.
+// The template's own text, in the page's language: the tab title, the description, the labels and the title.
 const STATIC_TEXT = [
-  ['#stage', 'aria-label', 'Still Water, a short fishing tale'], ['#mute', '', 'Mute'], ['#skip', '', 'Skip fish'],
-  ['#thinkWho', '', 'Fisherman'], ['#card .hint', '', 'Tap to continue'], ['#title h1', '', 'Still Water'],
-  ['#title .sub', '', 'A short fishing tale'], ['#title .begin', '', 'Tap to begin'],
-  ['#title .how', '', 'Tap to cast. Tap when the float goes under. Hold to reel.'], ['#again', '', 'Cast again'],
+  ['#stage', 'aria-label', 'Still Water, a short fishing tale'], ['meta[name="description"]', 'content', 'A short fishing tale'],
+  ['#mute', 'aria-label', 'Mute'], ['#mute', 'title', 'Mute'], ['#skip', 'aria-label', 'Skip'], ['#skip', 'title', 'Skip'],
+  ['#card .hint', '', 'Tap to continue'], ['#title h1', 'aria-label', 'Still Water'], ['#title h1 .sr', '', 'Still Water'],
+  ['#title .begin', '', 'Tap to begin'], ['#again', '', 'Cast again'],
 ];
 function staticText() {
   document.documentElement.lang = LANG;
@@ -5201,7 +5348,7 @@ function langHref() {
 function langLink(a) {
   const o = OTHER_LANG[LANG];
   a.textContent = o.label; a.href = langHref();
-  a.setAttribute('hreflang', o.code); a.setAttribute('lang', o.code); a.setAttribute('aria-label', o.name);
+  a.setAttribute('hreflang', o.code); a.setAttribute('lang', o.code); a.setAttribute('aria-label', o.name); a.title = o.name;
 }
 function boot() {
   LANG = pickLang();
@@ -5232,8 +5379,8 @@ function boot() {
     document.documentElement.style.setProperty('--u', sw / 100 + 'px');
     document.documentElement.style.setProperty('--gp', sw / W + 'px');
     document.getElementById('prompt').style.bottom = ((34 / H) * 100).toFixed(2) + '%';
-    UI.snapPx();
-    UI.hugPlates();
+    UI.fitTitles();
+    UI.hugCaption();
     UI.dlgCap();
     UI.thinkRelayout();
     UI.fitChoices();
@@ -5241,9 +5388,9 @@ function boot() {
   }
   window.addEventListener('resize', resize);
   resize();
-  // The web fonts arrive after the first layout (display=swap), and the Cyrillic or italic subset only when
-  // first used: the bubble, the panel's cap, the two columns and the pixel sizes are measured again with the
-  // real metrics each time a load finishes.
+  // The web font arrives after the first layout (display=swap), and the Cyrillic or italic subset only when
+  // first used: the bubble, the caption's slab, the two columns and the ending's title are measured again with
+  // the real metrics each time a load finishes.
   if (document.fonts) {
     if (document.fonts.ready) document.fonts.ready.then(resize, () => {});
     if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', resize);
@@ -5273,7 +5420,7 @@ function boot() {
       return;
     }
     if (e.code === 'KeyC') { if (companionOpen()) companionTap(); return; } // the keyboard's way to tap him
-    if (TEST_BUILD && e.code === 'KeyT') { setTestMode(!TEST); return; }
+    if (TEST_BUILD && e.code === 'KeyT') { setTestMode(!TEST, true); return; }
     if (TEST_BUILD && e.code === 'KeyS' && TEST) { testCatch(); return; }
     if (e.code === 'Space' || e.code === 'Enter') {
       if (document.activeElement && /^(BUTTON|A)$/.test(document.activeElement.tagName)) return;
@@ -5290,7 +5437,7 @@ function boot() {
     e.stopPropagation();
     SFX.setMuted(!SFX.muted); // before init, so a mute before the first tap starts the audio silent
     SFX.init(); SFX.resume();
-    UI.el.mute.textContent = tr(SFX.muted ? 'Unmute' : 'Mute'); // the label is the action
+    UI.muted(SFX.muted);
     UI.el.mute.blur();
   });
   UI.el.again.addEventListener('click', e => { e.stopPropagation(); if (UI.el.again.disabled) return; UI.el.again.blur(); UI.againOff(); restart(); });

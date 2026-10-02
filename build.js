@@ -33,10 +33,14 @@ if (isTest) code = code.replace(TEST_FLAG, 'setTestMode(true); // test build').r
 const strip = c => c.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
 const src = strip(code);
 
-// The tab title and <html lang> before the script runs (link previews read them); staticText sets both again.
-const TITLES = { en: ['Still Water', ' (test build)'], ru: ['Тихий омут', ' (тестовая сборка)'] };
+// The tab title, the description and <html lang> before the script runs (link previews read them); staticText
+// sets them again.
+const TITLES = { en: ['Still Water', ' (test build)', 'A short fishing tale'], ru: ['Тихий омут', ' (тестовая сборка)', 'Короткая рыбацкая сказка'] };
 const title = TITLES[lang][0] + (isTest ? TITLES[lang][1] : '');
-const page = tpl.replace('<title>Still Water</title>', '<title>' + title + '</title>').replace('<html lang="en">', '<html lang="' + lang + '">');
+const DESC = '<meta name="description" content="A short fishing tale">';
+if (!tpl.includes(DESC)) throw new Error('src/template.html is missing the description meta');
+const page = tpl.replace('<title>Still Water</title>', '<title>' + title + '</title>').replace('<html lang="en">', '<html lang="' + lang + '">')
+  .replace(DESC, '<meta name="description" content="' + TITLES[lang][2] + '">');
 const out = page.replace('/*GAME*/', () => src); // function form: no $-pattern substitution
 
 const defaultDest = lang === 'ru'
