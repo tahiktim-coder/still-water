@@ -30,10 +30,12 @@
   --ui-row: #c3def3;
   --ui-dim: #99c4e7;
   --ui-accent: #e2aa2a;
-  --slab: none; --raise: none; --hi: none; --row: none; --k: 2;
+  --slab: none; --raise: none; --hi: none; --row: none; --plate: none; --ask: none; --k: 2;
+  --ui-line: #3673b1; /* rings that must read (Cast again, the hollow pips): 3:1 against the slab */
   --u: 3.6px;
   --gp: 1px; /* one game pixel in CSS px, set by resize */
   --font: Literata, 'PT Serif', Georgia, serif;
+  --who-fs: max(11px, calc(var(--u) * 2.97)); /* the small size: the speaker labels */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --page-bg: #07142a; --page-ink: #eaf7ff; }
@@ -66,9 +68,20 @@ body {
 /* The slab: one opaque box on the game grid (see the head of this sheet). */
 .slab { border: 0 solid transparent; border-image: var(--slab) var(--k) fill / calc(var(--gp) * var(--k)) stretch; }
 .slab:empty { border-image: none; }
-/* Loose text over the picture (the prompt, 'Tap to begin'): a one-game-pixel outline in the darkest index. */
-.shade { text-shadow: var(--gp) 0 0 var(--ui-solid), calc(var(--gp) * -1) 0 0 var(--ui-solid), 0 var(--gp) 0 var(--ui-solid), 0 calc(var(--gp) * -1) 0 var(--ui-solid),
-  0 calc(var(--gp) * 2) 0 var(--ui-solid); }
+/* Loose text over the picture (the prompt, 'Tap to begin'): a closed one-game-pixel ring in the darkest index
+   (the four sides and the four corners), no drop. */
+.shade { --o: var(--gp); --n: calc(var(--gp) * -1);
+  text-shadow: var(--o) 0 0 var(--ui-solid), var(--n) 0 0 var(--ui-solid), 0 var(--o) 0 var(--ui-solid), 0 var(--n) 0 var(--ui-solid),
+    var(--o) var(--o) 0 var(--ui-solid), var(--n) var(--o) 0 var(--ui-solid), var(--o) var(--n) 0 var(--ui-solid), var(--n) var(--n) 0 var(--ui-solid); }
+/* A hyphenated word never breaks at its hyphen (что-нибудь); a line typing out keeps its rest laid out but
+   unseen (richText), so no word jumps to the next line as it types. */
+.nw { white-space: nowrap; }
+/* A sentence of a short text (a caption, a bubble, a card's line) is its own box, so lines break between
+   sentences where they fit (sentText). */
+.sent { display: inline-block; text-wrap: balance; }
+.ghost { color: transparent; text-shadow: none; }
+/* A bubble whose sentences would take more than three lines flows them as one balanced text (thinkLayout). */
+.flow .sent { display: inline; }
 /* The pixel markers, drawn with clip-path so no glyph falls back to a system font: a 3 by 5 game-pixel triangle
    pointing right in the label colour before every choice (the panel, the companion's slab, Cast again), 3 game
    pixels before its words and centred on their first line; a 5 by 3 one pointing down for 'more' (the panel,
@@ -85,11 +98,11 @@ body {
 /* The HUD: the fish count on a small slab, and 44 px buttons, each a 15 by 11 game-pixel slab under a pixel
    icon (Mute, Skip) or a two-letter code (the language link, on the title only). */
 #hud {
-  position: absolute; z-index: 5; top: calc(var(--gp) * 2); left: calc(var(--gp) * 4); right: var(--gp);
+  position: absolute; z-index: 5; top: 0; left: 0; right: 0; /* set by resize: each slab the same whole game pixels from the edges */
   display: flex; justify-content: space-between; align-items: center;
   font-size: max(11px, calc(var(--u) * 2.97)); font-weight: 500; pointer-events: none;
 }
-#count { color: var(--ui-ink); line-height: calc(var(--gp) * 11); padding: 0 calc(var(--gp) * 4); font-variant-numeric: tabular-nums; }
+#count { color: var(--ui-ink); line-height: calc(var(--gp) * 11); padding: 0 calc(var(--gp) * 4); text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
 #count:empty { visibility: hidden; }
 #hudButtons { display: flex; align-items: center; }
 #mute, #skip, #lang {
@@ -113,37 +126,41 @@ body {
 #mute:focus-visible::before, #skip:focus-visible::before, #lang:focus-visible::before { border-image-source: var(--hi); }
 #mute:active, #skip:active, #lang:active { transform: translateY(var(--gp)); }
 
-/* The caption: a slab hugging its words (hug). On the title (only the test build's T key puts one there) it
-   sits low, clear of the name. */
+/* The caption: a slab hugging its words (hug), at the story size, its top on a whole game pixel (resize). On
+   the title (only the test build's T key puts one there) it sits low, clear of the name. */
 #caption {
-  position: absolute; z-index: 5; top: 11%; left: 0; right: 0; width: 82%; margin: 0 auto; text-align: center;
+  position: absolute; z-index: 5; top: var(--cap-top, 11%); left: 0; right: 0; width: 82%; margin: 0 auto; text-align: center;
   padding: calc(var(--gp) * 3) calc(var(--gp) * 6);
-  font-size: calc(var(--u) * 3.6); color: var(--ui-ink); text-wrap: balance;
+  color: var(--ui-ink); text-wrap: balance;
   opacity: 0; transition: opacity 0.9s ease; pointer-events: none;
 }
 #caption.on { opacity: 1; }
 #caption.whisper { color: var(--ui-dim); letter-spacing: 0.04em; }
 #stage.titling #caption { top: auto; bottom: 30%; z-index: 8; }
+/* Loose text has one size, the story's, with a 12 px floor: the prompt, 'Tap now' and 'Tap to begin'. */
 #prompt {
   position: absolute; z-index: 5; left: 6%; right: 6%; bottom: 9%; text-align: center;
-  font-size: calc(var(--u) * 3.33); font-weight: 500; color: var(--ui-ink);
+  font-size: max(12px, calc(var(--u) * 3.96)); font-weight: 500; color: var(--ui-ink); text-wrap: balance;
   opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
 }
-#prompt.on { opacity: 0.92; }
-#prompt.urgent { font-size: calc(var(--u) * 4.14); animation: blink 0.36s steps(2, jump-none) infinite; }
+#prompt.on { opacity: 1; }
+#prompt.urgent { animation: blink 0.36s steps(2, jump-none) infinite; }
 
-/* The dialogue panel: one slab holding the speaker's label, the line and the choices. */
+/* The dialogue panel: one slab holding the speaker's label, the line and the choices. Its least height is a
+   labelled two-line line's, so narration (no label) takes the same box, its line centred in it. */
 #dialog {
   position: absolute; z-index: 6; left: calc(var(--gp) * 6); right: calc(var(--gp) * 6); bottom: calc(var(--gp) * 6);
   max-height: var(--dlg-max, 46%); display: flex; flex-direction: column;
-  padding: calc(var(--gp) * 6) calc(var(--gp) * 7);
+  min-height: min(var(--dlg-max, 46%), calc(var(--gp) * 17 + var(--who-fs) * 1.2 + 2.9em));
+  padding: calc(var(--gp) * 6) calc(var(--gp) * 7) calc(var(--gp) * 8); /* 8 below: the ▾ stays clear of the last line */
   opacity: 0; transform: translateY(calc(var(--u) * 2)); transition: opacity 0.25s ease, transform 0.25s ease;
   pointer-events: none;
 }
 #dialog.on { opacity: 1; transform: none; pointer-events: auto; }
 /* Speaker labels: small capitals, a little tracking, in the label colour. */
-#who { flex: 0 0 auto; font-size: 11px; font-weight: 500; line-height: 1.2; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ui-accent); margin-bottom: calc(var(--gp) * 3); }
-#text { flex: 0 1 auto; min-height: 2.9em; overflow-y: auto; max-width: 34em; line-height: 1.45; text-wrap: pretty; }
+#who { flex: 0 0 auto; font-size: var(--who-fs); font-weight: 500; line-height: 1.2; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ui-accent); margin-bottom: calc(var(--gp) * 3); }
+#text { flex: 0 1 auto; min-height: 2.9em; overflow-y: auto; max-width: 34em; line-height: 1.45; text-wrap: balance; }
+#dialog.nolabel #text { min-height: 0; margin: auto 0; }
 #dialog.narr #text, #dialog.whisper #text { color: var(--ui-dim); }
 #dialog.whisper #text { letter-spacing: 0.04em; }
 #text .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
@@ -154,14 +171,17 @@ body {
 #choices[hidden] { display: none; }
 /* The panel stays below the waterline (dlgCap). While buttons show, the question may scroll so the buttons fit;
    when that would leave less than two lines of it, the panel tightens (#dialog.tight), and if four or more
-   rows still do not fit they become a two by two grid of plates, each a slab one step lighter than the panel
-   (--row), equal widths, the words wrapping inside beside the marker (fitChoices). */
+   rows still do not fit they become a grid of plates, two columns sized by their words, each a slab one step
+   lighter than the panel ringed so it shows in the red too (--plate), the words wrapping inside beside the
+   marker, an odd last plate spanning both columns (fitChoices). */
 #dialog.choosing #text { min-height: 0; }
-#dialog.tight { padding: calc(var(--gp) * 4) calc(var(--gp) * 5); }
+#dialog.choosing { padding-bottom: calc(var(--gp) * 6); } /* no ▾ while answers show */
+#dialog.tight { padding-top: calc(var(--gp) * 4); padding-bottom: calc(var(--gp) * 4); }
 #dialog.tight #who { margin-bottom: calc(var(--gp) * 2); }
 #dialog.tight #choices { margin-top: var(--gp); }
-#choices.grid { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--gp) * 2); margin-top: calc(var(--gp) * 2); }
-#choices.grid .choice { padding: calc(var(--gp) * 2) calc(var(--gp) * 3) calc(var(--gp) * 2) calc(var(--gp) * 9); border-image: var(--row) var(--k) fill / calc(var(--gp) * var(--k)) stretch; }
+#choices.grid { display: grid; grid-template-columns: auto auto; gap: calc(var(--gp) * 2); margin-top: calc(var(--gp) * 2); }
+#choices.grid .choice { padding: calc(var(--gp) * 2) calc(var(--gp) * 3) calc(var(--gp) * 2) calc(var(--gp) * 9); border-image: var(--plate) var(--k) fill / calc(var(--gp) * var(--k)) stretch; }
+#choices.grid.odd .choice:last-child { grid-column: 1 / -1; }
 #choices.grid .choice:focus-visible { border-image-source: var(--hi); }
 #choices.grid .lb { text-wrap: balance; }
 /* The first moments after buttons appear: a tap meant to finish the line must not pick one. */
@@ -179,18 +199,19 @@ body {
 .choice:hover, .choice:focus-visible { color: var(--ui-pale); outline: none; }
 .choice:focus-visible { border-image: var(--row) var(--k) fill / calc(var(--gp) * var(--k)) stretch; }
 .choice:active { transform: translateY(var(--gp)); }
-#more { right: calc(var(--gp) * 6); bottom: calc(var(--gp) * 4); }
+#more { right: calc(var(--gp) * 6); bottom: calc(var(--gp) * 3); }
 #more.on, #thinkMore.on { opacity: 0.9; animation: nudge 0.9s steps(2, jump-none) infinite; }
 
 /* The thought bubble (bible, 4b): a solid pixel cloud on the game's own grid, drawn by thinkLayout as SVG rects
    in game pixels (#thinkPix): a one-game-pixel outline in the ink, the palette's darkest index inside, and three
    shrinking pixel circles as the tail toward whoever is thinking. Its box is sized from the measured text, in
-   whole game pixels. The companion's question is a bubble like his others; its two answers sit on a slab
-   directly above it, in the sky (#thinkChoices), clear of the man, the companion, the lantern and the tail. */
+   whole game pixels, with the same padding above and below and at either side, the words centred in it, at
+   the story size. The companion's question is a bubble like his others; its two answers sit on a slab directly
+   above it, in the sky (#thinkChoices), clear of the man, the companion, the lantern and the tail. */
 #think {
-  position: absolute; z-index: 6; color: var(--ui-ink);
-  padding: calc(var(--u) * 2.4) calc(var(--u) * 2.8) calc(var(--u) * 3.2);
-  font-size: max(12px, calc(var(--u) * 2.79)); line-height: 1.45; text-align: center;
+  position: absolute; z-index: 6; color: var(--ui-ink); display: flex; flex-direction: column; justify-content: center;
+  padding: calc(var(--gp) * 5) calc(var(--gp) * 7);
+  line-height: 1.45; text-align: center;
   opacity: 0; transition: opacity 0.35s ease; pointer-events: none;
 }
 #think.on { opacity: 1; }
@@ -200,23 +221,40 @@ body {
 #thinkPix .line { fill: var(--ui-ink); fill-opacity: 0.9; }
 #thinkText { position: relative; text-wrap: balance; }
 #thinkText .mark { display: inline-block; transform: scaleX(-1) translateY(0.14em); }
+/* The answers' slab: as wide as the cloud (or its words), its left edge on the cloud's, ringed in the cloud's own
+   ink, 5 game pixels above its bumps. Each row is a 44 px target, but the first row's words sit at the bottom of
+   its target and the last row's at the top (--gap game pixels from the line between them), so the two answers
+   read as a short list; the slab you see (::before) hugs the words, inset from the targets by --ins (whole game
+   pixels), and the targets reach past it into the sky. */
 #thinkChoices {
-  position: absolute; left: 0; bottom: 100%; margin-bottom: calc(var(--gp) * 3); display: flex; flex-direction: column; width: max-content;
-  padding: calc(var(--gp) * 2) calc(var(--gp) * 6) calc(var(--gp) * 2) calc(var(--gp) * 5); text-align: left;
-  font-size: calc(var(--u) * 3.96); line-height: 1.45;
+  --gap: calc(var(--gp) * 2); --pad: calc(44px - 1.3em - var(--gap));
+  --ins: calc(var(--pad) - var(--gp) * 3);
+  --ins: max(0px, round(down, calc(var(--pad) - var(--gp) * 3), var(--gp)));
+  position: absolute; left: 0; bottom: 100%; margin-bottom: calc(var(--gp) * 5 - var(--ins)); display: flex; flex-direction: column;
+  width: max-content; min-width: 100%;
+  padding: 0 calc(var(--gp) * 6) 0 calc(var(--gp) * 5); text-align: left;
+  font-size: calc(var(--u) * 3.96); line-height: 1.45; border-image: none;
 }
+#thinkChoices::before { content: ''; position: absolute; left: 0; right: 0; top: var(--ins); bottom: var(--ins);
+  border: 0 solid transparent; border-image: var(--ask) var(--k) fill / calc(var(--gp) * var(--k)) stretch; pointer-events: none; }
+#thinkChoices .choice { padding-top: var(--gap); padding-bottom: var(--gap); }
+#thinkChoices .choice:first-child { padding-top: max(0px, var(--pad)); }
+#thinkChoices .choice:last-child { padding-bottom: max(0px, var(--pad)); }
 #thinkChoices[hidden] { display: none; }
-/* The same 'more' marker as the panel's, inside the bubble's lower right, for a bubble that waits for a tap. */
-#thinkMore { right: calc(var(--gp) * 8); bottom: calc(var(--gp) * 3); }
+/* The same 'more' marker as the panel's, set after the bubble's last word and kept on its line (glueTail), so
+   it always sits inside the cloud, for a bubble that waits for a tap. */
+#thinkMore { position: relative; display: inline-block; vertical-align: baseline; margin-left: calc(var(--gp) * 2); }
+#thinkMore[hidden] { display: none; }
 
 /* The catch card: a slab where the panel lives, so the boat, the man and the line stay in view above it. Its
    'Tap to continue' is for screen readers; the eye gets the ▾ marker once CARD_GRACE has passed. */
 #card {
   position: absolute; z-index: 6; left: calc(var(--gp) * 6); right: calc(var(--gp) * 6); bottom: calc(var(--gp) * 6);
-  padding: calc(var(--gp) * 6) calc(var(--gp) * 8) calc(var(--gp) * 7); text-align: center;
+  padding: calc(var(--gp) * 6) calc(var(--gp) * 7) calc(var(--gp) * 8); text-align: center;
   opacity: 0; transform: translateY(calc(var(--u) * 2)); transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none;
 }
 #card.on { opacity: 1; transform: none; }
+/* The fish sits centred in a box of one height for every species (cardScale), so the card never jumps. */
 #cardFish { display: block; margin: 0 auto calc(var(--gp) * 4); image-rendering: crisp-edges; image-rendering: pixelated; }
 #cardName { font-size: calc(var(--u) * 4.6); font-weight: 500; line-height: 1.2; }
 #cardMeta { margin-top: calc(var(--gp) * 1.5); color: var(--ui-dim); font-size: max(11px, calc(var(--u) * 3.06)); font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
@@ -235,8 +273,8 @@ body {
 #title.on { opacity: 1; }
 #title h1 { position: absolute; left: 0; top: 0; margin: 0; line-height: 0; }
 #title h1 svg { display: block; overflow: visible; }
-#title .begin { position: absolute; bottom: 21%; left: 0; right: 0; margin: 0; font-size: max(13px, calc(var(--u) * 4.14)); font-weight: 500; animation: breathe 2.6s ease-in-out infinite; }
-#found { position: absolute; bottom: 9.5%; left: 0; right: 0; width: max-content; margin: 0 auto; padding: calc(var(--gp) * 2) calc(var(--gp) * 5);
+#title .begin { position: absolute; bottom: 21%; left: 0; right: 0; margin: 0; font-size: max(12px, calc(var(--u) * 3.96)); font-weight: 500; animation: breathe 2.6s ease-in-out infinite; }
+#found { position: absolute; bottom: var(--found-bottom, 9.5%); left: 0; right: 0; width: max-content; margin: 0 auto; padding: calc(var(--gp) * 2) calc(var(--gp) * 5);
   font-size: max(11px, calc(var(--u) * 2.79)); font-weight: 500; color: var(--ui-row); }
 #found:empty { display: none; }
 
@@ -254,21 +292,22 @@ body {
 #ending.on { opacity: 1; pointer-events: auto; }
 .endBox { display: flex; flex-direction: column; align-items: center; width: 100%; padding: calc(var(--gp) * 11) calc(var(--gp) * 8) calc(var(--gp) * 10); }
 #ending h2 { margin: 0 -0.1em 0 0; font-size: calc(var(--u) * 5.4); font-weight: 500; line-height: 1.2; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ui-ink); }
-#endText { margin: calc(var(--gp) * 7) 0 0; color: var(--ui-pale); max-width: 30em; line-height: 1.5; text-wrap: balance; }
+#endText { margin: calc(var(--gp) * 7) 0 0; color: var(--ui-pale); max-width: 30em; line-height: 1.5; text-wrap: pretty; }
 #endAsked { position: relative; margin: calc(var(--gp) * 6) 0 0; padding-top: calc(var(--gp) * 6); color: var(--ui-pale); max-width: 30em; line-height: 1.5; white-space: pre-line; }
 #endAsked:empty { display: none; }
-#endAsked .head { color: var(--ui-dim); }
-#endAsked::before { content: ''; position: absolute; top: 0; left: 50%; width: calc(var(--gp) * 14); height: var(--gp); margin-left: calc(var(--gp) * -7); background: var(--ui-dim); opacity: 0.6; }
-/* Pips: a 3-game-pixel mark per ending, solid when found, an outline when not, then the count. */
+#endAsked .head { display: block; color: var(--ui-dim); text-wrap: balance; }
+#endAsked::before { content: ''; position: absolute; top: 0; left: 50%; width: calc(var(--gp) * 14); height: var(--gp); margin-left: calc(var(--gp) * -7); background: var(--ui-line); }
+/* Pips: a 3-game-pixel mark per ending on one box, solid when found, a ring (3:1) when not, then the count. */
 .pips { display: flex; align-items: center; justify-content: center; gap: calc(var(--gp) * 3); margin: calc(var(--gp) * 7) 0 0; }
 .pips[hidden] { display: none; }
-.pips i { width: calc(var(--gp) * 3); height: calc(var(--gp) * 3); box-shadow: inset 0 0 0 var(--gp) var(--ui-dim); opacity: 0.6; }
-.pips i.on { background: var(--ui-ink); box-shadow: none; opacity: 1; }
+.pips i { box-sizing: border-box; width: calc(var(--gp) * 3); height: calc(var(--gp) * 3); border: var(--gp) solid var(--ui-line); }
+.pips i.on { background: var(--ui-ink); border-color: var(--ui-ink); }
 .pips b { margin-left: calc(var(--gp) * 2); font-size: max(11px, calc(var(--u) * 2.88)); font-weight: 500; color: var(--ui-dim); font-variant-numeric: tabular-nums; }
-/* Cast again: a raised slab (index 1 on an index 2 outline) with the choice marker before its words; hovered or
-   focused it takes the ink outline and its words brighten, with no ring. */
+/* Cast again: a raised slab (index 1 ringed in the line colour, 3:1) with the choice marker before its words,
+   its insets equal by eye (6 game pixels to the marker, 6 after the words); hovered or focused its ring
+   lightens (--hi) and its words brighten. */
 #again {
-  position: relative; margin-top: calc(var(--gp) * 8); min-height: 44px; padding: calc(var(--gp) * 3) calc(var(--gp) * 10) calc(var(--gp) * 3) calc(var(--gp) * 12);
+  position: relative; margin-top: calc(var(--gp) * 8); min-height: 44px; padding: calc(var(--gp) * 3) calc(var(--gp) * 6) calc(var(--gp) * 3) calc(var(--gp) * 12);
   font: inherit; font-weight: 500; color: var(--ui-ink); background: none; cursor: pointer;
   border: 0 solid transparent; border-image: var(--raise) var(--k) fill / calc(var(--gp) * var(--k)) stretch;
 }

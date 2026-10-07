@@ -243,7 +243,7 @@ Red style. One voice. The only insertions are the optional lines marked below, i
 5. Optional, kept: Golden fish, whisper from the boat: `I'm sorry.`
 6. Golden fish: `I sat where you sit. I said what you said. Three times.`
 7. Golden fish: `I'd like to go home now. What would you like.`
-- Choice: **Let me go home** / **Take the light away** / **Cut the line** / **Let me in.** (only if home was wished) / **Stay with him** (only if `answered`) / **Let me get my gold** (only if gold) / **Nothing** (only if `refused = 2`)
+- Choice: **Let me go home** / **Take the light away** / **Cut the line** / **Let me in** (only if home was wished) / **Stay with him** (only if `answered`) / **Let me get my gold** (only if gold) / **Nothing** (only if `refused = 2`)
 
 Buttons are a flex column with smaller padding when there are more than three. Keys 1 to 6 select them. The dialogue panel is capped at 46% of the stage height with the text scrolling, so the buttons never cover the turned companion. Check the five-button case in shots at 320 px width.
 

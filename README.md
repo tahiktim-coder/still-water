@@ -19,6 +19,8 @@ To work on it with Claude Code, run `claude` in this folder. `CLAUDE.md` explain
 
 To build the Russian pages, run `node build.js --lang=ru` (add `--test` for the test build); they land in `tools/out/ru/`. `npm run build:site` builds all four published pages into `site/`.
 
+Checks: `npm run sim` (a bot reaches every ending in both languages), `npm run skipcheck`, `npm run domtest`, `npm run shots` (scene PNGs), `npm run uishots` (the UI at four phone and desktop sizes in headless Edge or Chrome, with contact sheets in `tools/out/ui/`) and `npm run sfx` (every sound rendered silently to WAVs, spectrograms and loudness figures in `tools/out/sfx/`).
+
 While developing, run `npm run build:test` and open `tools/out/test.html?test`, or press T in that build, to turn on test mode (the shipping `dist/index.html` has none). A "Skip fish" button then lands each fish with one click so you can reach any part of the story quickly.
 
 ## Publish on itch.io

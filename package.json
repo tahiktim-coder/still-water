@@ -11,7 +11,9 @@
     "sim": "node tools/sim.js",
     "shots": "node tools/shot.js all && node tools/snaps.js",
     "domtest": "node build.js && node build.js --lang=ru && node tools/domtest.js",
-    "skipcheck": "node tools/skipcheck.js"
+    "skipcheck": "node tools/skipcheck.js",
+    "uishots": "node tools/uishots.js",
+    "sfx": "node tools/sfxrender.js"
   },
   "devDependencies": {
     "jsdom": "^24.1.3",

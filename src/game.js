@@ -77,6 +77,8 @@ const ACC = {
 const SHORE_GREEN = 25;
 const PAL = new Uint32Array(32);
 const PALRGB = new Float32Array(32 * 3);
+// The UI's own copy of the palette (UI.colors): the live mood without the Dark ending's dimming.
+const UIRGB = new Float32Array(32 * 3);
 function setPal(i, r, g, b) {
   r = clamp(r | 0, 0, 255); g = clamp(g | 0, 0, 255); b = clamp(b | 0, 0, 255);
   PAL[i] = (0xff000000 | (b << 16) | (g << 8) | r) >>> 0;
@@ -644,7 +646,8 @@ const KEPT_LADDER = [1, 0.7, 0.45];  // its alpha per act (bible, 8c); 0.05 afte
 // the open stretch of horizon under the sun, clear of the far mountain foot and of the rod.
 const FARBOAT = sprite(['6......6', '.666666.', '..5555..']);
 const FAR_X = 97;
-const HB_GAP = 1.7;               // seconds between heartbeats in the red; Stay stretches it until it stops
+const HB_GAP = 1.9;               // seconds between heartbeats in the red (varied, in runs with rests); Stay quickens it, the snap stops it
+const HB_FLAM = 0.5;              // a scripted beat within this of a loop beat is dropped (no lub-lub-dub-dub)
 const COMP_DX = 50, COMP_DY = -17; // the companion's seat, from the boat's corner and the waterline
 const KNIFE_X = 12;               // hull column of the knife, beside the lantern pole
 
@@ -1138,15 +1141,15 @@ const RU = {
   ' kg': ' кг',
   'Home': 'Дом',
   'Dark': 'Тьма',
-  'Still water': 'Тихая вода',
+  'Still water': 'Тихий омут',
   'Swallowed': 'Проглочен',
   'Stay': 'Остаться',
   'Deep': 'Глубина',
   'Inside': 'Внутри',
-  'You open the door. Someone was waiting to get out. They take the boat. Some nights you hear them cast. Some nights, you knock.': 'Ты открываешь дверь. Там кто-то ждал, чтобы выйти. Он берёт твою лодку. Иногда ночью ты слышишь, как он забрасывает леску. Иногда ночью стучишь ты.',
-  'You swim ashore and open the door. Someone was waiting to get out. They walk into the water, toward the gold. Some nights, you knock.': 'Ты доплываешь до берега и открываешь дверь. Там кто-то ждал, чтобы выйти. Он уходит в воду, к золоту. Иногда ночью стучишь ты.',
+  'You open the door. Someone was waiting to get out. They take the boat. Some nights you hear them cast. Some nights, you knock.': 'Ты открываешь дверь. Там кто-то ждал, когда можно будет выйти. Он берёт твою лодку. Иногда ночью ты слышишь, как он забрасывает леску. Иногда ночью стучишь ты.',
+  'You swim ashore and open the door. Someone was waiting to get out. They walk into the water, toward the gold. Some nights, you knock.': 'Ты доплываешь до берега и открываешь дверь. Там кто-то ждал, когда можно будет выйти. Он уходит в воду, к золоту. Иногда ночью стучишь ты.',
   'The golden fish goes with them. You stay behind the door.': 'Золотая рыбка уходит с ним. Ты остаёшься за дверью.',
-  'The day outside does not end. You watch it through the window.': 'День за окном не кончается. Ты смотришь на него в окно.',
+  'The day outside does not end. You watch it through the window.': 'День за окном не кончается. Ты смотришь на него изнутри.',
   ' Somewhere a sun is coming up. Someone is rowing out.': ' Где-то встаёт солнце. Кто-то отчаливает от берега.',
   'The water is warmer than you thought, and full of light, and ': 'Вода теплее, чем ты думал, и полна света, и ',
   'He took the sun down with him. ': 'Он унёс солнце с собой под воду. ',
@@ -1165,7 +1168,7 @@ const RU = {
   'You sit with the lantern until it gutters out. There is no shore to see it from. Sometimes something takes the bait. ': 'Ты сидишь с фонарём, пока он не догорит. Нет берега, с которого его было бы видно. Иногда что-то берёт наживку. ',
   'You hang in the water beside the lantern until it gutters out. The big ones pass under you all night. You never reel anything in.': 'Ты висишь в воде рядом с фонарём, пока он не догорит. Громадины всю ночь проходят под тобой. Ты так ничего и не вытаскиваешь.',
   'You row until the water is only water. You never fish here again. Some evenings, the sunset looks back.': 'Ты гребёшь, пока вода не станет просто водой. Здесь ты больше не рыбачишь. Иногда по вечерам закат смотрит на тебя в ответ.',
-  'You swim for the shore and reach it. Every morning you wake in the water again, above the gold. You can always come back for it, it said.': 'Ты плывёшь к берегу и добираешься до него. Каждое утро ты снова просыпаешься в воде, над золотом. «Ты всегда можешь за ним вернуться», — сказала рыбка.',
+  'You swim for the shore and reach it. Every morning you wake in the water again, above the gold. You can always come back for it, it said.': 'Ты плывёшь к берегу и доплываешь. Каждое утро ты снова просыпаешься в воде, над золотом. «Ты всегда можешь за ним вернуться», — сказала рыбка.',
   'You cut it. The red sun goes down for everyone. There is no shore in any direction. You row anyway, for a while.': 'Ты перерезаешь леску. Красное солнце заходит для всех. Берега нет ни с одной стороны. Ты всё равно гребёшь — какое-то время.',
   'You cut it. The red sun goes down for everyone. You swim for a while.': 'Ты перерезаешь леску. Красное солнце заходит для всех. Какое-то время ты плывёшь.',
   'You stay. ': 'Ты остаёшься. ',
@@ -1175,7 +1178,7 @@ const RU = {
   'there is no bottom.': 'дна нет.',
   'The gold is somewhere below. ': 'Золото где-то внизу. ',
   'the big ones let you pass. There is no bottom.': 'громадины пропускают тебя. Дна нет.',
-  'You wanted nothing. It showed you anyway. You row until the water is only water. Some evenings, the sunset looks back.': 'Ты ничего не хотел. Оно всё равно всё тебе показало. Ты гребёшь, пока вода не станет просто водой. Иногда по вечерам закат смотрит на тебя в ответ.',
+  'You wanted nothing. It showed you anyway. You row until the water is only water. Some evenings, the sunset looks back.': 'Ты ничего не хотел. Оно всё равно тебе показало. Ты гребёшь, пока вода не станет просто водой. Иногда по вечерам закат смотрит на тебя в ответ.',
   'Somewhere far above, the sun is still shining on the sea. There is no boat on it.': 'Где-то далеко наверху солнце всё ещё светит над морем. Лодки на нём нет.',
   'The golden fish slips out of the boat as you go in.': 'Золотая рыбка выскальзывает из лодки, пока ты заходишь внутрь.',
   'The golden fish follows you in.': 'Золотая рыбка заплывает внутрь следом за тобой.',
@@ -1228,7 +1231,7 @@ const RU = {
   'a boat full of gold': 'полную лодку золота',
   'Everything you asked for. ': 'Всё, что ты просил. ',
   ' And forever. Your words, not mine.': ' И навсегда. Твои слова, не мои.',
-  'You light the lantern. The shore does not.': 'Ты зажигаешь фонарь. Берег — нет.',
+  'You light the lantern. The shore does not.': 'Ты зажигаешь фонарь. На берегу огня нет.',
   'You light the lantern.': 'Ты зажигаешь фонарь.',
   'The sun sets the way suns do.': 'Солнце садится, как и положено солнцу.',
   'The sun slips into the ': 'Солнце соскальзывает в ',
@@ -1236,7 +1239,7 @@ const RU = {
   'lake': 'озеро',
   'sea': 'море',
   'Something rises where the sun went down.': 'Там, где село солнце, что-то поднимается.',
-  'Something gold slips by you on the way down.': 'Что-то золотое проскальзывает мимо тебя по пути вниз.',
+  'Something gold slips by you on the way down.': 'Что-то золотое проскальзывает мимо тебя в глубину.',
   'Something gold circles you. It has time.': 'Что-то золотое кружит вокруг тебя. Ему некуда спешить.',
   'Something gold circles the boat. It has time.': 'Что-то золотое кружит вокруг лодки. Ему некуда спешить.',
   'The line goes slack.': 'Леска провисает.',
@@ -1264,7 +1267,7 @@ const RU = {
   'The lake': 'Озеро',
   'The sea': 'Море',
   'Nothing on the lake is moving except you.': 'На озере ничего не движется, кроме тебя.',
-  'The stranger’s bait. Cursed or blessed, he said. It has an eye.': 'Наживка того незнакомца. На беду или на удачу, сказал он. У неё есть глаз.',
+  'The stranger’s bait. Cursed or blessed, he said. It has an eye.': 'Наживка того незнакомца. «На беду или на удачу», — сказал он. У неё есть глаз.',
   'Something interesting, for once.': 'Хоть бы раз что-нибудь интересное.',
   'First time out here. Look at that sun.': 'Первый раз здесь. Ты посмотри, какое солнце.',
   'I could stay out here forever.': 'Я бы остался здесь навсегда.',
@@ -1286,7 +1289,7 @@ const RU = {
   'Nothing': 'Ничего',
   'Who?': 'Кого?',
   'Doesn’t matter. Someone': 'Неважно. Кого-нибудь',
-  'Someone. You didn’t ask who.': 'Кого-нибудь. Ты не сказал, кого.',
+  'Someone. You didn’t ask who.': 'Кого-нибудь. Ты не сказал кого.',
   'If they ask you anything, don’t answer.': 'Если тебя о чём-то спросят — не отвечай.',
   'A home on the shore. One has just come free.': 'Дом на берегу. Один как раз освободился.',
   'Every light out here is for someone. That one is for you.': 'Каждый огонь здесь горит для кого-то. Этот — для тебя.',
@@ -1322,11 +1325,11 @@ const RU = {
   'He goes back to watching the horizon.': 'Он снова смотрит на горизонт.',
   'The line goes taut. You did not feel a bite.': 'Леска натягивается. Поклёвки ты не почувствовал.',
   'One wish left. You said forever, then asked for nothing twice.': 'Осталось одно желание. Ты сказал «навсегда», а потом дважды попросил «ничего».',
-  'It wants to see why.': 'Оно хочет разглядеть, зачем.',
+  'It wants to see why.': 'Оно хочет понять зачем.',
   'I’m right here, fisherman.': 'Я здесь, рыбак. Совсем рядом.',
   'One wish left. But first, the sun I promised you.': 'Осталось одно желание. Но сначала — солнце, которое я тебе обещала.',
   'You said forever. I passed that on.': 'Ты сказал «навсегда». Я передала.',
-  'You said forever, then you wished for it. I listened twice.': 'Ты сказал «навсегда», а потом ещё и загадал это. Я услышала оба раза.',
+  'You said forever, then you wished for it. I listened twice.': 'Ты сказал «навсегда», а потом ещё и пожелал этого. Я слышала оба раза.',
   'You said forever. I listened.': 'Ты сказал «навсегда». Я услышала.',
   'i could stay out here forever. i could stay out here forever.': 'я бы остался здесь навсегда. я бы остался здесь навсегда.',
   'There it is. Forever, like you said.': 'Вот оно. Навсегда, как ты сказал.',
@@ -1343,15 +1346,15 @@ const RU = {
   'Cut the line': 'Перерезать леску',
   'Stay with him': 'Остаться с ним',
   'Let me get my gold': 'Дай мне забрать моё золото',
-  'Let me in.': 'Впусти меня.',
-  'Of course. They’ve been waiting to get out.': 'Конечно. Там давно ждут, чтобы их выпустили.',
+  'Let me in': 'Впусти меня',
+  'Of course. They’ve been waiting to get out.': 'Конечно. Там давно ждут, когда их выпустят.',
   'Home. Yes. Come inside.': 'Домой. Да. Заходи.',
   'Thank you.': 'Спасибо.',
   'As you wish. Without light you won’t have to see the teeth.': 'Как пожелаешь. Без света тебе не придётся видеть зубы.',
   'Don’t leave me out here.': 'Не оставляй меня здесь.',
   'Don’t leave me in the boat.': 'Не оставляй меня в лодке.',
   'You reach for the knife in your belt.': 'Ты тянешься к ножу на поясе.',
-  'You reach for the knife on the gunwale.': 'Ты тянешься к ножу на борту.',
+  'You reach for the knife on the gunwale.': 'Ты тянешься к ножу у борта.',
   'No. Nobody cuts the—': 'Нет. Никто не перерезает ле—',
   'Stay with him. Two wishes, one seat.': 'Остаться с ним. Два желания, одно место.',
   'He said he’d stay with me.': 'Он сказал, что останется со мной.',
@@ -1443,7 +1446,7 @@ function resetWS() {
 const G = {
   phase: 'title', t: 0, pt: 0, holding: false, bob: null, cast: null, wait: null, reel: null, land: null,
   rodA: REST_A, rodBend: 0, bobDip: 0, biteWin: 1, tip: { x: 110, y: 205 }, hand: { x: 136, y: 227 }, farRing: 0.6,
-  lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0, hbGap: HB_GAP,
+  lanternPos: { x: 124, y: 218 }, tutorial: 0, ringT: 0, hb: 0, hbAt: -9, hbVol: 1, hbGap: HB_GAP, hbRun: 5, lap: 2, ambSent: null,
   capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null,
   arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, inside: null,
 };
@@ -2758,8 +2761,28 @@ function render(t) {
 }
 
 // ---------------------------------------------------------------- audio (synthesised, no files)
+// Every voice goes into `bus` (the play foley through `fol`, FOLEY_VOL over it). The master chain: bus -> uw
+// (the underwater low-pass, SFX.under) -> a 30 Hz high-pass -> trim (SFX_TRIM, the one level knob) -> a soft
+// compressor -> a limiter (the last level stage: its threshold and the spec's makeup gain set the ceiling) ->
+// out (the mute, 1 or 0) -> the speakers. Every voice starts at silence before its source starts and ramps to
+// silence before it stops, and the noise is a looped 4 s buffer, so no noise runs out. Each low story sound (heartbeat, knock, weight,
+// surge, slam, drone, rumble) carries upper partials or a 150-450 Hz body, so it reads on a phone speaker.
+const SFX_TRIM = 1.28;                 // the level into the dynamics; raise it here, never after the limiter
+const LIM_TH = -8.5;                   // the limiter's threshold (dB); with its makeup gain, a ceiling near -3.7 dBFS
+const FOLEY_VOL = 0.9;                 // the play foley (cast, float, bite, reel, catch, laps), a little under the story
+const AMB_VOL = 0.035, AMB_LFO = 0.17, AMB_FROZEN = 0.022, AMB_EYES = 0.25; // the bed, its breathing depth (a share of it), the frozen day (-4 dB), under the eyes
+const DRONE_VOL = 0.0135, DRONE_LP = 520, DRONE_DUCK = 0.005; // ducked for a climax
+const INSIDE_HUSH = 0.35;              // the drone, the heart and the bed under the Inside knocking (-9 dB)
+const INSIDE_CAST = 0.1;               // his far, small row and cast at the close of Inside (-20 dB), under the knocks from inside
+const KNOCK_INSIDE = 0.4;              // the three knocks from inside the cabin after the cast, quieter than his own
+const OCEAN_CAST = 0.3;                // the cast into the ocean window (-10 dB), so the big one is louder than the float
+const KNOCK_PAN = -0.4;                // the cabin sits left of the boat
+const KNOCK_KNUCKLE = 0.06;            // the knuckle tick never fades below this, so a faint knock still reads on a phone
+const KNOCK_WALK = 0.6;                // the knocking that leads him home in Inside
+const STAY_SNAP_K = 2.8;               // the Stay snap, 9 dB over a line snap; with snapLow it stands 3 to 5 LU over a bite or a plop (the drone ducked, the heart stopped)
+const vr = (x, r) => x * (1 + (Math.random() * 2 - 1) * r); // x, varied by up to ±r (only inside SFX, which is silent in Node)
 const SFX = {
-  ctx: null, out: null, buf: null, muted: false, drn: null,
+  ctx: null, out: null, bus: null, fol: null, dst: null, uw: null, far: null, buf: null, amb: null, sc: null, muted: false, drn: null, wgt: null,
   init() {
     if (this.ctx || !IS_BROWSER) return;
     try {
@@ -2769,135 +2792,368 @@ const SFX = {
       this.ctx = c;
       this.out = c.createGain();
       this.out.gain.value = 0; // silent until unmuted, so a mute before the first tap never lets a burst through
-      if (!this.muted) this.out.gain.setTargetAtTime(0.6, c.currentTime, 0.05);
+      if (!this.muted) this.out.gain.setTargetAtTime(1, c.currentTime, 0.05);
       this.out.connect(c.destination);
-      const len = c.sampleRate * 2, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
+      const lim = this.dyn(LIM_TH, 0, 20, 0.001, 0.12), cmp = this.dyn(-20, 10, 3, 0.006, 0.3), hp = this.filt('highpass', 30, 0.707), trim = c.createGain();
+      trim.gain.value = SFX_TRIM;
+      this.uw = this.filt('lowpass', 20000, 0.5);
+      this.bus = c.createGain(); this.fol = c.createGain(); this.fol.gain.value = FOLEY_VOL; this.fol.connect(this.bus);
+      this.bus.connect(this.uw); this.uw.connect(hp); hp.connect(trim); trim.connect(cmp); cmp.connect(lim); lim.connect(this.out);
+      // The far send (the knocks across the water): a 0.11 s echo, darkened each time round, 12 dB down.
+      const fin = c.createGain(), dl = c.createDelay(1), fl = this.filt('lowpass', 1400, 0.7), fb = c.createGain(), wet = c.createGain();
+      dl.delayTime.value = 0.11; fb.gain.value = 0.25; wet.gain.value = 0.25;
+      fin.connect(dl); dl.connect(fl); fl.connect(fb); fb.connect(dl); fl.connect(wet); wet.connect(this.bus);
+      this.far = fin;
+      const len = c.sampleRate * 4, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       this.buf = b;
       this.ambient();
     } catch (e) { this.ctx = null; }
   },
   resume() { if (this.ctx && this.ctx.state !== 'running' && this.ctx.state !== 'closed') { try { this.ctx.resume(); } catch (e) { /* not allowed yet */ } } },
-  setMuted(m) { this.muted = m; if (this.ctx) this.out.gain.setTargetAtTime(m ? 0 : 0.6, this.ctx.currentTime, 0.05); },
-  tone(f, dur, type, vol, f2, delay) {
-    const c = this.ctx; if (!c) return;
-    const t = c.currentTime + (delay || 0);
-    const o = c.createOscillator(), g = c.createGain();
-    o.type = type || 'sine';
-    o.frequency.setValueAtTime(f, t);
-    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.02, dur * 0.3));
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this.out);
-    o.start(t); o.stop(t + dur + 0.05);
+  setMuted(m) { this.muted = m; if (this.ctx) this.out.gain.setTargetAtTime(m ? 0 : 1, this.ctx.currentTime, 0.05); },
+  // The building blocks. Only ever called with a context.
+  filt(type, f, q) { const n = this.ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = q; return n; },
+  dyn(th, knee, ratio, atk, rel) {
+    const n = this.ctx.createDynamicsCompressor();
+    n.threshold.value = th; n.knee.value = knee; n.ratio.value = ratio; n.attack.value = atk; n.release.value = rel;
+    return n;
   },
-  noise(dur, vol, type, f, f2, q, delay) {
-    const c = this.ctx; if (!c) return;
-    const t = c.currentTime + (delay || 0);
-    const s = c.createBufferSource(); s.buffer = this.buf;
-    const fl = c.createBiquadFilter(); fl.type = type || 'lowpass';
-    fl.frequency.setValueAtTime(f, t);
-    if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + dur);
-    fl.Q.value = q || 0.8;
-    const g = c.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.03, dur * 0.3));
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(fl); fl.connect(g); g.connect(this.out);
-    s.start(t, Math.random()); s.stop(t + dur + 0.05);
+  osc(f, type, to, t) { const o = this.ctx.createOscillator(); o.type = type; o.frequency.value = f; if (to) o.connect(to); o.start(t); return o; },
+  src(t) { const s = this.ctx.createBufferSource(); s.buffer = this.buf; s.loop = true; s.start(t, Math.random() * this.buf.duration); return s; },
+  // An LFO of the given depth added to param, optionally smoothed by a low-pass (a gated square); returns the oscillator.
+  lfo(rate, depth, param, t, type, lp) {
+    const o = this.osc(rate, type || 'sine', null, t), g = this.ctx.createGain();
+    g.gain.value = depth;
+    if (lp) { const f = this.filt('lowpass', lp, 0.7); o.connect(f); f.connect(g); } else o.connect(g);
+    g.connect(param);
+    return o;
   },
-  ambient() {
+  // Silence, a linear attack to vol, a hold (o.hold seconds), an exponential decay to dur, silence just after.
+  env(p, t, vol, atk, dur, hold) {
+    p.setValueAtTime(0, t);
+    p.linearRampToValueAtTime(vol, t + atk);
+    if (hold) p.setValueAtTime(vol, t + Math.min(dur * 0.9, atk + hold));
+    p.exponentialRampToValueAtTime(Math.min(vol, 0.0001), t + dur);
+    p.linearRampToValueAtTime(0, t + dur + 0.02);
+  },
+  // gain -> [low-pass o.lp] -> [pan o.pan] -> o.to or the bus, and into the far send when o.far.
+  route(n, o) {
     const c = this.ctx;
-    const s = c.createBufferSource(); s.buffer = this.buf; s.loop = true;
-    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420;
-    const g = c.createGain(); g.gain.value = 0.035;
-    const l = c.createOscillator(); l.frequency.value = 0.07;
-    const lg = c.createGain(); lg.gain.value = 0.02;
-    l.connect(lg); lg.connect(g.gain);
-    s.connect(f); f.connect(g); g.connect(this.out);
-    s.start(); l.start();
+    if (o.lp) { const f = this.filt('lowpass', o.lp, 0.7); n.connect(f); n = f; }
+    if (o.pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = o.pan; n.connect(p); n = p; }
+    n.connect(o.to || this.dst || this.bus);
+    if (o.far) n.connect(this.far);
   },
-  whoosh() { this.noise(0.35, 0.09, 'bandpass', 600, 2400, 1.4); },
-  plop() { this.tone(560, 0.16, 'sine', 0.22, 170); this.noise(0.2, 0.08, 'bandpass', 1500, 500, 1.2); },
-  nibble() { this.tone(320, 0.07, 'sine', 0.09, 210); },
-  bite() { this.noise(0.3, 0.14, 'bandpass', 900, 300, 1); this.tone(740, 0.1, 'triangle', 0.14); this.tone(990, 0.14, 'triangle', 0.12, null, 0.09); },
-  hook() { this.tone(300, 0.12, 'triangle', 0.12, 600); },
-  tick() { this.tone(1400 + Math.random() * 300, 0.02, 'square', 0.025); },
-  snap() { this.noise(0.14, 0.2, 'highpass', 2500, null, 0.6); this.tone(700, 0.22, 'sawtooth', 0.08, 90); },
-  snapLow() { this.tone(140, 0.9, 'sawtooth', 0.07, 60); this.noise(0.8, 0.08, 'lowpass', 500, 120); },
-  splash() { this.noise(0.55, 0.2, 'lowpass', 3200, 380, 0.7); },
-  row() { this.noise(0.9, 0.07, 'lowpass', 160, 520, 0.6); this.noise(0.28, 0.05, 'bandpass', 1400, 600, 1.1, 0.55); }, // one oar stroke
-  caught() { this.tone(660, 0.12, 'triangle', 0.1); this.tone(880, 0.22, 'triangle', 0.1, null, 0.1); },
-  chime() { [784, 988, 1175, 1568].forEach((f, i) => this.tone(f, 1.8, 'sine', 0.07, null, i * 0.11)); },
-  select() { this.tone(520, 0.08, 'triangle', 0.08); },
-  swell() { this.noise(7, 0.07, 'lowpass', 250, 900, 0.5); },
+  tone(f, dur, type, vol, f2, delay, o = {}) {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime + (delay || 0);
+    const s = this.osc(f, type || 'sine', null, t), g = c.createGain();
+    g.gain.value = 0;
+    s.frequency.setValueAtTime(f, t);
+    if (f2) s.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    this.env(g.gain, t, vol, o.atk || Math.min(f < 120 ? 0.012 : 0.01, dur * 0.3), dur, o.hold);
+    s.connect(g); this.route(g, o);
+    s.stop(t + dur + 0.05);
+  },
+  // Looped noise through one filter; o.path is [[share of dur, Hz], ...] for a filter that moves more than once.
+  noise(dur, vol, type, f, f2, q, delay, o = {}) {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime + (delay || 0);
+    const s = this.src(t), fl = this.filt(type || 'lowpass', f, q || 0.8), g = c.createGain();
+    g.gain.value = 0;
+    fl.frequency.setValueAtTime(f, t);
+    if (o.path) o.path.forEach(([k, fr]) => fl.frequency.exponentialRampToValueAtTime(fr, t + k * dur));
+    else if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    this.env(g.gain, t, vol, o.atk || Math.min(0.03, dur * 0.3), dur, o.hold);
+    s.connect(fl); fl.connect(g); this.route(g, o);
+    s.stop(t + dur + 0.05);
+  },
+  // The bed (S8): low water noise breathing slowly, faded in over the row-in; scene() moves it with the world.
+  ambient() {
+    const c = this.ctx, t = c.currentTime, s = this.src(t), f = this.filt('lowpass', 420, 0.7), g = c.createGain(), lg = c.createGain();
+    g.gain.value = 0; lg.gain.value = 0;
+    const l = this.osc(0.07, 'sine', lg, t);
+    lg.connect(g.gain);
+    s.connect(f); f.connect(g); g.connect(this.bus);
+    this.amb = { g, f, l, lg };
+    const sc = this.sc || [0, 0, 0, 1];
+    this.scene(sc[0], sc[1], sc[2], sc[3], 1);
+  },
+  // Darker at night, half under the red drone, a little brighter and quicker at sea, uncannily still when the
+  // day is frozen; duck is its share: a quarter while the eyes look up from the water (holding its breath), half
+  // while he walks home in Inside (the knocking leads).
+  scene(mood, sea, frozen, duck, tau) {
+    const was = this.sc;
+    this.sc = [mood, sea, frozen, duck];
+    const a = this.amb; if (!a) return;
+    const red = clamp(mood - 1, 0, 1);
+    let gain = AMB_VOL * (1 - 0.5 * red), lp = lerp(420, 300, Math.min(mood, 1)) + 250 * sea;
+    if (frozen) { gain = AMB_FROZEN; lp = 220; }
+    gain *= duck;
+    const now = this.ctx.currentTime, k = tau || (was && was[3] !== duck ? 0.4 : 1.5);
+    a.g.gain.setTargetAtTime(gain, now, k); a.lg.gain.setTargetAtTime(gain * AMB_LFO, now, k);
+    a.f.frequency.setTargetAtTime(lp, now, k); a.l.frequency.setTargetAtTime(sea > 0.5 ? 0.11 : 0.07, now, k);
+  },
+  // A small wave against the hull (or against him, swimming: no clunk).
+  lap(hull) {
+    if (!this.ctx) return;
+    this.noise(0.4, vr(0.12, 0.2), 'bandpass', vr(520, 0.15), 320, 1.1, 0, { atk: 0.08 });
+    if (hull && Math.random() < 0.3) this.tone(130, 0.14, 'sine', 0.1, 105, 0, { lp: 400 });
+  },
+  // The underwater low-pass: 0 open, 1 at 500 Hz (the Deep dive, the inside of the mouth).
+  under(k, tau) { if (this.ctx) this.uw.frequency.setTargetAtTime(20000 * Math.pow(500 / 20000, k), this.ctx.currentTime, tau || 0.05); },
+  whoosh(k = 1) { this.noise(0.35, 0.28 * k, 'bandpass', 500, null, 0.9, 0, { path: [[0.4, 2000], [1, 900]] }); },
+  plop(k = 1) {
+    if (!this.ctx) return;
+    this.tone(vr(560, 0.06), 0.16, 'sine', vr(0.14, 0.16) * k, 170);
+    this.noise(0.2, vr(0.05, 0.16) * k, 'bandpass', vr(1500, 0.1), 500, 1.2);
+  },
+  nibble() {
+    if (!this.ctx) return;
+    this.tone(vr(320, 0.06), 0.07, 'sine', vr(0.15, 0.16), 210);
+    this.noise(0.035, 0.035, 'bandpass', vr(1400, 0.1), 900, 2.5);
+  },
+  bite() {
+    if (!this.ctx) return;
+    const p = vr(1, 0.03);
+    this.noise(0.3, vr(0.1, 0.16), 'bandpass', vr(900, 0.1), 300, 1);
+    this.tone(740 * p, 0.1, 'triangle', 0.1, null, 0, { lp: 3000 }); this.tone(990 * p, 0.14, 'triangle', 0.085, null, 0.09, { lp: 3000 });
+  },
+  hook() {
+    if (!this.ctx) return;
+    this.tone(vr(300, 0.06), 0.12, 'triangle', vr(0.18, 0.16), 600, 0, { lp: 3000 });
+    this.noise(0.04, 0.06, 'bandpass', 1600, 900, 1.5, 0.06); // the line tightening
+  },
+  // The reel's pawl, about 6.5 a second, higher as the tension rises.
+  reelTick(T) { if (this.ctx) this.noise(0.014, 0.1, 'bandpass', vr(2600 + 900 * T, 0.06), null, 2.5); },
+  // The surge cue: the drag ratchets out (let go now).
+  drag() {
+    for (let i = 0; i < 9; i++) this.noise(0.012, 0.18, 'bandpass', 3200, null, 3, i * 0.034);
+    this.tone(180, 0.3, 'sawtooth', 0.05, 260, 0, { lp: 900 });
+  },
+  // The line: a crack, a twang and a whip. far: the line in the sky giving way, higher, softer, recoiling.
+  snap(far, k = 1) {
+    const v = (far ? 0.5 : 1) * k, p = far ? 1.5 : 1;
+    this.noise(0.06, 0.13 * v, 'bandpass', 3000 * p, null, 0.9);
+    this.tone(700 * p, 0.22, 'sawtooth', 0.07 * v, 90 * p, 0, { lp: 2200 });
+    this.tone(1300 * p, 0.08, 'sine', 0.06 * v, 300 * p);
+    if (far) this.noise(0.5, 0.05, 'bandpass', 3000, 700, 1, 0.03);
+  },
+  snapLow() { this.tone(140, 0.9, 'sawtooth', 0.07, 60, 0, { lp: 900 }); this.noise(0.8, 0.08, 'lowpass', 500, 120); },
+  // A slack line (too early, slipped the hook): the line falls loose and the float settles.
+  slack() { if (this.ctx) { this.tone(300, 0.15, 'sine', 0.016, 180); this.plop(0.16); } },
+  splash() {
+    if (!this.ctx) return;
+    this.noise(0.55, vr(0.14, 0.16), 'lowpass', vr(3200, 0.1), 380, 0.7);
+    this.tone(vr(180, 0.1), 0.12, 'sine', 0.085, 70, 0, { lp: 600 }); // the body
+    const n = 2 + (Math.random() < 0.5 ? 1 : 0);
+    for (let i = 0; i < n; i++) this.noise(0.02, 0.04, 'bandpass', vr(2500, 0.2), null, 3, 0.15 + Math.random() * 0.25); // drops
+  },
+  row(k = 1) {
+    this.tone(240, 0.12, 'sawtooth', 0.02 * k, 210, 0, { lp: 900 }); // the oarlock
+    this.noise(0.9, 0.22 * k, 'lowpass', 160, 520, 0.6); this.noise(0.28, 0.16 * k, 'bandpass', 1400, 600, 1.1, 0.55); // one oar stroke
+  },
+  // The catch card; in act 2 the second note sours a semitone.
+  caught(sour) {
+    if (!this.ctx) return;
+    const v = vr(0.06, 0.1);
+    this.tone(660, 0.12, 'sine', v); this.tone(sour ? 880 * 0.944 : 880, 0.22, 'sine', v, null, 0.1);
+  },
+  // The golden fish. Each granted wish sinks it a semitone (n); in the red it turns: G, B flat, D, F sharp.
+  chime(n = 0, red) {
+    const k = Math.pow(2, -n / 12);
+    (red ? [784, 932, 1175, 1480] : [784, 988, 1175, 1568]).forEach((f, i) => {
+      this.tone(f * k, 1.8, 'sine', 0.024, null, i * 0.11);
+      this.tone(f * k * 2.76, 0.6, 'sine', 0.0036, null, i * 0.11); // glass
+    });
+  },
+  select() { this.tone(620, 0.06, 'sine', 0.058, 500, 0, { atk: 0.005 }); this.noise(0.015, 0.016, 'bandpass', 2000, null, 1.5); },
+  // A slow swell of water (the sunset, the ocean, the dive): the filter opens and closes over d, a soft G fifth
+  // under it; glide: the fifth sinks a semitone (the sun going down).
+  swell(d = 7, glide) {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime, s = this.src(t), f = this.filt('lowpass', 200, 0.5), g = c.createGain();
+    const shape = (p, v) => { p.setValueAtTime(0, t); p.linearRampToValueAtTime(v, t + 0.45 * d); p.setValueAtTime(v, t + 0.65 * d); p.linearRampToValueAtTime(0, t + d); };
+    f.frequency.setValueAtTime(200, t); f.frequency.exponentialRampToValueAtTime(1100, t + 0.55 * d); f.frequency.exponentialRampToValueAtTime(300, t + d);
+    g.gain.value = 0; shape(g.gain, 0.08);
+    s.connect(f); f.connect(g); g.connect(this.bus); s.stop(t + d + 0.05);
+    [98, 146.8].forEach(fr => {
+      const og = c.createGain(), o = this.osc(fr, 'sine', og, t);
+      og.gain.value = 0; shape(og.gain, 0.006); og.connect(this.bus);
+      if (glide) { o.frequency.setValueAtTime(fr, t); o.frequency.exponentialRampToValueAtTime(fr * 0.944, t + d); }
+      o.stop(t + d + 0.05);
+    });
+  },
   match() { this.noise(0.25, 0.12, 'bandpass', 2800, 900, 2); this.tone(180, 0.5, 'sine', 0.04, 120, 0.1); },
-  hiss(d) { this.noise(d || 2, 0.16, 'highpass', 2200, 7000, 0.4); },
-  rumble() { this.noise(4.5, 0.18, 'lowpass', 120, 300, 0.7); this.tone(38, 4.4, 'sawtooth', 0.1, 55); },
-  // Swallowed: a deep surge as the head rises (sub-bass and low noise swelling up with no attack, no stinger),
-  // a heavy water slam as the mouth closes, and the water closing over it.
+  // Steam off the drowned sun (Stay's disc, the cut): a band of noise sinking from 4.2 to 2.6 kHz under a
+  // fixed 8 kHz low-pass, held, then dying away, with a thinning crackle.
+  hiss(d = 2, v = 1) {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime, s = this.src(t), bp = this.filt('bandpass', 4200, 0.6), lp = this.filt('lowpass', 6000, 0.7), g = c.createGain(), pk = 0.038 * v;
+    bp.frequency.setValueAtTime(4200, t); bp.frequency.exponentialRampToValueAtTime(2600, t + d);
+    g.gain.value = 0;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(pk, t + 0.04); g.gain.setValueAtTime(pk, t + d * 0.35);
+    g.gain.exponentialRampToValueAtTime(pk * 0.06, t + d); g.gain.linearRampToValueAtTime(0, t + d + 0.15);
+    s.connect(bp); bp.connect(lp); lp.connect(g); g.connect(this.bus); s.stop(t + d + 0.2);
+    for (let i = 0; i < 12; i++) { const r = Math.random(); this.noise(0.004, 0.05 * v, 'bandpass', vr(2200, 0.15), null, 2, d * 0.6 * r * r); }
+  },
+  // The lantern snuffed (Dark).
+  snuff() { this.noise(0.22, 0.11, 'bandpass', 1100, 500, 0.9); this.tone(160, 0.15, 'sine', 0.042, 90); },
+  // The boat going under with the gold: bubbles, about 10 a second thinning to 2, over a low churn.
+  gurgle(d) {
+    if (!this.ctx) return;
+    this.noise(d, 0.04, 'lowpass', 500, 300, 0.7, 0, { atk: 0.4, hold: d * 0.5 });
+    for (let x = 0.05; x < d; x += vr(1, 0.5) / lerp(10, 2, x / d)) { const f = vr(500, 0.4); this.tone(f, 0.04, 'sine', vr(0.05, 0.3), f * 1.8, x); }
+  },
+  // A glint of the gold below.
+  glint() { this.tone(2637, 0.6, 'sine', 0.016); this.tone(3951, 0.4, 'sine', 0.008, null, 0.03); },
+  // The cost of a wish: a low toll as the sun steps down (196 Hz, then 185 on the second step).
+  // Its octave and the bell's 2.76 partial carry it on a phone.
+  toll(f = 196) { this.tone(f, 2.5, 'sine', 0.019, null, 0, { atk: 0.015, lp: 1500 }); this.tone(f * 2, 1.6, 'sine', 0.01); this.tone(f * 2.76, 1.2, 'sine', 0.012); },
+  // One far bird at the Still water dawn.
+  bird() { this.tone(2600, 0.05, 'sine', 0.016, 2300); this.tone(2650, 0.05, 'sine', 0.013, 2300, 0.14); },
+  // The Home jaws: the low noise and saw closing, and a grinding layer under them (a 7 Hz gate).
+  rumble() {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime, d = 4.5;
+    this.noise(d, 0.18, 'lowpass', 120, 300, 0.7, 0, { hold: 2.5 });
+    this.tone(38, 4.4, 'sawtooth', 0.1, 55, 0, { lp: 300, hold: 2.5 });
+    const s = this.src(t), bf = this.filt('bandpass', 180, 2), am = c.createGain(), g = c.createGain();
+    bf.frequency.setValueAtTime(180, t); bf.frequency.exponentialRampToValueAtTime(120, t + d);
+    am.gain.value = 1; const l = this.lfo(7, 0.6, am.gain, t, 'square', 30);
+    g.gain.value = 0; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.08, t + 2.5); g.gain.setValueAtTime(0.08, t + 4); g.gain.linearRampToValueAtTime(0, t + d);
+    s.connect(bf); bf.connect(am); am.connect(g); g.connect(this.bus);
+    s.stop(t + d + 0.05); l.stop(t + d + 0.05);
+  },
+  // Swallowed: a deep surge as the head rises (sub-bass, its octave and low noise swelling up with no attack,
+  // and a rush of water riding the same envelope), a heavy water slam as the mouth closes, and the water closing over it.
   surge() {
     const c = this.ctx; if (!c) return;
     const t = c.currentTime, d = SURGE_DUR;
-    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 0.8;
+    const f = this.filt('lowpass', 70, 0.8), g = c.createGain();
     f.frequency.setValueAtTime(70, t); f.frequency.exponentialRampToValueAtTime(360, t + d * 0.6); f.frequency.exponentialRampToValueAtTime(110, t + d);
-    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.26, t + d * 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-    const n = c.createBufferSource(); n.buffer = this.buf; n.loop = true;
-    const o = c.createOscillator(); o.frequency.setValueAtTime(32, t); o.frequency.exponentialRampToValueAtTime(56, t + d * 0.6);
-    n.connect(f); o.connect(f); f.connect(g); g.connect(this.out);
-    n.start(t, Math.random()); o.start(t); n.stop(t + d + 0.05); o.stop(t + d + 0.05);
+    g.gain.value = 0; g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2, t + d * 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + d); g.gain.linearRampToValueAtTime(0, t + d + 0.02);
+    const n = this.src(t), o = this.osc(32, 'sine', f, t), o2 = this.osc(64, 'sawtooth', null, t), g2 = c.createGain();
+    g2.gain.value = 0.5; o2.connect(g2); g2.connect(f);
+    o.frequency.setValueAtTime(32, t); o.frequency.exponentialRampToValueAtTime(56, t + d * 0.6);
+    o2.frequency.setValueAtTime(64, t); o2.frequency.exponentialRampToValueAtTime(112, t + d * 0.6);
+    const rf = this.filt('bandpass', 600, 0.8), rg = c.createGain(), rn = this.src(t);
+    rf.frequency.setValueAtTime(600, t); rf.frequency.exponentialRampToValueAtTime(1800, t + d * 0.6);
+    rg.gain.value = 0.8; rn.connect(rf); rf.connect(rg); rg.connect(g);
+    n.connect(f); f.connect(g); g.connect(this.bus);
+    [n, o, o2, rn].forEach(x => x.stop(t + d + 0.05));
   },
-  slam() { this.noise(0.9, 0.34, 'lowpass', 700, 70, 1); this.tone(62, 0.8, 'sine', 0.32, 30); },
+  slam() {
+    this.noise(0.9, 0.42, 'lowpass', 700, 70, 1);
+    this.tone(62, 0.8, 'sine', 0.27, 30, 0, { atk: 0.006 });
+    this.noise(0.3, 0.5, 'bandpass', 350, 180, 1.2); // the body of water
+    this.tone(700, 0.25, 'sine', 0.1, 380, 0, { atk: 0.004 }); // its upper body, for a phone
+    this.noise(0.015, 0.12, 'bandpass', 1200, null, 1); // the hit
+  },
   douse() { this.noise(1.4, 0.24, 'lowpass', 2800, 260, 0.7); this.noise(0.6, 0.08, 'highpass', 3000, 1200, 0.5, 0.2); },
-  crunch() { this.noise(0.9, 0.45, 'lowpass', 900, 60, 1.2); this.tone(90, 1, 'sawtooth', 0.25, 28); },
-  // Stay: the line straining under him, a rising creak (a rough low saw sliding up through a narrow band).
-  creak(d) { this.tone(58, d, 'sawtooth', 0.12, 150); this.noise(d, 0.07, 'bandpass', 320, 1500, 7); this.tone(117, d, 'square', 0.03, 300); },
-  knock(v = 1) { this.tone(88, 0.16, 'sine', 0.32 * v, 52); this.noise(0.12, 0.16 * v, 'lowpass', 380, 140, 1.2); }, // one knock, muffled by the water between (v: quieter)
-  heartbeat() { this.tone(52, 0.2, 'sine', 0.3, 40); this.tone(48, 0.22, 'sine', 0.24, 36, 0.26); },
+  crunch() { this.noise(0.9, 0.45, 'lowpass', 900, 60, 1.2); this.tone(90, 1, 'sawtooth', 0.25, 28, 0, { lp: 1200 }); },
+  // Stay: he lands on the hot eye, a wet thud and a burst of steam (not the jaws' crunch).
+  impact() { this.tone(120, 0.25, 'sine', 0.42, 60, 0, { atk: 0.005 }); this.noise(0.3, 0.5, 'lowpass', 900, 200, 1); this.noise(0.18, 0.3, 'bandpass', 450, 250, 1.2); this.hiss(0.5, 2); },
+  // A stick-slip creak: a saw through a narrow band, gated at 22 Hz, over a low saw. The line (Stay's strain)
+  // at 600 Hz; door, the cabin door (Inside), tighter and higher.
+  creak(d, door) {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime, s = this.osc(90, 'sawtooth', null, t), bp = this.filt('bandpass', door ? 900 : 600, door ? 8 : 5), am = c.createGain(), g = c.createGain();
+    s.frequency.setValueAtTime(90, t); s.frequency.exponentialRampToValueAtTime(140, t + d);
+    am.gain.value = 1; const l = this.lfo(22, 0.7, am.gain, t, 'square', 60);
+    g.gain.value = 0; this.env(g.gain, t, door ? 0.2 : 0.3, 0.03, d, d * 0.6);
+    s.connect(bp); bp.connect(am); am.connect(g); g.connect(this.bus);
+    s.stop(t + d + 0.05); l.stop(t + d + 0.05);
+    this.tone(58, d, 'sawtooth', 0.05, door ? 80 : 150, 0, { lp: 900 });
+  },
+  // One knock across the water: a wood body, the door's mass, the panel ringing and the knuckle, panned
+  // toward the cabin with a short far echo (v: quieter).
+  knock(v = 1) {
+    if (!this.ctx) return;
+    const p = vr(1, 0.05), o = { pan: KNOCK_PAN, far: true };
+    v = vr(v, 0.1);
+    this.tone(190 * p, 0.09, 'sine', 0.16 * v, 140 * p, 0, Object.assign({ atk: 0.004 }, o));
+    this.tone(85 * p, 0.14, 'sine', 0.12 * v, 55 * p, 0, Object.assign({ atk: 0.008 }, o));
+    this.noise(0.07, 0.28 * v, 'bandpass', 420 * p, 300, 4, 0, o); // the panel, the part a phone plays
+    this.noise(0.012, Math.max(0.05 * v, KNOCK_KNUCKLE), 'bandpass', 1800, null, 1.2, 0, o); // a faint knock keeps its knuckle, above the drone's band
+  },
+  // Lub, then dub 0.26 s later: each a sine with its 2nd and 3rd partials and a soft low thump, every beat a
+  // little different in pitch and strength (k: quieter, under the Inside knocking).
+  heartbeat(k = 1) {
+    if (!this.ctx) return;
+    const p = vr(1, 0.03), v = vr(0.6, 0.15) * k;
+    this.beat(56 * p, v, 0); this.beat(50 * p, v * 0.75, 0.26);
+  },
+  beat(f, v, d) {
+    this.tone(f, 0.22, 'sine', 0.085 * v, f * 0.714, d, { atk: 0.012 });
+    this.tone(f * 2, 0.12, 'sine', 0.07 * v, f * 1.43, d, { atk: 0.01 });
+    this.tone(f * 3, 0.08, 'sine', 0.07 * v, f * 2.14, d, { atk: 0.01 });
+    this.tone(f * 5, 0.05, 'sine', 0.035 * v, f * 3.6, d, { atk: 0.006 });
+    this.noise(0.09, 0.09 * v, 'lowpass', 280, 120, 0.9, d);
+    this.noise(0.07, 0.4 * v, 'bandpass', 380, 240, 0.9, d, { atk: 0.006 }); // the thump a phone can play
+  },
+  // The red's bed: two close saws and a low sine through a low-pass that opens enough for a phone (520 Hz),
+  // its cutoff breathing over 20 s and its level over 9 s. droneDuck(v) takes it down for a climax.
   drone(on) {
     const c = this.ctx; if (!c) return;
+    const t = c.currentTime;
     if (on && !this.drn) {
-      const g = c.createGain(); g.gain.value = 0.0001;
-      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 240;
-      const os = [[55, 'sawtooth'], [55.7, 'sawtooth'], [41.2, 'sine']].map(([fr, ty]) => { const o = c.createOscillator(); o.type = ty; o.frequency.value = fr; o.connect(f); o.start(); return o; });
-      f.connect(g); g.connect(this.out);
-      g.gain.setTargetAtTime(0.08, c.currentTime, 2.5);
+      const g = c.createGain(), br = c.createGain(), f = this.filt('lowpass', DRONE_LP, 0.5);
+      g.gain.value = 0; br.gain.value = 1;
+      const os = [[55, 'sawtooth'], [55.7, 'sawtooth'], [41.2, 'sine']].map(([fr, ty]) => this.osc(fr, ty, f, t));
+      os.push(this.lfo(0.05, 150, f.frequency, t), this.lfo(0.11, 0.2, br.gain, t));
+      f.connect(br); br.connect(g); g.connect(this.bus);
+      g.gain.setTargetAtTime(DRONE_VOL, t, 2.5);
       this.drn = { g, os };
     } else if (!on && this.drn) {
       const d = this.drn; this.drn = null;
-      d.g.gain.setTargetAtTime(0.0001, c.currentTime, 0.8);
-      setTimeout(() => d.os.forEach(o => { try { o.stop(); } catch (e) { /* already stopped */ } }), 4000);
+      d.g.gain.setTargetAtTime(0, t, 0.8);
+      d.os.forEach(o => o.stop(t + 4));
     }
   },
-  // The big one's weight (bible, section 8): a sub-bass swell, two low oscillators through a low-pass and a
-  // slow filtered noise bed, rising over the crossing with no attack, held while it sits under the boat, and
-  // fading over WEIGHT_OUT seconds when it leaves or the Swallowed cinematic takes over. Never a hit.
-  wgt: null,
+  droneDuck(v, tau) { if (this.ctx && this.drn) this.drn.g.gain.setTargetAtTime(v, this.ctx.currentTime, tau || 0.05); },
+  // The weight stepping back (not stopping) under the Swallowed lunge, so the surge and the slam stand over it.
+  weightDuck(v, tau) {
+    if (!this.ctx || !this.wgt) return;
+    const p = this.wgt.g.gain, now = this.ctx.currentTime;
+    p.cancelScheduledValues(now); p.setValueAtTime(p.value, now); p.setTargetAtTime(v, now, tau || 0.05);
+  },
+  // The big one's weight (bible, section 8): a sub-bass swell (two low oscillators through a low-pass), their
+  // octave and twelfth for a phone, and a slow groaning band of noise, rising over the crossing with no attack
+  // and sagging 4% in pitch, held while it sits under the boat, and fading over WEIGHT_OUT seconds when it
+  // leaves or the Swallowed cinematic takes over. Never a hit.
   weight(on) {
     const c = this.ctx; if (!c) return;
     const now = c.currentTime;
     if (on && !this.wgt) {
-      const g = c.createGain(); g.gain.setValueAtTime(0.0001, now);
+      const g = c.createGain(); g.gain.value = 0; g.gain.setValueAtTime(0, now);
       g.gain.linearRampToValueAtTime(WEIGHT_VOL, now + OCEAN_CROSS);
-      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 90; f.Q.value = 1.2;
-      const os = [[44, 'sine'], [52.5, 'triangle']].map(([fr, ty]) => { const o = c.createOscillator(); o.type = ty; o.frequency.value = fr; o.connect(f); o.start(); return o; });
-      const n = c.createBufferSource(); n.buffer = this.buf; n.loop = true;
-      const nf = c.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = 140; nf.Q.value = 0.7;
-      const ng = c.createGain(); ng.gain.value = 0.35;
-      n.connect(nf); nf.connect(ng); ng.connect(g); n.start();
-      f.connect(g); g.connect(this.out);
-      this.wgt = { g, os: os.concat([n]) };
+      const f = this.filt('lowpass', 90, 1.2);
+      const os = [[44, 'sine'], [52.5, 'triangle']].map(([fr, ty]) => this.osc(fr, ty, f, now));
+      [[88, 0.25], [132, 0.18], [176, 0.12], [264, 0.08]].forEach(([fr, v]) => { const pg = c.createGain(); pg.gain.value = v; pg.connect(g); os.push(this.osc(fr, 'sine', pg, now)); });
+      os.forEach(o => { o.frequency.setValueAtTime(o.frequency.value, now); o.frequency.linearRampToValueAtTime(o.frequency.value * 0.96, now + OCEAN_CROSS); });
+      const n = this.src(now), nf = this.filt('bandpass', 280, 0.8), ng = c.createGain();
+      ng.gain.value = 1;
+      os.push(this.lfo(0.12, 0.4, ng.gain, now), n);
+      n.connect(nf); nf.connect(ng); ng.connect(g);
+      const sg = c.createGain(); sg.gain.value = 0.6; f.connect(sg); sg.connect(g); g.connect(this.bus); // the sub, under its partials
+      this.wgt = { g, os };
     } else if (!on && this.wgt) {
       const w = this.wgt; this.wgt = null;
       w.g.gain.cancelScheduledValues(now); w.g.gain.setValueAtTime(w.g.gain.value, now);
-      w.g.gain.linearRampToValueAtTime(0.0001, now + WEIGHT_OUT);
-      setTimeout(() => w.os.forEach(o => { try { o.stop(); } catch (e) { /* already stopped */ } }), (WEIGHT_OUT + 0.5) * 1000);
+      w.g.gain.linearRampToValueAtTime(0, now + WEIGHT_OUT);
+      w.os.forEach(o => o.stop(now + WEIGHT_OUT + 0.5));
     }
   },
 };
-const WEIGHT_VOL = 0.22, WEIGHT_OUT = 2;
+// The play foley goes through SFX.fol (FOLEY_VOL): each of these sends its voices there while it runs.
+['whoosh', 'plop', 'nibble', 'bite', 'hook', 'reelTick', 'drag', 'slack', 'splash', 'row', 'caught', 'select', 'lap'].forEach(k => {
+  const f = SFX[k];
+  SFX[k] = function (...a) { const d = this.dst; this.dst = this.fol; try { return f.apply(this, a); } finally { this.dst = d; } };
+});
+const WEIGHT_VOL = 0.02, WEIGHT_OUT = 2, WEIGHT_DUCK = 0.3; // the duck: 30% (-10 dB) under the lunge
 
 // ---------------------------------------------------------------- dialogue
 // A line is {who, text, style, choices, mark, bubble}, {act: fn} or {pause: seconds}. mark asks the UI for
@@ -2926,7 +3182,7 @@ function dlgNext() {
     if (L.bubble) { dlgBubble(L); return; }
     thinkHide();
     UI.dlgShow(tr(L.who || ''), L.style || '');
-    UI.dlgText('', L.mark);
+    UI.dlgText('', L.mark, L.text);
     UI.dlgChoices(null);
     return;
   }
@@ -2962,7 +3218,7 @@ function dlgFull() {
   const L = DLG.cur;
   DLG.n = L.text.length;
   UI.dlgBusy(false);
-  UI.dlgText(L.text, L.mark);
+  UI.dlgText(L.text, L.mark, L.text);
   if (L.choices) UI.dlgChoices(choiceList(L));
   else UI.dlgMore(true);
 }
@@ -2973,7 +3229,7 @@ function dlgUpdate(dt) {
   if (!L || DLG.n >= L.text.length) return;
   const prev = Math.floor(DLG.n);
   DLG.n = Math.min(L.text.length, DLG.n + dt * 42);
-  if (Math.floor(DLG.n) !== prev) UI.dlgText(L.text.slice(0, Math.floor(DLG.n)), L.mark);
+  if (Math.floor(DLG.n) !== prev) UI.dlgText(L.text.slice(0, Math.floor(DLG.n)), L.mark, L.text);
   if (DLG.n >= L.text.length) dlgFull();
 }
 function dlgTap() {
@@ -3009,7 +3265,7 @@ const sunsetCine = refused => ({
   dur: 10,
   init(s) { s.y0 = WS.sunY; s.tr0 = WS.troubled; },
   update(t, dt, at, s) {
-    at('snd', 0, () => SFX.swell());
+    at('snd', 0, () => SFX.swell(7, true)); // the fifth sinks with the sun
     at('cap', 0.4, () => cap(refused ? 'The sun sets the way suns do.' : trJoin(['The sun slips into the ', placeWord(), ' like a coin into a well.']), 4.8));
     const k = clamp(t / 7.5, 0, 1);
     WS.sunY = lerp(s.y0, HY + 14, E.io(k));
@@ -3046,7 +3302,7 @@ const CINE_RED = {
     WS.pupil = clamp((t - 12) / 1.3, 0, 1);
     WS.pupilDx = s.asked ? clamp((t - 13.6) / 1.0, 0, 1) * 4 : 0;
     at('turn', 13.6, () => { if (WS.companion > 0) tween(WS, 'companionTurn', 1, 0.4); });
-    at('hb', 13.6, () => SFX.heartbeat());
+    at('hb', 13.6, () => { if (G.t - G.hbAt > HB_FLAM) heartNow(); }); // the turn's beat, unless the loop just beat
   },
 };
 const CINE_JAWS = {
@@ -3073,7 +3329,7 @@ const CINE_DARK = {
     else if (t >= 8) WS.lanternFlicker = 0;
     WS.eyes = t > 7.5 && t < 7.8 ? 1 : 0; // one look from the water before the lantern dies
     if (WS.eyes) WS.lanternFlicker = 0.1;
-    at('out', 8, () => SFX.hiss(0.6));
+    at('out', 8, () => SFX.snuff());
     at('fade', 8.3, () => UI.fade(1, 1));
   },
 };
@@ -3094,7 +3350,7 @@ function stayEyeTrack() {
   WS.pupilDx = clamp((c.x - WS.sunX) * 0.12, -STAY_LOOK, STAY_LOOK);
 }
 // His one word, in his bubble, shown for STAY_LEAP_AT - STAY_SAY_AT and hidden as he launches.
-function staySay() { UI.think(tr(STAY_WORD), { side: 'companion', more: false }); }
+function staySay() { UI.think(tr(STAY_WORD), { side: 'companion', more: false, timed: true }); }
 // Sunk: he floats, so there is nothing to crouch on and nothing to rock.
 function stayCrouch() { if (!swimming()) { WS.companionStand = 0; WS.companionCrouch = 1; } }
 const sternX = () => boatLeft() + COMP_DX + 4;
@@ -3116,11 +3372,12 @@ function stayFlight(t) {
   WS.eyeWide = E.io(WS.leap);
   stayEyeTrack();
 }
-// He lands and hangs on: the glow spikes for two frames (skipped for reduced motion), the crunch, the creak.
+// He lands and hangs on: the glow spikes for two frames (skipped for reduced motion), a wet thud on the hot
+// eye, the creak, and the drone ducks.
 function stayImpact(s) {
   if (!REDUCED_MOTION) WS.sunGlow = 2.4;
   WS.leap = 0; WS.cling = 1; WS.eyeWide = 1; s.yHit = WS.sunY;
-  SFX.crunch(); SFX.creak(STAY_STRAIN); goldFishFade(STAY_STRAIN + STAY_DROP);
+  SFX.impact(); SFX.creak(STAY_STRAIN); SFX.droneDuck(DRONE_DUCK); goldFishFade(STAY_STRAIN + STAY_DROP); // the bed steps back for the fight
 }
 // The line takes his weight: it bows and shivers harder, the disc sags and trembles.
 function stayStrain(t, s) {
@@ -3128,7 +3385,8 @@ function stayStrain(t, s) {
   WS.strain = 0.35 + 0.65 * k;
   WS.sunY = s.yHit + Math.round(STAY_SAG * k) + (REDUCED_MOTION ? 0 : ((t * 24) | 0) & 1);
 }
-function staySnap(s) { SFX.snap(); SFX.snapLow(); s.ySnap = WS.sunY; }
+// The heart stops with the line: the silence after the snap is the payoff.
+function staySnap(s) { SFX.snap(false, STAY_SNAP_K); SFX.snapLow(); heartStop(); s.ySnap = WS.sunY; }
 // The disc and he fall together; the upper line recoils, whipping; where they meet the water, the splash.
 function stayFall(t, dt, s) {
   const k = clamp((t - STAY_SNAP) / STAY_DROP, 0, 1);
@@ -3162,7 +3420,7 @@ const CINE_STAY = {
   init(s) {
     if (!swimming()) WS.companionStand = 1; // sunk: he leaps from the water, never stands on it
     tween(WS, 'pupilDx', STAY_LOOK, 0.4);
-    G.hbGap = HB_GAP * 0.45; G.hb = Math.min(G.hb, 0.4); // the heartbeat quickens
+    G.hbGap = HB_GAP * 0.45; G.hb = Math.min(G.hb, Math.max(0.4, G.hbAt + G.hbGap - G.t)); // the heartbeat quickens, never sooner than a quick gap after the last beat
   },
   update(t, dt, at, s) {
     at('say', STAY_SAY_AT, staySay);
@@ -3240,7 +3498,7 @@ const cutCine = (silent, v = cutVariant(silent)) => ({
       goldFishDrop();
       splash(SUNX - 3, HY + 2, 6);
     });
-    at('stalk', 1.0, () => { if (!silent) SFX.snap(); });
+    at('stalk', 1.0, () => { if (!silent) SFX.snap(true); }); // the line in the sky, higher and further
     if (t > 1.0 && !silent) WS.stalkCut = clamp((t - 1) / 0.7, 0, 1);
     if (t < 6) WS.sunY = lerp(s.y0, HY + 28, E.in(clamp((t - 1.1) / 1.5, 0, 1)));
     at('hiss', 2.5, () => { SFX.hiss(2.2); ring(SUNX, HY + 3, true); ring(SUNX, HY + 3); WS.pupil = 0; SFX.drone(false); });
@@ -3256,6 +3514,7 @@ const cutCine = (silent, v = cutVariant(silent)) => ({
       WS.sunKind = 0; WS.sunR = 8; WS.stalk = 0; WS.stalkCut = 0; WS.companionTurn = 0; WS.frozen = 0;
       if (silent) G.bob = null;
       if (WS.cabin > 0) tween(WS, 'cabinLit', 0, 1.5); // the window goes dark; the cabin stays
+      if (WS.sea < 0.5) SFX.bird(); // one far bird over the lake; the laps come back with the day
       keptOver(!silent); // kept: the fish goes over the side; the silent ending says nothing about it
     });
     if (t >= 6) {
@@ -3283,12 +3542,14 @@ const comp = (text, extra) => Object.assign({ who: 'Companion', text, bubble: tr
 // cinematic. DLG is inactive there, so the text appears whole and the cinematic hides the panel itself.
 const placeWord = () => WS.sea > 0.5 ? 'sea' : 'lake'; // the lake, or the open sea after the fish wish
 function lakeWhisper(text) { UI.dlgShow(tr(WS.sea > 0.5 ? 'The sea' : 'The lake'), 'whisper'); UI.dlgText(tr(text)); }
+// The golden fish's chime, a semitone lower for each granted wish; red: the turned chord.
+const wishChime = red => SFX.chime(STORY.wishes.length, red || WS.mood > 1.5);
 function goldenScene() {
   G.bob = null;
   WS.goldFish = { x: 26, y: 240, a: 0, surf: 263 };
   tween(WS.goldFish, 'a', 1, 0.8);
   splash(42, 262, 10); ring(42, 264); ring(42, 264, true);
-  SFX.chime();
+  wishChime();
   if (STORY.act === 0) wish1(); else wish2();
 }
 // Kept, act 1: the fish speaks from the boat with no surfacing splash (bible, Act 1).
@@ -3366,12 +3627,12 @@ function wish1b(kept) {
 const GRANT1 = {
   company: () => [
     { who: FISHN, text: 'Who?', choices: [{ label: 'Doesn’t matter. Someone', pick() { /* the list continues */ } }] },
-    { act: () => { tween(WS, 'companion', 1, 2.2); SFX.chime(); } },
+    { act: () => { tween(WS, 'companion', 1, 2.2); wishChime(); } },
     fish('Someone. You didn’t ask who.'),
     fish('If they ask you anything, don’t answer.'),
   ],
   home: () => [
-    { act: () => { WS.cabinLit = 1; tween(WS, 'cabin', 1, 2.2); SFX.chime(); } },
+    { act: () => { WS.cabinLit = 1; tween(WS, 'cabin', 1, 2.2); wishChime(); } },
     fish('A home on the shore. One has just come free.'),
     fish('Every light out here is for someone. That one is for you.'),
   ],
@@ -3541,10 +3802,10 @@ const SW = {
 const SPRAY_N = 60, RING_GAP = 0.3;
 function swallowFloat(t, at, s) {
   if (t < SW.fly) { const k = t / SW.fly; G.bob = { x: lerp(s.from.x, s.to.x, k), y: lerp(s.from.y, s.to.y, k) - Math.sin(k * Math.PI) * 14, fly: true }; }
-  at('land', SW.fly, () => { G.bob = { x: s.to.x, y: s.to.y, fly: false }; ring(s.to.x, s.to.y + 1); SFX.plop(); });
+  at('land', SW.fly, () => { G.bob = { x: s.to.x, y: s.to.y, fly: false }; ring(s.to.x, s.to.y + 1); SFX.plop(OCEAN_CAST); });
   at('float', SW.bulge, () => { if (G.bob) ring(G.bob.x, G.bob.y + 1); G.bob = null; }); // pulled under as it rises
 }
-function lungeBulge() { tween(WS, 'bulge', 1, SW.bulgeDur, E.io); SFX.surge(); }
+function lungeBulge() { tween(WS, 'bulge', 1, SW.bulgeDur, E.io); SFX.weightDuck(WEIGHT_VOL * WEIGHT_DUCK, 0.2); SFX.surge(); } // the mass gives way to the rise
 function lungeRise() {
   tween(WS, 'lunge', 1, SW.riseDur, E.out); tween(WS, 'streak', 1, 0.6);
   WS.shed = 1; tween(WS, 'shed', 0, SHED_DUR, E.lin); // sheets of water slide off the snout
@@ -3593,7 +3854,7 @@ const CINE_SWALLOW = {
   init(s) {
     s.from = { x: G.tip ? G.tip.x : W / 2, y: WL - 2 }; s.to = oceanMark();
     G.bob = { x: s.from.x, y: s.from.y, fly: true };
-    SFX.whoosh();
+    SFX.whoosh(OCEAN_CAST);
   },
   update(t, dt, at, s) {
     swallowFloat(t, at, s);
@@ -3611,6 +3872,7 @@ const CINE_SWALLOW = {
     at('splash', SW.splash, waterCloses);
     for (let k = 0; k < 3; k++) at('ring' + k, SW.splash + k * RING_GAP, () => ring(lungeCx(), HY + 3, true, 1.5 - k * 0.3));
     at('swim', SW.swim, bigSwimsOff);
+    at('muffle', SW.black - 0.3, () => SFX.under(1, 0.15)); // inside
     at('black', SW.black, () => UI.fade(1, 0.25));
   },
 };
@@ -3639,9 +3901,12 @@ const CINE_OCEAN_BACK = {
 const SUN_STEP = 8;
 function sunDrop() {
   const y0 = WS.sunY;
+  SFX.toll(196); // the cost is heard: a low toll as each step begins
   tween(WS, 'sunY', y0 + SUN_STEP, 1.6, E.io, () =>
-    tween(WS, 'sunY', y0 + SUN_STEP, 1.4, E.lin, () =>
-      tween(WS, 'sunY', y0 + 2 * SUN_STEP, 1.6, E.io)));
+    tween(WS, 'sunY', y0 + SUN_STEP, 1.4, E.lin, () => {
+      SFX.toll(185);
+      tween(WS, 'sunY', y0 + 2 * SUN_STEP, 1.6, E.io);
+    }));
   tween(WS, 'troubled', 0.22, 5);
 }
 function refuse1() {
@@ -3686,13 +3951,13 @@ const GRANT2 = {
     fish('This one is tired. I know one that never sets.'),
   ],
   hear: () => [
-    { act: () => { STORY.heard = true; SFX.chime(); } },
+    { act: () => { STORY.heard = true; wishChime(); } },
     fish('Listen, then. They all say the same thing.'),
   ],
 };
 // Forever: the clouds stop, the birds hang, the fish stop jumping and the sun holds until the sunset
 // cinematic, which drives it directly (bible, 8b). Nothing says so.
-function freezeDay() { WS.frozen = 1; G.frozeT = G.t; untween(WS, 'sunY'); SFX.chime(); }
+function freezeDay() { WS.frozen = 1; G.frozeT = G.t; untween(WS, 'sunY'); wishChime(); }
 // The lines that close a granted wish 2, then the sunset.
 function wish2Cost() {
   return [
@@ -3713,7 +3978,7 @@ function grant2(w) {
 function grantGold() {
   dlgRun([
     fish('Gold. A boat full of it.'),
-    { act: () => { tween(WS, 'gold', 1, 1.5); SFX.chime(); } },
+    { act: () => { tween(WS, 'gold', 1, 1.5); wishChime(); } },
     { pause: 1.2 },
   ], () => playCine(CINE_SINK, () => dlgRun([fish('Sorry. Gold is heavy. You can always come back for it.')].concat(wish2Cost()), wish2Sunset)));
 }
@@ -3723,14 +3988,14 @@ function grantGold() {
 const SINK_DUR = 4;
 const CINE_SINK = {
   dur: 6,
-  init() { tween(WS, 'boatSunk', 1, SINK_DUR, E.io); SFX.hiss(3.5); },
+  init() { tween(WS, 'boatSunk', 1, SINK_DUR, E.io); SFX.gurgle(3.5); },
   update(t, dt, at) {
     if (t < SINK_DUR && Math.random() < dt * 14) {
       const bx = boatLeft();
       bubble(bx + 4 + Math.random() * (BOAT.w - 10), WL + Math.random() * 3);
     }
     at('ring1', 1.4, () => ring(boatLeft() + BOAT.w * 0.35, WL + 2, true));
-    at('glint', 1.8, () => { WS.glint = 1; SFX.tick(); });
+    at('glint', 1.8, () => { WS.glint = 1; SFX.glint(); });
     at('glintOff', 1.9, () => { WS.glint = 0; });
     at('under', SINK_DUR, () => { SFX.plop(); ring(boatLeft() + BOAT.w * 0.6, WL + 2, true); });
   },
@@ -3788,7 +4053,7 @@ function redSequence() {
     // the boat fish glows back to 1 and speaks from there (bible, Red sequence).
     { act: () => {
       if (STORY.kept) { tween(WS, 'goldKept', 1, 0.9); return; }
-      WS.goldFish = { x: SUNX - 14, y: HY - 24, a: 0, surf: HY + 1 }; tween(WS.goldFish, 'a', 1, 0.9); SFX.chime();
+      WS.goldFish = { x: SUNX - 14, y: HY - 24, a: 0, surf: HY + 1 }; tween(WS.goldFish, 'a', 1, 0.9); wishChime(true);
     } },
     { pause: 2 }, // two seconds of silence, no caption
   ].concat(redLines()), () => playCine(CINE_RED, wish3));
@@ -3805,7 +4070,7 @@ function wish3Choices() {
     { label: 'Take the light away', pick: endDark },
     { label: 'Cut the line', pick: endCut },
   ];
-  if (has('home')) c.push({ label: 'Let me in.', pick: endInside });
+  if (has('home')) c.push({ label: 'Let me in', pick: endInside });
   if (STORY.answered === true) c.push({ label: 'Stay with him', pick: endStay });
   if (has('gold')) c.push({ label: 'Let me get my gold', pick: endDeep });
   if (STORY.refused === 2) c.push({ label: 'Nothing', pick: endSilent });
@@ -3863,14 +4128,15 @@ const CINE_DEEP = {
   dur: 14,
   init(s) {
     s.g0 = WS.sunGlow; s.h0 = WS.horizGlow; s.tr0 = WS.troubled;
-    G.bob = null; G.tip = null; G.hbGap = 1e9;
+    G.bob = null; G.tip = null; heartStop();
     tween(WS, 'ash', 0, 3);
     if (WS.goldFish) tween(WS.goldFish, 'a', 0, 1.5); // the sky fish stays above; under the surface it is out of sight
-    SFX.splash(); SFX.swell();
+    SFX.splash(); SFX.swell(); s.uw = 0;
   },
   update(t, dt, at, s) {
     const k = E.io(clamp((t - 0.4) / camDur(6), 0, 1));
     WS.dive = k;
+    if (Math.abs(k - s.uw) > 0.02) { s.uw = k; SFX.under(k); } // the mix sinks with the camera
     if (k > DIVE_SWITCH && WS.lantern > 0) { untween(WS, 'lantern'); WS.lantern = 0; } // the lantern goes with the surface view, not after it
     WS.dim = 6 * clamp((t - 1) / 7, 0, 1);
     WS.sunGlow = lerp(s.g0, 0, clamp(t / 4, 0, 1));
@@ -3878,7 +4144,7 @@ const CINE_DEEP = {
     WS.troubled = lerp(s.tr0, 0.15, clamp(t / 5, 0, 1));
     WS.starA = clamp((t - 3) / 4, 0, 1);
     at('drone', 2, () => SFX.drone(false));
-    at('glint', 8, () => { WS.glint = 1; SFX.tick(); });
+    at('glint', 8, () => { WS.glint = 1; SFX.glint(); });
     at('glintOff', 8.08, () => { WS.glint = 0; });
     at('fade', 12, () => UI.fade(1, 2));
   },
@@ -4249,16 +4515,17 @@ const CINE_INSIDE = {
     const I = G.inside = insidePose(t, s);
     WS.push = I.k;
     if (I.live) WS.boatX = s.bx0 + I.ax - s.ax0; // the live group drifts first, then the ladder takes over
-    if (t >= s.nextKnock && t < IN.walk + IN.walkDur - 0.3) { s.nextKnock += IN.knockGap; insideKnock(0.4); }
+    at('hush', IN.drift, () => { SFX.droneDuck(DRONE_VOL * INSIDE_HUSH, 0.4); G.hbVol = INSIDE_HUSH; }); // the hum and the heart step back so the knocking leads him
+    if (t >= s.nextKnock && t < IN.walk + IN.walkDur - 0.3) { s.nextKnock += IN.knockGap; insideKnock(KNOCK_WALK); }
     if (s.sunk && t >= s.ring && t < IN.drift + IN.driftDur) { s.ring += 0.8; ring(I.ax, I.wl + 1, false, 0.6, true); }
     at('skyFish', SKY_FISH_AT, () => goldFishFade(SKY_FISH_FADE)); // the released sky fish leaves the frame to the door
-    at('open', IN.open, () => { WS.door = 1; SFX.creak(0.6); });
-    at('close', IN.close, () => { WS.door = 0; SFX.knock(0.7); G.hbGap = 1e9; });
-    at('row', IN.row, () => { if (!s.sunk) SFX.row(); });
-    at('cast', IN.cast, () => { if (!s.sunk) SFX.whoosh(); });
-    at('plop', IN.cast + IN.castDur, () => { if (!s.sunk) { SFX.plop(); const p = INSIDE_LAND || { x: I.ax - 16, y: HY + 5 }; ring(p.x, p.y); } });
+    at('open', IN.open, () => { WS.door = 1; SFX.creak(0.6, true); });
+    at('close', IN.close, () => { WS.door = 0; SFX.knock(0.7); SFX.droneDuck(DRONE_DUCK, 0.3); heartStop(); }); // the shut door takes the hum down and the heart
+    at('row', IN.row, () => { if (!s.sunk) SFX.row(INSIDE_CAST); });
+    at('cast', IN.cast, () => { if (!s.sunk) SFX.whoosh(INSIDE_CAST); });
+    at('plop', IN.cast + IN.castDur, () => { if (!s.sunk) { SFX.plop(INSIDE_CAST); const p = INSIDE_LAND || { x: I.ax - 16, y: HY + 5 }; ring(p.x, p.y); } });
     at('under', IN.under + IN.underDur * 0.8, () => { if (s.sunk) { SFX.plop(); ring(W_UNDER.x, HY + 1); } });
-    IN.knocks.forEach((k, i) => at('k' + i, k, () => insideKnock(0.3)));
+    IN.knocks.forEach((k, i) => at('k' + i, k, () => insideKnock(KNOCK_INSIDE)));
     at('fade', IN.fade, () => UI.fade(1, 1));
   },
 };
@@ -4510,6 +4777,7 @@ function hook() {
 const SURGE_WARN = 0.25, RELEASE_LOSS = 0.06, GOLD_REEL_D = 1.0, GOLD_T_CAP = 0.62;
 // Reel feel (eased 2026-09-30 so a first-time phone player lands fish faster): progress per second while
 // holding, the steady and surge tension climbs, how fast tension falls on release, and the gap between surges.
+const REEL_TICK = 0.13, REEL_TICK_RND = 0.05; // the reel's pawl, about 6.5 a second
 const REEL_RATE = 0.42, PULL_BASE = 0.32, PULL_SURGE = 1.0, RELEASE_EASE = 0.95, SURGE_GAP = 1.2, SURGE_GAP_RND = 1.8;
 function reelUpdate(dt) {
   const r = G.reel;
@@ -4517,7 +4785,7 @@ function reelUpdate(dt) {
     r.p += (dt * REEL_RATE) / r.d;
     r.T += dt * (PULL_BASE + (r.surge > 0 && r.sAge > SURGE_WARN ? PULL_SURGE : 0)) * r.d;
     r.tick -= dt;
-    if (r.tick <= 0) { r.tick = 0.07; SFX.tick(); }
+    if (r.tick <= 0) { r.tick = REEL_TICK + arnd() * REEL_TICK_RND; SFX.reelTick(r.T); }
   } else { r.p -= dt * RELEASE_LOSS; r.T -= dt * RELEASE_EASE; }
   if (!r.golden) {
     if (r.surge > 0) {
@@ -4527,7 +4795,7 @@ function reelUpdate(dt) {
       if (Math.random() < dt * 14) splash(G.bob.x, G.bob.y, 1);
     } else {
       r.next -= dt;
-      if (r.next <= 0) { r.surge = 0.45 + Math.random() * 0.55 + SURGE_WARN; r.sAge = 0; r.next = SURGE_GAP + Math.random() * SURGE_GAP_RND; ring(G.bob.x, G.bob.y + 1); SFX.nibble(); }
+      if (r.next <= 0) { r.surge = 0.45 + Math.random() * 0.55 + SURGE_WARN; r.sAge = 0; r.next = SURGE_GAP + Math.random() * SURGE_GAP_RND; ring(G.bob.x, G.bob.y + 1); SFX.drag(); }
     }
   } else r.T = Math.min(r.T, GOLD_T_CAP);
   r.T = clamp(r.T, 0, 1.05); r.p = clamp(r.p, 0, 1);
@@ -4551,7 +4819,7 @@ function land() {
 }
 // The card as the player sees it: the name, line and voice translated, the weight formatted (kgText).
 const cardView = f => Object.assign({}, f, { name: tr(f.name), desc: tr(f.desc), voice: tr(f.voice), meta: kgText(f.weight) });
-function showCard(f) { thinkHide(); setPhase('card'); G.cardReady = false; UI.card(cardView(f)); SFX.caught(); }
+function showCard(f) { thinkHide(); setPhase('card'); G.cardReady = false; UI.card(cardView(f)); SFX.caught(STORY.act === 2); }
 // The first half second of a card ignores taps (a reflex tap from the reel would close it unread); the
 // "Tap to continue" hint fades in once it can be closed.
 const CARD_GRACE = 0.5;
@@ -4634,14 +4902,14 @@ function fishUpdate(dt) {
       G.bobDip = 999;
       ring(G.bob.x, G.bob.y + 1); ring(G.bob.x, G.bob.y + 1, true); splash(G.bob.x, G.bob.y, 3);
       SFX.bite();
-      if (glitter) SFX.chime();
+      if (glitter) wishChime();
       G.ringT = 0;
     }
   } else if (ph === 'bite') {
     G.ringT += dt;
     if (G.ringT > 0.35) { G.ringT = 0; ring(G.bob.x, G.bob.y + 1); }
     G.rodA = lerp(G.rodA, AIM_A + 0.12, Math.min(1, dt * 8));
-    if (G.pt > G.biteWin) lose(STORY.goldenNext ? 'It slipped away. Cast again.' : 'It slipped the hook.');
+    if (G.pt > G.biteWin) { SFX.slack(); lose(STORY.goldenNext ? 'It slipped away. Cast again.' : 'It slipped the hook.'); }
   } else if (ph === 'reeling') {
     reelUpdate(dt);
   } else if (ph === 'landing') {
@@ -4740,7 +5008,7 @@ function press() {
   if (p === 'title') startGame();
   else if (p === 'ready') { if (G.arrived) cast(); } // no cast until the boat has rowed in
   else if (p === 'ocean') { if (G.pt >= OCEAN_GRACE) oceanCast(); }
-  else if (p === 'waiting') lose(STORY.goldenNext ? 'Too early.' : 'Too early. Nothing was biting yet.');
+  else if (p === 'waiting') { SFX.slack(); lose(STORY.goldenNext ? 'Too early.' : 'Too early. Nothing was biting yet.'); }
   else if (p === 'bite') hook();
   else if (p === 'reeling') G.holding = true;
   else if (p === 'card') { if (G.pt >= CARD_GRACE) closeCard(); }
@@ -4813,14 +5081,14 @@ function resetAll() {
   resetWS();
   Object.assign(STORY, freshStory());
   loadRun();
-  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null, arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, hbGap: HB_GAP, tip: { x: 110, y: 205 }, farRing: FAR_RING_FIRST, inside: null });
+  Object.assign(G, { bob: null, cast: null, wait: null, reel: null, land: null, holding: false, rodA: REST_A, rodBend: 0, bobDip: 0, capUntil: 0, thinkUntil: 0, thinkAt: -9, thinkMore: false, cardReady: false, thinkPending: [], knock: null, arrived: true, open: null, eyesDone: false, eyesAt: -9, frozeT: 0, hb: 0, hbAt: -9, hbVol: 1, hbGap: HB_GAP, hbRun: 5, lap: 2, ambSent: null, tip: { x: 110, y: 205 }, farRing: FAR_RING_FIRST, inside: null });
   PARTS.length = 0; RINGS.length = 0; ASH.length = 0; SHAD.length = 0; BIRDS.length = 0; TW.length = 0;
   OCEAN.shad.length = 0; OCEAN.big = null; OCEAN.tr0 = 0;
   cloudT = 0; genEyes();
   WS.farBoat = RUN.count > 0 || loadEndings().length > 0 || sessionEndings.length > 0 ? 1 : 0; // bible, Title
   CINE = null;
   DLG.q = []; DLG.cur = null; DLG.active = false; DLG.done = null; DLG.wait = 0;
-  SFX.drone(false); SFX.weight(false);
+  SFX.drone(false); SFX.weight(false); SFX.under(0);
   UI.count(0); UI.dlgHide(); UI.thinkHide(); UI.cardHide(); UI.endingHide();
   setPhase('title');
   UI.title(true, foundEndings());
@@ -4829,10 +5097,33 @@ function restart() {
   UI.fade(1, 0.6);
   setTimeout(() => { resetAll(); UI.fade(0, 1.4); }, 650);
 }
+// The sound of the world. The bed follows the mood, the sea, the frozen day and the eyes (SFX.scene, sent
+// only when something moves); the lake laps at the hull now and then, by day more often, never in the red,
+// frozen or under the surface; the heartbeat in the red comes in runs of 4 to 7 beats with a rest between,
+// each gap a little different, and runs on without rests once Stay quickens it. Its timing has its own
+// random stream (arnd), so the sound never shifts the game's.
+let audSeed = 20261004;
+const arnd = () => (audSeed = (audSeed * 16807) % 2147483647) / 2147483647;
+function heartGap() {
+  const g = G.hbGap * (1 + (arnd() * 2 - 1) * 0.04);
+  if (G.hbGap < HB_GAP || --G.hbRun > 0) return g;
+  G.hbRun = 4 + ((arnd() * 4) | 0);
+  return g + 2.5 + arnd() * 2;
+}
+// One beat, and the loop re-phased from it (G.hbAt is its time, so a scripted beat never doubles a loop beat).
+function heartNow() { SFX.heartbeat(G.hbVol); G.hbAt = G.t; G.hb = heartGap(); }
+// The heart stops for good this run (Stay's snap, the Inside door, the Deep dive); resetAll starts it again.
+function heartStop() { G.hbGap = 1e9; G.hb = 1e9; }
 function ambientUpdate(dt) {
+  const sc = [WS.mood, WS.sea, WS.frozen ? 1 : 0, WS.eyes > 0 ? AMB_EYES : G.inside ? INSIDE_HUSH : 1], was = G.ambSent;
+  if (!was || sc.some((v, i) => Math.abs(v - was[i]) > 0.02)) { G.ambSent = sc; SFX.scene(sc[0], sc[1], sc[2], sc[3]); }
+  if (G.phase !== 'title' && WS.mood < 1.5 && !WS.frozen && WS.dive < 0.5 && WS.dim < 5) {
+    G.lap -= dt;
+    if (G.lap <= 0) { G.lap = WS.mood > 0.5 ? 3 + arnd() * 4 : 1.8 + arnd() * 2.7; SFX.lap(!swimming()); }
+  }
   if (WS.mood > 1.6 && G.phase !== 'end' && WS.dim < 5) {
     G.hb -= dt;
-    if (G.hb <= 0) { G.hb = G.hbGap; SFX.heartbeat(); }
+    if (G.hb <= 0) heartNow();
   }
 }
 function update(dt) {
@@ -4861,9 +5152,10 @@ function init() {
 // of bumps along the top, a smaller row along the bottom and one round each end; the tail is three pixel
 // circles (TAIL_PUFFS, radius 3, 2 and 1) stepping down from x tx toward the speaker (dir).
 const THINK_PAD = 2, THINK_GW = Math.round(W * 0.4), THINK_GUTTER = 16, BUMP_R = 5.5;
-// A long line (the bait line in Russian) widens the cloud in steps up to THINK_GW_MAX game pixels, so it sets in
-// THINK_LINES lines.
-const THINK_GW_MAX = 116, THINK_LINES = 3;
+// A long line (the bait line) widens the cloud in steps up to THINK_GW_MAX game pixels, so it sets in
+// THINK_LINES lines; a short one narrows it to its widest line plus THINK_PX game pixels a side (the CSS
+// padding), down to THINK_GW_MIN.
+const THINK_GW_MAX = 140, THINK_LINES = 3, THINK_GW_MIN = 48, THINK_PX = 7;
 const TAIL_PUFFS = [
   { dx: 0, dy: 4, rows: ['..###..', '.#####.', '#######', '#######', '#######', '.#####.', '..###..'] },
   { dx: 5, dy: 10, rows: ['.###.', '#####', '#####', '#####', '.###.'] },
@@ -4917,11 +5209,13 @@ function thinkRects(k) {
 // The companion's question keeps his bubble where it is and puts its two buttons above it, in the sky, so they
 // never sit on the rod, the lantern or the tail. In the red (mood past 1) the eye hangs where his bubble would
 // sit, so his bubble moves down to y 205 and right of the disc (companionRed), clear of the eye and still
-// above both heads. thinkLayout keeps every bubble THINK_GUTTER CSS px inside the stage's right edge.
+// above both heads; it is pinned there (pin): never wider than the room right of its left edge, so a long line
+// wraps instead of sliding the cloud left over the eye. thinkLayout keeps every bubble THINK_GUTTER CSS px
+// inside the stage's right edge.
 const THINK_AT = {
   fisherman: { left: 122, y: 186, tail: 150, dir: -1 },
   companion: { left: 100, y: 190, tail: 160, dir: 1 },
-  companionRed: { left: 124, y: 205, tail: 168, dir: 1 },
+  companionRed: { left: 124, y: 205, tail: 168, dir: 1, pin: true },
 };
 const thinkAnchor = side => (WS.mood > 1 && THINK_AT[side + 'Red']) || THINK_AT[side];
 // The catch card's sprite scale: the largest integer factor that keeps the fish inside CARD_FISH_W of the
@@ -4929,19 +5223,95 @@ const thinkAnchor = side => (WS.mood > 1 && THINK_AT[side + 'Red']) || THINK_AT[
 // sits low, under the boat, so a short stage takes a smaller fish), between CARD_FISH_MIN and CARD_FISH_MAX,
 // so the species signatures read on a phone (bible, section 5).
 const CARD_FISH_W = 0.6, CARD_FISH_H = 26, CARD_FISH_V = 12, CARD_FISH_MIN = 2, CARD_FISH_MAX = 8;
+// The tallest a card's fish may be, in CSS px: also the height of the fish's box on every card (cardScale), so
+// the card keeps one height from catch to catch. Act 2's grey fish get a one-pixel rim of ramp CARD_RIM.
+const CARD_RIM = 6, CARD_CLEAR = 2; // CARD_CLEAR: game rows of water kept between the keel and a tall card
+const cardFishTall = (stageW, stageH) => Math.min(CARD_FISH_H * stageW / 100, stageH ? CARD_FISH_V * stageH / 100 : Infinity);
 function cardFishScale(w, h, stageW, panelW, stageH) {
-  const u = stageW / 100, tall = Math.min(CARD_FISH_H * u, stageH ? CARD_FISH_V * stageH / 100 : Infinity);
+  const u = stageW / 100, tall = cardFishTall(stageW, stageH);
   return clamp(Math.floor(Math.min((CARD_FISH_W * (panelW || 80 * u)) / w, tall / h)), CARD_FISH_MIN, CARD_FISH_MAX);
 }
-// Russian typography on screen: a one-letter word (в, с, к, у, о, и, а, я) keeps the next word on its line,
-// and an em dash keeps the word before it, through a no-break space. Only the displayed text changes (the
-// UI sinks call it): tr, the logic and the sim see the plain strings. Two passes catch "и в дом".
-// A one- or two-letter word before closing punctuation keeps the word before it too (сказал он.).
+// Typography on screen, in the UI sinks only: tr, the logic and the sim see the plain strings. Every rule swaps
+// a space for a no-break space, one character for one, so a line typing out can be cut at any index of it.
+// Both languages: a number keeps the word after it (5 fish, 0,25 кг, 1 из 7), and a word of up to three
+// letters that opens a sentence keeps the next one (… still. The flame; … света. Ты говорил). Russian book
+// typography besides: a short preposition, conjunction or particle (в, на, под, не, ни, но, для …) keeps the
+// next word, бы, же and ли keep the word before, an em dash keeps the word before it, a one- or two-letter word
+// before closing punctuation keeps the word before it (сказал он.), and a few set phrases stay whole (всё
+// равно). The word rules run twice, for chains (и не на). A hyphenated word (что-нибудь) is kept whole by the
+// DOM (richText), not here.
+const NB = '\u00a0';
+const NB_NUM = /(\d) (?=\S)/g;
+const NB_START = /(^|[.!?…]["»”)]? )([A-ZА-ЯЁ][a-zа-яё]{0,2}) /g;
+const NB_SHORT = /(^|[\s(«"„—])([вксуоиая]|на|по|до|за|из|от|об|во|со|ко|не|ни|но|да|или|без|под|над|для|при|про|изо|обо) /gi;
+const NB_AFTER = / (бы|же|ли)(?=[\s.,!?…:;»"]|$)/g;
 const NB_TAIL = / ([а-яёА-ЯЁ]{1,2}[.,!?…])/g;
-const NB_ONE = /(^|[\s («"])([вВсСкКуУоОиИаАяЯ]) /g;
+const NB_SET = /[вВ]сё равно|Полную лодку/g;
 function nbsp(t) {
-  if (LANG !== 'ru' || !t) return t;
-  return t.replace(NB_ONE, '$1$2 ').replace(NB_ONE, '$1$2 ').replace(/ —/g, ' —').replace(NB_TAIL, ' $1');
+  if (!t) return t;
+  t = t.replace(NB_NUM, '$1' + NB).replace(NB_START, '$1$2' + NB).replace(NB_START, '$1$2' + NB);
+  if (LANG !== 'ru') return t;
+  return t.replace(NB_SHORT, '$1$2' + NB).replace(NB_SHORT, '$1$2' + NB).replace(NB_AFTER, NB + '$1')
+    .replace(/ —/g, NB + '—').replace(NB_TAIL, NB + '$1').replace(NB_SET, m => m.replace(' ', NB));
+}
+// A string set into a node for the eye (t already through nbsp): a hyphenated word in a nowrap span, so it never
+// breaks at its hyphen; the wrong question mark (mark) as its own span; and while a line types out (n, the
+// characters shown), the rest in a transparent span, so the line is laid out whole from its first letter and no
+// word jumps to the next line as it types.
+const NW_WORD = /[^\s\u00a0]+-[^\s\u00a0]+/g;
+// A short text in sentences (a caption, a bubble, a card's line): each sentence its own inline box (.sent), so a
+// line breaks between sentences wherever they fit and a sentence never leaves its first word at a line end.
+function sentText(node, t, mark) {
+  node.textContent = '';
+  if (!t) return;
+  let a = 0;
+  const put = b => { const sp = document.createElement('span'); sp.className = 'sent'; richText(sp, t.slice(a, b), undefined, b === t.length && mark); node.appendChild(sp); };
+  for (let i = 1; i < t.length - 1; i++) {
+    if (t[i] !== ' ') continue;
+    const p = t[i - 1], q = t[i - 2];
+    if ('.!?…'.indexOf(p) >= 0 || ('»”"'.indexOf(p) >= 0 && q && '.!?…'.indexOf(q) >= 0)) { put(i); node.appendChild(document.createTextNode(' ')); a = i + 1; }
+  }
+  put(t.length);
+}
+function richText(node, t, n, mark) {
+  node.textContent = '';
+  if (!t) return;
+  if (n === undefined || n > t.length) n = t.length;
+  const m = mark && t.endsWith('?') ? t.length - 1 : -1, words = [], cut = new Set([0, t.length, n]);
+  if (m >= 0) cut.add(m);
+  NW_WORD.lastIndex = 0;
+  for (let r = NW_WORD.exec(t); r; r = NW_WORD.exec(t)) { words.push([r.index, r.index + r[0].length]); cut.add(r.index); cut.add(r.index + r[0].length); }
+  const at = [...cut].sort((a, b) => a - b);
+  let wi = 0, box = null, boxW = -1;
+  for (let k = 0; k + 1 < at.length; k++) {
+    const a = at[k], b = at[k + 1];
+    if (a === b) continue;
+    while (wi < words.length && words[wi][1] <= a) wi++;
+    const inWord = wi < words.length && words[wi][0] <= a;
+    if (inWord && boxW !== wi) { box = document.createElement('span'); box.className = 'nw'; boxW = wi; node.appendChild(box); }
+    let piece;
+    if (a === m) { piece = document.createElement('span'); piece.className = 'mark'; piece.textContent = '?'; } else piece = document.createTextNode(t.slice(a, b));
+    if (a >= n) { const g = document.createElement('span'); g.className = 'ghost'; g.appendChild(piece); piece = g; }
+    (inWord ? box : node).appendChild(piece);
+  }
+}
+// Keeps a marker (the bubble's ▾) on the line of the text's last word: the last word, any spans after it (the
+// mark, a hyphenated word) and the marker go into one nowrap span.
+function glueTail(node, tail) {
+  const last = node.lastChild;
+  if (last && last.nodeType === 1 && last.classList.contains('sent')) { glueTail(last, tail); return; }
+  const nw = document.createElement('span'), moved = [];
+  nw.className = 'nw';
+  while (node.lastChild && node.lastChild.nodeType === 1) moved.unshift(node.removeChild(node.lastChild));
+  const t = node.lastChild;
+  if (t && t.nodeType === 3) {
+    const i = t.data.lastIndexOf(' ');
+    nw.append(t.data.slice(i + 1));
+    t.data = t.data.slice(0, i + 1);
+  }
+  moved.forEach(c => nw.appendChild(c));
+  nw.appendChild(tail);
+  node.appendChild(nw);
 }
 // The title's pixel lettering (chosen in a logo lab: 'soft', redrawn larger). Hand-made letters drawn as SVG
 // rects, one glyph pixel to one game pixel, so set on a whole game-pixel column and row (placeLogo) the name
@@ -4953,7 +5323,7 @@ function nbsp(t) {
 // [its first row, its rows]. Enough glyphs for 'Still Water' and 'Тихий омут'.
 const LOGO_GLYPHS = {
   S: [0, ['..######.', '.#......#', '#.......#', '#........', '#........', '#........', '.#.......', '..##.....', '....####.', '........#', '.........#', '.........#', '.........#', '.........#', '#........#', '#.......#.', '.#######..']],
-  W: [0, ['#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '#....#....#', '.####.####.']],
+  W: [0, ['#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '#....#....#', '#....#....#', '#...#.#...#', '#...#.#...#', '#..#...#..#', '#..#...#..#', '#.#.....#.#', '#.#.....#.#', '.#.......#.']],
   t: [2, ['.#....', '.#....', '.#....', '.#....', '#####.', '.#....', '.#....', '.#....', '.#....', '.#....', '.#....', '.#....', '.#....', '..#...', '...##.']],
   i: [2, ['.#.', '.#.', '...', '...', '##.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '..#']],
   l: [0, ['##.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '..#']],
@@ -5048,17 +5418,61 @@ function makeUI() {
     again: $('again'), fade: $('fade'), mute: $('mute'), skip: $('skip'), lang: $('lang'),
   };
   let capTimer = null;
-  const rgb = (i, a) => 'rgba(' + (PALRGB[i * 3] | 0) + ',' + (PALRGB[i * 3 + 1] | 0) + ',' + (PALRGB[i * 3 + 2] | 0) + ',' + (a === undefined ? 1 : a) + ')';
-  const mixWhite = (i, k) => 'rgb(' + [0, 1, 2].map(j => Math.round(PALRGB[i * 3 + j] + (255 - PALRGB[i * 3 + j]) * k)).join(',') + ')';
+  // The UI's colours (UI.colors): from UIRGB, the palette without the Dark ending's dimming, as [r, g, b].
+  const U = i => [UIRGB[i * 3], UIRGB[i * 3 + 1], UIRGB[i * 3 + 2]];
+  const mixWhite = (i, k) => U(i).map(v => v + (255 - v) * k);
+  const css = c => 'rgb(' + c.map(v => Math.round(v)).join(',') + ')';
+  const lin = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const lum = c => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  // A text colour lifted toward white until it holds `need` against the lighter of the slab's two fills.
+  const lift = (c, need) => {
+    for (let k = 0; k <= 1; k += 0.04) { const m = c.map(v => v + (255 - v) * k); if (contrast(m, U(1)) >= need) return m; }
+    return [255, 255, 255];
+  };
+  // The first ramp step (from 2 up) that holds `need` against the slab: for a ring that must read.
+  const step = need => { for (let i = 2; i < 12; i++) if (contrast(U(i), U(0)) >= need) return U(i); return U(11); };
   // mark: the one line whose question mark is drawn wrong. Only that glyph gets a span; everything is text.
-  const setText = (node, t, mark) => {
-    t = nbsp(t);
-    node.textContent = t;
-    if (!mark || !t.endsWith('?')) return;
-    node.textContent = t.slice(0, -1);
-    const s = document.createElement('span');
-    s.className = 'mark'; s.textContent = '?';
-    node.appendChild(s);
+  const setText = (node, t, mark) => richText(node, nbsp(t), undefined, mark);
+  const setSent = (node, t, mark) => sentText(node, nbsp(t), mark);
+  const gpx = () => el.stage.clientWidth / W;
+  // A slab's height (or width) rounded up to whole game pixels, the remainder taken by its bottom padding (or its
+  // width), so its notched corners land on the canvas's own grid. No layout (jsdom): nothing.
+  const snapH = n => {
+    n.style.paddingBottom = ''; n.style.minHeight = '';
+    const gp = gpx(), h = n.getBoundingClientRect().height;
+    if (!h || !gp) return;
+    const x = Math.ceil(h / gp - 0.02) * gp - h;
+    if (x > 0.05) n.style.paddingBottom = parseFloat(getComputedStyle(n).paddingBottom) + x + 'px';
+    const h2 = n.getBoundingClientRect().height, x2 = Math.ceil(h2 / gp - 0.02) * gp - h2;
+    if (x2 > 0.05) n.style.minHeight = h2 + x2 + 'px'; // a box held at its least height
+  };
+  // even: an even number of game pixels, so a box centred on the stage (216 wide) starts on a whole one.
+  const snapW = (n, even) => {
+    n.style.width = '';
+    const gp = gpx(), w = n.getBoundingClientRect().width, k = even ? 2 : 1;
+    if (w && gp) n.style.width = Math.ceil(w / gp / k - 0.01) * k * gp + 'px';
+  };
+  // The widest line of a node's text as laid out, in CSS px (0 with no layout): rects whose middles share a row
+  // are one line.
+  const lineWidth = n => {
+    const r = document.createRange();
+    if (!r.getClientRects) return 0;
+    // the words themselves (each text node's line boxes) and the ▾ marker, not the boxes that hold them
+    const rects = [];
+    const walk = node => {
+      if (node.nodeType === 3) { r.selectNodeContents(node); rects.push(...r.getClientRects()); return; }
+      if (node.classList && node.classList.contains('pxmore')) { rects.push(node.getBoundingClientRect()); return; }
+      node.childNodes.forEach(walk);
+    };
+    walk(n);
+    const rows = [];
+    for (const q of rects) {
+      if (!q.width) continue;
+      const c = (q.top + q.bottom) / 2, o = rows.find(w => c >= w.t && c <= w.b);
+      if (o) { o.l = Math.min(o.l, q.left); o.r = Math.max(o.r, q.right); } else rows.push({ t: q.top, b: q.bottom, l: q.left, r: q.right });
+    }
+    return rows.reduce((w, o) => Math.max(w, o.r - o.l), 0);
   };
   // New buttons are cold for CHOICE_GRACE seconds of game time: the tap that finished the line often comes
   // twice, and the second must not pick an ending. The cold class blocks pointer events; the check in the
@@ -5074,7 +5488,7 @@ function makeUI() {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'choice';
       const lb = document.createElement('span'); // the words, whose first line the marker (::before) centres on
-      lb.className = 'lb'; lb.textContent = nbsp(c.label);
+      lb.className = 'lb'; sentText(lb, nbsp(c.label));
       b.appendChild(lb);
       b.addEventListener('click', ev => { ev.stopPropagation(); b.blur(); if (!ui.choicesCold()) c.cb(); });
       box.appendChild(b);
@@ -5087,13 +5501,16 @@ function makeUI() {
   const fitChoices = () => {
     el.choices.classList.remove('grid');
     el.dlg.classList.remove('tight');
-    if (el.choices.hidden) return;
-    const lh = parseFloat(getComputedStyle(el.text).lineHeight) || 0;
-    const cramped = () => el.text.clientHeight < Math.min(el.text.scrollHeight, lh * 2) - 1 ||
-      el.dlg.scrollHeight > el.dlg.clientHeight + 1;
-    if (!cramped()) return;
-    el.dlg.classList.add('tight');
-    if (cramped() && el.choices.classList.contains('many')) el.choices.classList.add('grid');
+    if (!el.choices.hidden) {
+      const lh = parseFloat(getComputedStyle(el.text).lineHeight) || 0;
+      const cramped = () => el.text.clientHeight < Math.min(el.text.scrollHeight, lh * 2) - 1 ||
+        el.dlg.scrollHeight > el.dlg.clientHeight + 1;
+      if (cramped()) {
+        el.dlg.classList.add('tight');
+        if (cramped() && el.choices.classList.contains('many')) el.choices.classList.add('grid');
+      }
+    }
+    if (el.dlg.classList.contains('on')) snapH(el.dlg);
   };
   // The endings found as pips (filled when found) and the short count; the whole sentence is their name.
   const pips = (box, found) => {
@@ -5108,14 +5525,34 @@ function makeUI() {
       box.appendChild(i);
     });
     const b = document.createElement('b');
-    b.textContent = foundShort(n);
+    b.textContent = nbsp(foundShort(n));
     box.appendChild(b);
   };
   let againTimer = null, cardSize = null;
+  // The card's fish, scaled (cardFishScale) and centred in a box of one height for every species
+  // (cardFishTall), so the card keeps its height from catch to catch. The card never reaches above the
+  // waterline: a taller card (a voice line, in Russian) takes a lower box and, if it must, a smaller fish.
   const cardScale = () => {
     if (!cardSize) return;
-    const sc = cardFishScale(cardSize.w, cardSize.h, el.stage.clientWidth, el.card.clientWidth, el.stage.clientHeight);
-    el.cardFish.style.width = cardSize.w * sc + 'px'; el.cardFish.style.height = cardSize.h * sc + 'px';
+    const sw = el.stage.clientWidth, sh = el.stage.clientHeight, cv = el.cardFish;
+    let sc = cardFishScale(cardSize.w, cardSize.h, sw, el.card.clientWidth, sh);
+    let box = Math.max(Math.floor(cardFishTall(sw, sh)), cardSize.h * sc);
+    const put = () => {
+      const h = cardSize.h * sc, pad = (box - h) / 2;
+      cv.style.width = cardSize.w * sc + 'px'; cv.style.height = h + 'px';
+      cv.style.marginTop = Math.floor(pad) + 'px';
+      cv.style.marginBottom = 'calc(var(--gp) * 4 + ' + Math.ceil(pad) + 'px)';
+    };
+    put();
+    if (!sh) return;
+    const over = (WL + CARD_CLEAR) * sh / H - el.card.offsetTop; // a line of water between the keel and the card
+    if (over > 0.5) {
+      box = Math.max(cardSize.h * CARD_FISH_MIN, Math.floor(box - over));
+      sc = clamp(Math.floor(box / cardSize.h), CARD_FISH_MIN, sc);
+      box = Math.max(box, cardSize.h * sc);
+      put();
+    }
+    snapH(el.card);
   };
   // The bubble's place and cloud from the live stage size, all in whole game pixels (gp CSS px each): the
   // width is THINK_GW, widened in steps up to THINK_GW_MAX while the text would take more than THINK_LINES
@@ -5126,15 +5563,46 @@ function makeUI() {
   const thinkLayout = side => {
     const a = thinkAnchor(side), gp = el.stage.clientWidth / W;
     const lh = parseFloat(getComputedStyle(el.thinkText).lineHeight) || 0;
-    let gw = THINK_GW;
+    const lines = () => (lh ? Math.round(el.thinkText.getBoundingClientRect().height / lh) : 0);
+    // A pinned bubble's widest is the room between its left edge and the gutter.
+    const gwMax = a.pin ? Math.min(THINK_GW_MAX, Math.floor(W - THINK_GUTTER / gp) - a.left - 1) : THINK_GW_MAX;
+    let gw = Math.min(THINK_GW, gwMax);
+    el.thinkText.classList.remove('flow');
     el.think.style.height = 'auto';
+    // The lines it should take: as many as its words need at THINK_GW (measured on one line), at most
+    // THINK_LINES; the cloud widens in steps of 4 until it sets in that many.
+    el.think.style.width = gw * gp + 'px';
+    el.thinkText.style.whiteSpace = 'nowrap';
+    const one = lineWidth(el.thinkText);
+    el.thinkText.style.whiteSpace = '';
+    const want = one ? clamp(Math.ceil(one / ((THINK_GW - 2 * THINK_PX) * gp)), 1, THINK_LINES) : THINK_LINES;
     for (;;) {
       el.think.style.width = gw * gp + 'px';
-      const lines = lh ? Math.round(el.thinkText.getBoundingClientRect().height / lh) : 0;
-      if (lines <= THINK_LINES || gw >= THINK_GW_MAX) break;
-      gw = Math.min(THINK_GW_MAX, gw + 4);
+      if (lines() <= want || gw >= gwMax) break;
+      gw = Math.min(gwMax, gw + 4);
     }
-    const left = Math.min(a.left, Math.floor(W - THINK_GUTTER / gp) - gw - 1);
+    // A few short sentences each take a line of their own where the cloud can widen to hold them.
+    const sents = [...el.thinkText.querySelectorAll('.sent')];
+    const wraps = () => sents.some(n => n.getBoundingClientRect().height > lh * 1.5);
+    if (lh && sents.length > 1 && sents.length <= THINK_LINES) {
+      while (wraps() && gw < gwMax) { gw = Math.min(gwMax, gw + 4); el.think.style.width = gw * gp + 'px'; }
+    }
+    // If the sentences still take more than THINK_LINES lines (one too long for a line of its own), they flow
+    // as one balanced text instead (.flow), so the bubble keeps to THINK_LINES.
+    if (lh && sents.length > 1 && lines() > THINK_LINES) el.thinkText.classList.add('flow');
+    // Then narrowed to its widest line, in steps of 2 game pixels, never re-wrapping: a word or two takes a
+    // small cloud.
+    const n0 = lines(), wide = lineWidth(el.thinkText);
+    if (wide > 0) {
+      const fit = Math.max(THINK_GW_MIN, 2 * Math.ceil((wide / gp + 2 * THINK_PX + 1) / 2));
+      if (fit < gw) {
+        el.think.style.width = fit * gp + 'px';
+        if (lines() === n0) gw = fit; else el.think.style.width = gw * gp + 'px';
+      }
+    }
+    // The tail stays where it is; the cloud slides so the tail leaves its middle half, inside the gutter.
+    let left = Math.min(Math.round(clamp(a.left, a.tail - gw * 0.75, a.tail - gw * 0.25)), Math.floor(W - THINK_GUTTER / gp) - gw - 1);
+    if (a.pin) left = Math.max(a.left, left);
     const gh = Math.max(12, Math.ceil(el.think.getBoundingClientRect().height / gp - 0.01));
     el.think.style.height = gh * gp + 'px';
     el.think.style.left = left * gp + 'px';
@@ -5172,22 +5640,31 @@ function makeUI() {
     let fs = parseFloat(getComputedStyle(n).fontSize) || 16;
     while (fs > 12 && n.scrollWidth > room) { fs -= 1; n.style.fontSize = fs + 'px'; }
   };
-  // The caption's slab hugs its words: its box is set to the widest line as laid out (balanced), plus padding.
+  // The caption's slab hugs its words: its box is set to the widest line as laid out (balanced), plus padding,
+  // in whole game pixels.
   const hugCaption = () => {
     const n = el.caption;
     n.style.width = '';
     if (!n.textContent) return;
-    const r = document.createRange(), rows = new Map();
-    if (!r.getClientRects) return; // jsdom has no layout
-    r.selectNodeContents(n);
-    for (const q of r.getClientRects()) {
-      const k = Math.round(q.top), o = rows.get(k);
-      rows.set(k, o ? [Math.min(o[0], q.left), Math.max(o[1], q.right)] : [q.left, q.right]);
-    }
-    let w = 0;
-    rows.forEach(([a, b]) => { w = Math.max(w, b - a); });
+    const w = lineWidth(n), gp = gpx();
+    if (!w || !gp) return; // jsdom has no layout
     const cs = getComputedStyle(n);
-    n.style.width = Math.ceil(w + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2) + 'px';
+    n.style.width = Math.ceil((w + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2) / gp / 2) * 2 * gp + 'px';
+    snapH(n);
+  };
+  // The HUD's fish count: its slab in whole game pixels.
+  const countFit = () => { if (el.count.textContent) snapW(el.count); };
+  // The ending's slab, its height in whole game pixels and its top on a whole game pixel, centred.
+  const placeEnding = () => {
+    el.endBox.style.marginTop = '';
+    el.ending.style.justifyContent = '';
+    if (!el.ending.classList.contains('on')) return;
+    snapW(el.again, true);
+    snapH(el.endBox);
+    const gp = gpx(), h = el.endBox.getBoundingClientRect().height, sh = el.stage.clientHeight;
+    if (!h || !gp || h >= sh) return;
+    el.ending.style.justifyContent = 'flex-start';
+    el.endBox.style.marginTop = Math.round((sh - h) / 2 / gp) * gp + 'px';
   };
   let slabKey = '';
   const ui = {
@@ -5204,22 +5681,35 @@ function makeUI() {
     thinkMore(on) { el.thinkMore.classList.toggle('on', !!on); },
     cardReady() { el.card.classList.add('ready'); },
     dlgBusy(on) { if (on) el.dlg.setAttribute('aria-busy', 'true'); else el.dlg.removeAttribute('aria-busy'); },
-    fitChoices, fitTitles, hugCaption,
-    // The dialogue panel never reaches the waterline (HY), so the boat, the man and the golden fish stay in view
-    // on the shortest stage, nor the companion (at his seat, or floating once the boat has sunk): its cap is the
-    // stage below whichever of the two sits lower, less its bottom margin. Set on resize and with every menu.
+    fitChoices, fitTitles, hugCaption, placeEnding,
+    countFit,
+    // The dialogue panel never reaches above the waterline (WL), so the boat, the man (or the swimmer) and the
+    // kept fish stay in view at every stage size, nor the companion (at his seat, or floating once the boat
+    // has sunk), nor the golden fish while it is in the water (it swims below the waterline): its cap is the
+    // stage below whichever sits lowest, less its bottom margin, in whole game pixels (at most 46% of the
+    // stage). Set on resize and with every line and menu; fitChoices then tightens the panel or sets four or
+    // more answers as a grid.
     dlgCap() {
-      const top = Math.max(HY, compY(boatSinkPx()) - 4);
-      el.stage.style.setProperty('--dlg-max', 'min(46%, calc(' + ((H - top) / H * 100).toFixed(2) + '% - var(--gp) * 6))');
+      const g = WS.goldFish;
+      let top = Math.max(WL, compY(boatSinkPx()) - 4);
+      if (g && g.a > 0.01 && g.y >= HY - 2) top = Math.max(top, Math.round(g.y + 1.5) + GOLD.h + 1);
+      const sh = el.stage.clientHeight, gp = gpx();
+      if (!sh || !gp) { el.stage.style.setProperty('--dlg-max', 'min(46%, calc(' + ((H - top) / H * 100).toFixed(2) + '% - var(--gp) * 6))'); return; }
+      const px = Math.min(0.46 * sh, (H - top) / H * sh - 6 * gp);
+      el.stage.style.setProperty('--dlg-max', Math.floor(px / gp) * gp + 'px');
     },
     inDialog(t) { return !!(t && t.closest && t.closest('#dialog.on')); },
     // The thought bubble (bible, 4b): opts.side 'fisherman' (default) or 'companion', opts.mark the wrong
     // question mark, opts.choices the answers on a slab above it (the companion's question), opts.more the ▾
     // marker in the lower right for a bubble that waits for a tap (every bubble does). No bubble has a label.
+    // opts.timed: a bubble that goes by itself (the Stay word), with no marker.
     think(text, opts) {
       opts = opts || {};
       const side = opts.side || 'fisherman';
-      setText(el.thinkText, text, opts.mark);
+      setSent(el.thinkText, text, opts.mark);
+      const waits = !opts.choices && !opts.timed;
+      el.thinkMore.hidden = !waits;
+      if (waits) glueTail(el.thinkText, el.thinkMore); else el.think.appendChild(el.thinkMore);
       el.thinkMore.classList.toggle('on', !!opts.more);
       buttons(el.thinkChoices, opts.choices || null);
       if (opts.choices) { this.choices = opts.choices; this.thinkOwns = true; }
@@ -5236,14 +5726,14 @@ function makeUI() {
       if (this.thinkOwns) { this.choices = null; this.thinkOwns = false; }
     },
     thinkRelayout() { if (this.thinkSide) thinkLayout(this.thinkSide); },
-    prompt(t) { el.prompt.textContent = t || ''; el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === tr('Tap now')); },
+    prompt(t) { setSent(el.prompt, t || ''); el.prompt.classList.toggle('on', !!t); el.prompt.classList.toggle('urgent', t === tr('Tap now')); },
     caption(t, dur, style) {
-      el.caption.textContent = nbsp(t); el.caption.className = 'slab on' + (style ? ' ' + style : '');
+      setSent(el.caption, t); el.caption.className = 'slab on' + (style ? ' ' + style : '');
       hugCaption();
       clearTimeout(capTimer);
       capTimer = setTimeout(() => el.caption.classList.remove('on'), (dur || 2.5) * 1000);
     },
-    count(n) { el.count.textContent = countText(n); },
+    count(n) { el.count.textContent = countText(n); countFit(); },
     card(f) {
       const s = f.spr, cv = el.cardFish;
       el.card.classList.remove('ready');
@@ -5251,27 +5741,42 @@ function makeUI() {
       const cx = cv.getContext('2d');
       const im = cx.createImageData(cv.width, cv.height);
       const o = new Uint32Array(im.data.buffer);
+      const opaque = (x, y) => x >= 0 && y >= 0 && x < s.w && y < s.h && s.data[y * s.w + x] !== 255;
       for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) { const v = s.data[y * s.w + x]; if (v !== 255) o[(y + 1) * cv.width + x + 1] = PAL[v]; }
+      // Act 2's grey fish would sink into the dark slab: a one-pixel rim round them, as the walkers have.
+      if (STORY.act >= 2) {
+        for (let y = -1; y <= s.h; y++) for (let x = -1; x <= s.w; x++) {
+          if (!opaque(x, y) && (opaque(x - 1, y) || opaque(x + 1, y) || opaque(x, y - 1) || opaque(x, y + 1))) o[(y + 1) * cv.width + x + 1] = PAL[CARD_RIM];
+        }
+      }
       cx.putImageData(im, 0, 0);
       cardSize = { w: cv.width, h: cv.height };
-      cardScale();
       el.cardName.textContent = f.name;
-      el.cardMeta.textContent = f.meta || kgText(f.weight);
-      el.cardDesc.textContent = nbsp(f.desc);
-      el.cardVoice.textContent = nbsp(f.voice || '');
+      el.cardMeta.textContent = nbsp(f.meta || kgText(f.weight));
+      setSent(el.cardDesc, f.desc);
+      setSent(el.cardVoice, f.voice || '');
       el.cardVoice.hidden = !f.voice;
+      cardScale();
       el.card.classList.add('on');
     },
     cardHide() { el.card.classList.remove('on', 'ready'); },
     // After a resize or rotation, the open card's fish is rescaled to the new card.
     cardRelayout() { if (el.card.classList.contains('on')) cardScale(); },
-    dlgShow(who, style) { el.dlg.className = 'slab on ' + (style || ''); el.who.textContent = who || ''; el.who.hidden = !who; el.more.classList.remove('on'); this.dlgBusy(true); },
-    dlgText(t, mark) { setText(el.text, t, mark); },
+    dlgShow(who, style) {
+      el.dlg.className = 'slab on ' + (style || '') + (who ? '' : ' nolabel');
+      el.who.textContent = who || ''; el.who.hidden = !who; el.more.classList.remove('on'); this.dlgBusy(true);
+      this.dlgCap();
+    },
+    // full: the whole line while it types out (t is the part shown), so it is laid out whole from the start.
+    dlgText(t, mark, full) {
+      if (full !== undefined) richText(el.text, nbsp(full), t.length, mark); else setText(el.text, t, mark);
+      if (!t || t === full) snapH(el.dlg);
+    },
     dlgChoices(list) {
       buttons(el.choices, list);
       this.choices = list; this.thinkOwns = false;
       el.dlg.classList.toggle('choosing', !!list);
-      if (list) el.choices.classList.toggle('many', list.length > 3);
+      if (list) { el.choices.classList.toggle('many', list.length > 3); el.choices.classList.toggle('odd', list.length % 2 === 1); }
       this.dlgCap();
       fitChoices();
     },
@@ -5284,21 +5789,24 @@ function makeUI() {
       el.stage.classList.toggle('titling', !!on); // a caption on the title sits low, clear of the name
       el.lang.hidden = !on; // the language link only on the title
       const n = found ? found.length : 0;
-      el.found.textContent = n ? foundLine(n) : '';
+      richText(el.found, nbsp(n ? foundLine(n) : ''));
+      el.found.style.width = ''; el.found.style.paddingBottom = ''; el.found.style.minHeight = '';
+      if (n && on) { snapW(el.found, true); snapH(el.found); }
     },
     // The ending card. The asked-for list's first line is its header (dim); the labels follow in the pale ink.
     ending(e, found) {
-      el.endTitle.textContent = e.title; el.endText.textContent = nbsp(e.text);
-      const asked = nbsp(e.asked || '').split(ASKED_SEP);
+      el.endTitle.textContent = e.title; richText(el.endText, nbsp(e.text));
+      const asked = (e.asked || '').split(ASKED_SEP).map(nbsp);
       el.endAsked.textContent = '';
       if (asked.length > 1) {
         const h = document.createElement('span');
-        h.className = 'head'; h.textContent = asked[0];
-        el.endAsked.append(h, ASKED_SEP + asked.slice(1).join(ASKED_SEP));
-      } else el.endAsked.textContent = asked[0];
+        h.className = 'head'; richText(h, asked[0]);
+        el.endAsked.append(h, asked.slice(1).join(ASKED_SEP));
+      } else richText(el.endAsked, asked[0]);
       pips(el.endPips, found);
       el.ending.classList.add('on');
       fitTitles();
+      placeEnding();
       // Cast again wakes only once the card has faded in (AGAIN_DELAY), so a stray tap from the finale cannot
       // restart before the ending is read; until then it is disabled and out of the tab order.
       this.againOff();
@@ -5318,34 +5826,46 @@ function makeUI() {
       el.mute.setAttribute('aria-label', w); el.mute.title = w;
       el.mute.dataset.muted = on ? '1' : '';
     },
+    // The UI's colours come from the live mood without the Dark ending's dimming (WS.dim), so the last card
+    // reads as well as any other: each text colour is lifted toward white until it holds UI_TEXT_CR against the
+    // slab, the rings that must read (Cast again, the hollow pips, the divider) take the first ramp step that
+    // holds UI_LINE_CR, and the grid's plates the first that holds UI_PLATE_CR, so they show in the red too.
     colors() {
       const s = document.documentElement.style;
-      const ink = mixWhite(11, WS.mood > 1 ? 0.25 : 0.4);
-      s.setProperty('--ui-solid', rgb(0));
-      s.setProperty('--ui-edge', rgb(6));
-      s.setProperty('--ui-ink', ink);
-      s.setProperty('--ui-pale', mixWhite(11, 0.7)); // the ending's words: the ink's own hue, paler, to read on black
-      s.setProperty('--ui-row', mixWhite(10, 0.3)); // a choice at rest, one ramp step above the dim line colour
-      s.setProperty('--ui-dim', mixWhite(9, 0.2));
+      buildPalette(WS.mood, 0); UIRGB.set(PALRGB); buildPalette(WS.mood, WS.dim);
+      const ink = lift(mixWhite(11, WS.mood > 1 ? 0.25 : 0.4), UI_TEXT_CR), dim = lift(mixWhite(9, 0.2), UI_TEXT_CR);
+      const line = step(UI_LINE_CR), plate = step(UI_PLATE_CR);
+      s.setProperty('--ui-solid', css(U(0)));
+      s.setProperty('--ui-edge', css(U(6)));
+      s.setProperty('--ui-ink', css(ink));
+      s.setProperty('--ui-pale', css(lift(mixWhite(11, 0.7), UI_TEXT_CR))); // the ending's words: the ink's own hue, paler
+      s.setProperty('--ui-row', css(lift(mixWhite(10, 0.3), UI_TEXT_CR))); // a choice at rest, a step above the dim line colour
+      s.setProperty('--ui-dim', css(dim));
+      s.setProperty('--ui-line', css(line));
       // The speaker labels, the ▾ and the choice markers: the gold, or in the red the blood palette's bright
       // accent (16) lifted toward white, so they read clearly on the near-black panel.
-      s.setProperty('--ui-accent', WS.mood > 1 ? mixWhite(16, RED_LABEL_LIFT) : rgb(15));
-      document.body.style.background = rgb(0);
-      // The slabs: the box (index 0 ringed by 1), the raised button (1 ringed by 2), its focus (1 ringed by the
-      // ink) and a focused row (1, no ring). Rebuilt only when one of their colours changes.
-      const key = rgb(0) + rgb(1) + rgb(2) + ink;
+      s.setProperty('--ui-accent', css(lift(WS.mood > 1 ? mixWhite(16, RED_LABEL_LIFT) : U(15), UI_TEXT_CR)));
+      document.body.style.background = 'rgb(' + (PALRGB[0] | 0) + ',' + (PALRGB[1] | 0) + ',' + (PALRGB[2] | 0) + ')';
+      // The slabs: the box (index 0 ringed by 1), the raised button (1 ringed by the line colour), its focus (1
+      // ringed by the dim ink), a focused row (1, no ring), a grid plate (1 ringed by the plate colour) and the
+      // companion's answers (0 ringed by the ink, like the cloud under them). Rebuilt only when one of their
+      // colours changes.
+      const key = [U(0), U(1), line, plate, dim, ink].map(css).join();
       if (key === slabKey) return;
       slabKey = key;
       s.setProperty('--k', String(SLAB_K));
-      s.setProperty('--slab', slabURI(rgb(0), rgb(1)));
-      s.setProperty('--raise', slabURI(rgb(1), rgb(2)));
-      s.setProperty('--hi', slabURI(rgb(1), ink));
-      s.setProperty('--row', slabURI(rgb(1), null));
+      s.setProperty('--slab', slabURI(css(U(0)), css(U(1))));
+      s.setProperty('--raise', slabURI(css(U(1)), css(line)));
+      s.setProperty('--hi', slabURI(css(U(1)), css(dim)));
+      s.setProperty('--row', slabURI(css(U(1)), null));
+      s.setProperty('--plate', slabURI(css(U(1)), css(plate)));
+      s.setProperty('--ask', slabURI(css(U(0)), css(ink)));
     },
   };
   return ui;
 }
 const CHOICE_GRACE = 0.4, AGAIN_DELAY = 1600, RED_LABEL_LIFT = 0.15;
+const UI_TEXT_CR = 4.5, UI_LINE_CR = 3, UI_PLATE_CR = 1.6; // contrast against the slab: text, a ring that must read, a plate's ring
 // The template's own text, in the page's language: the tab title, the description, the labels and the title.
 const STATIC_TEXT = [
   ['#stage', 'aria-label', 'Still Water, a short fishing tale'], ['meta[name="description"]', 'content', 'A short fishing tale'],
@@ -5401,12 +5921,27 @@ function boot() {
       OUT32 = new Uint32Array(IMG.data.buffer);
       ASH.length = 0;
     }
+    // The stage keeps the aspect, except that a remainder under 2 px is filled (no dark hairline at an edge)
+    // and an odd one shrinks by a pixel, so the centred stage sits on whole pixels.
     const sc = Math.min(aw / W, ah / H);
-    const sw = Math.floor(W * sc), sh = Math.floor(H * sc);
+    let sw = Math.floor(W * sc), sh = Math.floor(H * sc);
+    if (aw - sw < 2) sw = aw; else if ((aw - sw) % 2) sw--;
+    if (ah - sh < 2) sh = ah; else if ((ah - sh) % 2) sh--;
     stage.style.width = sw + 'px'; stage.style.height = sh + 'px';
-    document.documentElement.style.setProperty('--u', sw / 100 + 'px');
-    document.documentElement.style.setProperty('--gp', sw / W + 'px');
+    const gp = sw / W, root = document.documentElement.style;
+    root.setProperty('--u', sw / 100 + 'px');
+    root.setProperty('--gp', gp + 'px');
     document.getElementById('prompt').style.bottom = ((34 / H) * 100).toFixed(2) + '%';
+    // The HUD's slabs sit the same whole number of game pixels (m) from the top and the sides, each button
+    // keeping its 44 px target inside the stage (the count's slab is the span itself; a button's is 15 by 11
+    // game pixels, centred in its 44 px).
+    const m = Math.max(4, Math.ceil((22 - 5.5 * gp) / gp - 1e-6), Math.ceil((22 - 7.5 * gp) / gp - 1e-6));
+    const hud = document.getElementById('hud');
+    hud.style.top = m * gp - (22 - 5.5 * gp) + 'px'; hud.style.left = m * gp + 'px'; hud.style.right = m * gp - (22 - 7.5 * gp) + 'px';
+    root.setProperty('--cap-top', Math.round(0.11 * sh / gp) * gp + 'px');
+    root.setProperty('--found-bottom', Math.round(0.095 * sh / gp) * gp + 'px');
+    UI.countFit();
+    UI.placeEnding();
     UI.fitTitles();
     UI.hugCaption();
     UI.dlgCap();
@@ -5420,6 +5955,9 @@ function boot() {
   // first used: the bubble, the caption's slab, the two columns and the ending's title are measured again with
   // the real metrics each time a load finishes.
   if (document.fonts) {
+    // The italic (the card's voice line) loads only once used, so the first one would show in a fallback face
+    // for a moment: warm it, Latin and Cyrillic, at boot.
+    if (document.fonts.load) document.fonts.load('italic 400 1em Literata', 'Aя').then(resize, () => {});
     if (document.fonts.ready) document.fonts.ready.then(resize, () => {});
     if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', resize);
   }

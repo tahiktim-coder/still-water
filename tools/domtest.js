@@ -50,12 +50,12 @@ async function run(plan, label, useKeys, P, latin, fresh) {
   while (frame < 10 * 600) {
     pump(1); frame++;
     if (latin) latinOnScreen(latin);
-    prompts.add($('prompt').textContent);
+    prompts.add($('prompt').textContent.replace(/\u00a0/g, ' '));
     if ($('ending').classList.contains('on')) break;
     if (holdUntil > 0) { if (frame >= holdUntil) { up(); holdUntil = -1; restUntil = frame + 3; } continue; }
     if (frame % 3) continue;
     const choices = [...$('choices').querySelectorAll('button'), ...$('thinkChoices').querySelectorAll('button')]; // the companion's question sits under his bubble
-    const prompt = $('prompt').textContent, phase = $('stage').dataset.phase;
+    const prompt = $('prompt').textContent.replace(/\u00a0/g, ' '), phase = $('stage').dataset.phase;
     const cold = $('choices').classList.contains('cold') || $('thinkChoices').classList.contains('cold'); // fresh buttons ignore taps briefly
     if (choices.length && cold) continue;
     if (choices.length) {

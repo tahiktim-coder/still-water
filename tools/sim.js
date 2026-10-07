@@ -157,10 +157,10 @@ const BASES = {
 };
 // Phase 30, Inside: the Russian card text too, asserted in the Russian pass ({ ruCard: { base, extra } }).
 const RU_INSIDE = {
-  21: 'Ты открываешь дверь. Там кто-то ждал, чтобы выйти. Он берёт твою лодку. Иногда ночью ты слышишь, как он забрасывает леску. Иногда ночью стучишь ты.',
-  22: 'Ты доплываешь до берега и открываешь дверь. Там кто-то ждал, чтобы выйти. Он уходит в воду, к золоту. Иногда ночью стучишь ты.',
+  21: 'Ты открываешь дверь. Там кто-то ждал, когда можно будет выйти. Он берёт твою лодку. Иногда ночью ты слышишь, как он забрасывает леску. Иногда ночью стучишь ты.',
+  22: 'Ты доплываешь до берега и открываешь дверь. Там кто-то ждал, когда можно будет выйти. Он уходит в воду, к золоту. Иногда ночью стучишь ты.',
   kept: 'Золотая рыбка уходит с ним. Ты остаёшься за дверью.',
-  forever: 'День за окном не кончается. Ты смотришь на него в окно.',
+  forever: 'День за окном не кончается. Ты смотришь на него изнутри.',
 };
 function baitOk(r, opts) {
   if (!r.id.startsWith('cut')) return r.text.indexOf(BAIT_END) < 0;
@@ -210,7 +210,7 @@ const plans = [
   [[1, 3, 2, 2], 'keep, nothing, gold -> cut (lake, sunk, kept let go)', 'You let it go. It let you.', { base: 10, noPocket: true, says: ['You let the golden fish go.'] }],
   [[0, 0, 0, 2, 0, 2], 'let go, company (someone), gold, yes -> cut (lake, sunk, company)', 'Someone swims behind you. You do not ask.', { base: 10, noPocket: true }],
   [[0, 0, 0, 2, 0, 0], 'let go, company (someone), gold, yes -> home (lake, sunk, company)', 'The water behind you is empty now. It was your turn.', { base: 2 }],
-  // Phase 30, Inside: 'Let me in.' sits after Cut the line on the house path.
+  // Phase 30, Inside: 'Let me in' sits after Cut the line on the house path.
   [[0, 2, 0, 3], 'let go, home, forever -> inside', 'The day outside does not end. You watch it through the window.', { base: 21, ruCard: { base: 21, extra: 'forever' }, says: ['Of course. They’ve been waiting to get out.'].concat(KNOCKS) }],
   [[1, 2, 2, 3], 'keep, home, gold -> inside (sunk)', 'The golden fish goes with them. You stay behind the door.', { base: 22, ruCard: { base: 22, extra: 'kept' } }],
 ];
