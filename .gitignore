@@ -1,3 +1,4 @@
 node_modules/
 tools/out/
 site/
+itch/*.zip

@@ -3,6 +3,8 @@
 //   node build.js --test                tools/out/test.html, the English test build
 //   node build.js --lang=ru             tools/out/ru/index.html, the Russian release build
 //   node build.js --lang=ru --test      tools/out/ru/test.html, the Russian test build
+//   node build.js --itch                tools/out/itch/index.html, the English release build with no language link
+//                                       on the title (the itch.io zip has no Russian page; npm run itch zips it)
 //   --out=<path>                        writes there instead (the Pages workflow builds site/ this way)
 const fs = require('fs');
 const path = require('path');
@@ -17,6 +19,8 @@ const isTest = process.argv.includes('--test');
 const lang = arg('lang') || 'en';
 if (lang !== 'en' && lang !== 'ru') throw new Error('--lang must be en or ru, not ' + lang);
 const outArg = arg('out');
+const isItch = process.argv.includes('--itch');
+if (isItch && (isTest || lang !== 'en')) throw new Error('--itch is the English release build only');
 
 const TEST_FLAG = "if (new URLSearchParams(window.location.search).has('test') || window.location.hash === '#test') setTestMode(true);";
 if (isTest && !js.includes(TEST_FLAG)) throw new Error('src/game.js is missing the test-mode flag line');
@@ -41,12 +45,17 @@ const DESC = '<meta name="description" content="A short fishing tale">';
 if (!tpl.includes(DESC)) throw new Error('src/template.html is missing the description meta');
 const page = tpl.replace('<title>Still Water</title>', '<title>' + title + '</title>').replace('<html lang="en">', '<html lang="' + lang + '">')
   .replace(DESC, '<meta name="description" content="' + TITLES[lang][2] + '">');
-const out = page.replace('/*GAME*/', () => src); // function form: no $-pattern substitution
+// The itch.io page has no Russian page beside it, so its title shows no language link.
+const LANG_HIDDEN = '#skip[hidden], #lang[hidden] { display: none; }';
+if (isItch && !page.includes(LANG_HIDDEN)) throw new Error('src/template.html is missing the hidden link rule');
+const shell = isItch ? page.replace(LANG_HIDDEN, () => LANG_HIDDEN + '\n#lang { display: none !important; }') : page;
+const out = shell.replace('/*GAME*/', () => src); // function form: no $-pattern substitution
 
 const defaultDest = lang === 'ru'
   ? path.join(root, 'tools', 'out', 'ru', isTest ? 'test.html' : 'index.html')
+  : isItch ? path.join(root, 'tools', 'out', 'itch', 'index.html')
   : isTest ? path.join(root, 'tools', 'out', 'test.html') : path.join(root, 'dist', 'index.html');
 const dest = outArg ? path.resolve(root, outArg) : defaultDest;
 fs.mkdirSync(path.dirname(dest), { recursive: true });
 fs.writeFileSync(dest, out);
-console.log('built ' + path.relative(root, dest) + ' (' + lang + (isTest ? ', test' : '') + ', ' + (out.length / 1024).toFixed(1) + ' KB)');
+console.log('built ' + path.relative(root, dest) + ' (' + lang + (isTest ? ', test' : '') + (isItch ? ', itch' : '') + ', ' + (out.length / 1024).toFixed(1) + ' KB)');

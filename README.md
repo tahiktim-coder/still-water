@@ -24,7 +24,8 @@ Checks: `npm run sim` (a bot reaches every ending in both languages), `npm run s
 While developing, run `npm run build:test` and open `tools/out/test.html?test`, or press T in that build, to turn on test mode (the shipping `dist/index.html` has none). A "Skip fish" button then lands each fish with one click so you can reach any part of the story quickly.
 
 ## Publish on itch.io
-1. Run `npm run build`.
-2. Zip `dist/index.html`. The zip must have `index.html` at its root.
-3. Create a new project, set Kind to HTML, upload the zip and tick "This file will be played in the browser".
-4. Under embed options, set the viewport to 405 × 720 and tick "Mobile friendly" (portrait) and "Fullscreen button".
+The itch.io page is English only: the same game as `dist/index.html`, without the RU link on the title.
+1. Run `npm run itch`. It writes `itch/still-water.zip` (one `index.html` at its root, about 95 KB).
+2. Create a new project: Kind of project HTML, pricing No payments (free).
+3. Upload the zip and tick "This file will be played in the browser".
+4. Under Embed options, set the viewport to 405 × 720, tick "Mobile friendly" with Orientation Portrait, and tick "Fullscreen button".
