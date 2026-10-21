@@ -2845,7 +2845,7 @@ function render(t) {
 const SFX_TRIM = 1.28;                 // the level into the dynamics; raise it here, never after the limiter
 const LIM_TH = -8.5;                   // the limiter's threshold (dB); with its makeup gain, a ceiling near -3.7 dBFS
 const FOLEY_VOL = 0.9;                 // the play foley (cast, float, bite, reel, catch, laps), a little under the story
-const AMB_VOL = 0.035, AMB_LFO = 0.17, AMB_FROZEN = 0.022, AMB_EYES = 0.25; // the bed, its breathing depth (a share of it), the frozen day (-4 dB), under the eyes
+const AMB_VOL = 0.025, AMB_LFO = 0.05, AMB_FROZEN = 0.022, AMB_EYES = 0.25; // the bed, its breathing depth (a share of it), the frozen day (-4 dB), under the eyes
 const DRONE_VOL = 0.0135, DRONE_LP = 520, DRONE_DUCK = 0.005; // ducked for a climax
 const INSIDE_HUSH = 0.35;              // the drone, the heart and the bed under the Inside knocking (-9 dB)
 const INSIDE_CAST = 0.1;               // his far, small row and cast at the close of Inside (-20 dB), under the knocks from inside
@@ -2962,11 +2962,11 @@ const SFX = {
   },
   lap(hull) {
     if (!this.ctx) return;
-    this.noise(0.4, vr(0.12, 0.2), 'bandpass', vr(520, 0.15), 320, 1.1, 0, { atk: 0.08 });
-    if (hull && Math.random() < 0.3) this.tone(130, 0.14, 'sine', 0.1, 105, 0, { lp: 400 });
+    this.tone(vr(720, 0.12), 0.07, 'sine', vr(0.035, 0.2), 430);
+    if (hull && Math.random() < 0.25) this.tone(130, 0.12, 'sine', 0.06, 105, 0, { lp: 400 });
   },
   under(k, tau) { if (this.ctx) this.uw.frequency.setTargetAtTime(20000 * Math.pow(500 / 20000, k), this.ctx.currentTime, tau || 0.05); },
-  whoosh(k = 1) { this.noise(0.35, 0.28 * k, 'bandpass', 500, null, 0.9, 0, { path: [[0.4, 2000], [1, 900]] }); },
+  whoosh(k = 1) { this.noise(0.2, 0.1 * k, 'bandpass', 2400, null, 2.2, 0, { path: [[0.5, 1800], [1, 1300]] }); },
   plop(k = 1) {
     if (!this.ctx) return;
     this.tone(vr(560, 0.06), 0.16, 'sine', vr(0.14, 0.16) * k, 170);
@@ -4864,7 +4864,7 @@ function ambientUpdate(dt) {
   if (!was || sc.some((v, i) => Math.abs(v - was[i]) > 0.02)) { G.ambSent = sc; SFX.scene(sc[0], sc[1], sc[2], sc[3]); }
   if (G.phase !== 'title' && WS.mood < 1.5 && !WS.frozen && WS.dive < 0.5 && WS.dim < 5) {
     G.lap -= dt;
-    if (G.lap <= 0) { G.lap = WS.mood > 0.5 ? 3 + arnd() * 4 : 1.8 + arnd() * 2.7; SFX.lap(!swimming()); }
+    if (G.lap <= 0) { G.lap = WS.mood > 0.5 ? 8 + arnd() * 6 : 5 + arnd() * 5; SFX.lap(!swimming()); }
   }
   if (WS.mood > 1.6 && G.phase !== 'end' && WS.dim < 5) {
     G.hb -= dt;
