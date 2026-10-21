@@ -28,4 +28,4 @@ The itch.io page is English only: the same game as `dist/index.html`, without th
 1. Run `npm run itch`. It writes `itch/still-water.zip` (one `index.html` at its root, about 95 KB).
 2. Create a new project: Kind of project HTML, pricing No payments (free).
 3. Upload the zip and tick "This file will be played in the browser".
-4. Under Embed options, set the viewport to 405 × 720, tick "Mobile friendly" with Orientation Portrait, and tick "Fullscreen button".
+4. Under Embed options, set the viewport to 432 × 768 (twice the game's pixels), tick "Mobile friendly" with Orientation Portrait, and tick "Fullscreen button".
