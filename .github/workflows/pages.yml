@@ -3,6 +3,7 @@
 #   /test.html       the English test build, with the Skip fish button on, for friends testing the story
 #   /ru/             the Russian release build (node build.js --lang=ru)
 #   /ru/test.html    the Russian test build (node build.js --lang=ru --test)
+#   /itch/           the exact itch.io upload (node build.js --itch: English, no language link), to try before uploading
 # The title of each page links to the other language's (ru/ from the root, ../ back).
 name: Deploy to GitHub Pages
 
@@ -37,6 +38,7 @@ jobs:
           node build.js --test --out=site/test.html
           node build.js --lang=ru --out=site/ru/index.html
           node build.js --lang=ru --test --out=site/ru/test.html
+          node build.js --itch --out=site/itch/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
