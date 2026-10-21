@@ -2,7 +2,39 @@
 
 English only. Copy each part into the matching field on the itch.io page editor.
 
-## Title
+## Cozy version (the disguise, use this one)
+
+The page sells a calm fishing game and lets the game do the rest. Keep the game's own title, since it is on the title screen.
+
+Title: Still Water: a relaxing fishing game
+
+Tagline: Row out, cast a line, watch the sun. A tiny, peaceful fishing game.
+
+Description:
+
+Take a little boat out onto a still mountain lake. Cast your line, wait for the float to dip, and reel in whatever is biting today. The water is a mirror, the clouds drift by, and nobody needs anything from you.
+
+Catch a few fish. Maybe something golden. Stay as long as you like.
+
+A short, quiet game, a few minutes a run, with more than one way it can end. Plays in a desktop browser or on a phone held upright. Sound on, headphones recommended.
+
+Controls: tap or click to cast and to strike, hold to reel, let go when it pulls.
+
+At the very bottom, small (fair to players, the way Doki Doki Literature Club does it):
+
+Not suitable for children or those who are easily disturbed.
+
+Credits: as below.
+
+Cover: cover_a.png (the calm day). Screenshots: shot_1, shot_2, shot_3 only (the red sun and the big one give it away).
+
+Tags (10): fishing, relaxing, cozy, pixel-art, short, atmospheric, cute, multiple-endings, singleplayer, psychological-horror (the one honest tag; drop it if you want the surprise whole).
+
+Genre: Simulation
+
+---
+
+## Title (the honest version)
 
 Still Water
 
