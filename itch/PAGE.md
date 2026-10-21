@@ -8,17 +8,17 @@ The page sells a calm fishing game and lets the game do the rest. Keep the game'
 
 Title: Still Water: a relaxing fishing game
 
-Tagline: Row out, cast a line, watch the sun. A tiny, peaceful fishing game.
+Tagline: A small, calm fishing game on a quiet lake.
 
 Description:
 
-Take a little boat out onto a still mountain lake. Cast your line, wait for the float to dip, and reel in whatever is biting today. The water is a mirror, the clouds drift by, and nobody needs anything from you.
+Sit in a little boat on a quiet lake. Throw your line, wait for a fish, and pull it in. The water is still, the clouds move slowly, and there is nowhere you need to be.
 
-Catch a few fish. Maybe something golden. Stay as long as you like.
+Catch some fish. Maybe a golden one. Stay as long as you want.
 
-A short, quiet game, a few minutes a run, with more than one way it can end. Plays in a desktop browser or on a phone held upright. Sound on, headphones recommended.
+A short game, a few minutes, with more than one ending. Play in your browser or on your phone. Turn the sound on.
 
-Controls: tap or click to cast and to strike, hold to reel, let go when it pulls.
+Controls: tap to throw the line and to hook a fish. Hold to pull it in. Let go when the fish pulls hard.
 
 At the very bottom, small (fair to players, the way Doki Doki Literature Club does it):
 
